@@ -1,12 +1,12 @@
 services:
-  # Main Blockchain Validator Node
+   # Main Blockchain Node (Validator)
   - type: web
-    name: sayman-validator
+    name: sayman-blockchain
     env: node
     region: oregon
     plan: free
     buildCommand: npm install
-    startCommand: node server.js --network public-testnet --mode validator
+    startCommand: node server.js --network testnet --mode fullnode
     envVars:
       - key: NODE_ENV
         value: production
@@ -14,7 +14,8 @@ services:
         value: 10000
       - key: P2P_PORT
         value: 6001
-    healthCheckPath: /api/stats
+    healthCheckPath: /health
+    autoDeploy: true
     
   # Full Node + Explorer UI
   - type: web

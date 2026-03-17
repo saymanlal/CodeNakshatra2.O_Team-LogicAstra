@@ -2,15 +2,15 @@ import crypto from 'crypto';
 import Transaction from './transaction.js';
 
 class Block {
-  constructor(index, transactions, previousHash, validator) {
+  constructor(index, timestamp, transactions, previousHash, validator, chainId) {
     this.index = index;
-    this.timestamp = Date.now();
-    this.transactions = transactions;
+    this.timestamp = timestamp;
+    this.transactions = transactions || [];
     this.previousHash = previousHash;
     this.validator = validator;
-    this.chainId = null;
-    this.gasUsed = 0;
+    this.chainId = chainId;
     this.hash = this.calculateHash();
+    this.gasUsed = 0;
   }
 
   calculateHash() {
@@ -19,11 +19,10 @@ class Block {
       .update(
         this.index +
         this.timestamp +
-        JSON.stringify(this.transactions) +
+        JSON.stringify(this.transactions.map(tx => tx.toJSON ? tx.toJSON() : tx)) +
         this.previousHash +
         this.validator +
-        (this.chainId || '') +
-        this.gasUsed
+        this.chainId
       )
       .digest('hex');
   }
@@ -32,28 +31,35 @@ class Block {
     return {
       index: this.index,
       timestamp: this.timestamp,
-      transactions: this.transactions.map(tx => tx.toJSON()),
+      transactions: Array.isArray(this.transactions) 
+        ? this.transactions.map(tx => tx.toJSON ? tx.toJSON() : tx)
+        : [],
       previousHash: this.previousHash,
       validator: this.validator,
       chainId: this.chainId,
-      gasUsed: this.gasUsed,
-      hash: this.hash
+      hash: this.hash,
+      gasUsed: this.gasUsed || 0
     };
   }
 
   static async fromJSON(data) {
-    const Transaction = (await import('./transaction.js')).default;
-    const transactions = data.transactions.map(tx => Transaction.fromJSON(tx));
+    const transactions = [];
+    for (const txData of data.transactions || []) {
+      transactions.push(new Transaction(txData));
+    }
+    
     const block = new Block(
       data.index,
+      data.timestamp,
       transactions,
       data.previousHash,
-      data.validator
+      data.validator,
+      data.chainId
     );
-    block.timestamp = data.timestamp;
-    block.chainId = data.chainId;
-    block.gasUsed = data.gasUsed || 0;
+    
     block.hash = data.hash;
+    block.gasUsed = data.gasUsed || 0;
+    
     return block;
   }
 }
