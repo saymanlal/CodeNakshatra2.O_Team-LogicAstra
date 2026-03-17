@@ -118,18 +118,26 @@ async function updateBlockFeed() {
     const feed = document.getElementById('block-feed');
     if (!feed) return;
     
+    // ✅ FIX: Get last 10 blocks (newest first)
+    const allBlocks = data.blocks;
+    const last10 = allBlocks.slice(-10).reverse();
+    
+    // Clear and rebuild
     feed.innerHTML = '';
     
-    // Show newest first
-    const blocks = data.blocks.reverse();
-    
-    blocks.slice(0, 10).forEach(block => {
+    last10.forEach(block => {
       const item = document.createElement('div');
       item.className = 'block-item';
       
-      // Proper date formatting
-      const date = new Date(block.timestamp);
-      const timeStr = isNaN(date.getTime()) ? 'Pending...' : date.toLocaleString();
+      // ✅ FIX: Proper date validation
+      const timestamp = block.timestamp;
+      let timeStr = 'Pending...';
+      if (timestamp && !isNaN(timestamp)) {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+          timeStr = date.toLocaleString();
+        }
+      }
       
       item.innerHTML = `
         <div class="block-index">#${block.index}</div>
@@ -145,9 +153,9 @@ async function updateBlockFeed() {
 }
 
 // Load explorer blocks with HOVER DETAILS
-async function loadExplorerBlocks() {
+async function loadExplorerBlocks(page = 1) {
   try {
-    const res = await fetch(`${apiBase}/blocks?limit=20`);
+    const res = await fetch(`${apiBase}/blocks?page=${page}&limit=20`);
     const data = await res.json();
     
     const tbody = document.getElementById('explorer-blocks');
@@ -155,15 +163,22 @@ async function loadExplorerBlocks() {
     
     tbody.innerHTML = '';
     
-    // Show newest first
-    const blocks = data.blocks.reverse();
+    // ✅ FIX: Get last 20 blocks (newest first)
+    const allBlocks = data.blocks;
+    const last20 = allBlocks.slice(-20).reverse();
     
-    blocks.forEach(block => {
+    last20.forEach(block => {
       const row = document.createElement('tr');
       
-      // Proper date formatting
-      const date = new Date(block.timestamp);
-      const timeStr = isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
+      // ✅ FIX: Proper date validation
+      const timestamp = block.timestamp;
+      let timeStr = 'Invalid Date';
+      if (timestamp && !isNaN(timestamp)) {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+          timeStr = date.toLocaleString();
+        }
+      }
       
       // Calculate total gas used
       let gasUsed = 0;
@@ -199,9 +214,40 @@ Chain ID: ${block.chainId || 'N/A'}`;
       
       tbody.appendChild(row);
     });
+    
+    // ✅ FIX: Add pagination controls
+    renderPagination(data.total, page);
+    
   } catch (error) {
     console.error('Error loading explorer blocks:', error);
   }
+}
+
+// ✅ NEW FUNCTION: Add pagination
+function renderPagination(totalBlocks, currentPage) {
+  const paginationDiv = document.getElementById('pagination-controls');
+  if (!paginationDiv) return;
+  
+  const totalPages = Math.ceil(totalBlocks / 20);
+  
+  if (totalPages <= 1) {
+    paginationDiv.innerHTML = '';
+    return;
+  }
+  
+  paginationDiv.innerHTML = `
+    <button 
+      onclick="loadExplorerBlocks(${currentPage - 1})" 
+      ${currentPage === 1 ? 'disabled' : ''}
+      style="padding: 8px 16px; border: var(--border); background: ${currentPage === 1 ? 'var(--mono-900)' : 'var(--mono-1000)'}; cursor: ${currentPage === 1 ? 'not-allowed' : 'pointer'};"
+    >← Previous</button>
+    <span style="padding: 8px 16px; color: var(--mono-400);">Page ${currentPage} of ${totalPages}</span>
+    <button 
+      onclick="loadExplorerBlocks(${currentPage + 1})" 
+      ${currentPage === totalPages ? 'disabled' : ''}
+      style="padding: 8px 16px; border: var(--border); background: ${currentPage === totalPages ? 'var(--mono-900)' : 'var(--mono-1000)'}; cursor: ${currentPage === totalPages ? 'not-allowed' : 'pointer'};"
+    >Next →</button>
+  `;
 }
 
 // View block details (modal/expanded view)
@@ -1038,3 +1084,8 @@ setInterval(() => {
     loadNetworkStats();
   }
 }, 3000);
+
+// ✅ Initialize explorer when page loads
+if (document.getElementById('explorer')) {
+  loadExplorerBlocks(1);
+}
