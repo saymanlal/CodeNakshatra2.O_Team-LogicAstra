@@ -173,3 +173,5 @@ function gracefulShutdown() {
 }
 
 startServer();
+
+/* ok now in sayman.onrender.com after deployement now no errors of p2p or others in console but still problems in the frontend ok now in dashboard it's reversed but it should update like the last block I can see there in top is 9 and now even the new blocks are getting created still in top it stuck 9 in the list and in explorer section at once it should only show last 20 block but should also have slider to go to next 20 and previous 20 and still the data and timing for blocks are showing invalid date and the styling have some problem because in navbar going from dashboard to explorer and so on the section changes but the black color show the current nav link isn't shifting and in validator section it is not showing any validator as we still have our first validator and in frontend at the bottom most footer write Copyright 2026 and all necessary stuff to be */
