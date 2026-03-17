@@ -213,6 +213,22 @@ export class P2PServer {
     };
   }
 
+  // ✅ ADD THIS MISSING METHOD
+  getNetworkStats() {
+    return {
+      nodeId: this.nodeId,
+      peers: this.peers.size,
+      enabled: !!this.wss,
+      peerList: Array.from(this.peers.values()).map(p => ({
+        id: p.id,
+        nodeId: p.nodeId,
+        chainHeight: p.chainHeight,
+        lastSeen: p.lastSeen
+      })),
+      mode: 'validator'
+    };
+  }
+
   close() {
     if (this.wss) {
       this.peers.forEach(peer => {

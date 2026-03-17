@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sayman Blockchain Network</title>
+  
+  <!-- Load elliptic.js from CDN FIRST -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js"></script>
+  
   <style>
     :root {
       --mono-000: #000000;
@@ -277,7 +281,7 @@
         </div>
         <div class="stat-card">
           <div class="stat-label">Total Stake</div>
-          <div class="stat-value" id="stat-stake">0<span class="stat-unit">SAYM</span></div>
+          <div class="stat-value"><span id="stat-stake">0</span><span class="stat-unit">SAYM</span></div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Mempool</div>
@@ -289,15 +293,15 @@
         </div>
         <div class="stat-card">
           <div class="stat-label">Block Reward</div>
-          <div class="stat-value" id="stat-reward">10<span class="stat-unit">SAYM</span></div>
+          <div class="stat-value"><span id="stat-reward">10</span><span class="stat-unit">SAYM</span></div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Block Time</div>
-          <div class="stat-value" id="stat-blocktime">5<span class="stat-unit">s</span></div>
+          <div class="stat-value"><span id="stat-blocktime">5</span><span class="stat-unit">s</span></div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Est. APR</div>
-          <div class="stat-value" id="stat-apr">0<span class="stat-unit">%</span></div>
+          <div class="stat-value"><span id="stat-apr">0</span><span class="stat-unit">%</span></div>
         </div>
       </div>
 
@@ -379,7 +383,7 @@
         </div>
         <div class="stat-card">
           <div class="stat-label">Avg Block Time</div>
-          <div class="stat-value" id="net-blocktime">0<span class="stat-unit">ms</span></div>
+          <div class="stat-value"><span id="net-blocktime">0</span><span class="stat-unit">ms</span></div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Mempool Size</div>
@@ -426,6 +430,8 @@
     </div>
   </div>
 
+  <!-- Load crypto-client.js AFTER elliptic -->
+  <script src="crypto-client.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

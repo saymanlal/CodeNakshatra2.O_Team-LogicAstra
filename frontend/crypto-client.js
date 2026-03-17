@@ -40,7 +40,8 @@ class SaymanWallet {
   }
 
   async signTransaction(txData) {
-    const txString = JSON.stringify({
+    // CRITICAL: Must match Transaction.calculateHash() exactly
+    const dataToHash = JSON.stringify({
       type: txData.type,
       timestamp: txData.timestamp,
       data: txData.data,
@@ -50,17 +51,15 @@ class SaymanWallet {
     });
 
     const encoder = new TextEncoder();
-    const data = encoder.encode(txString);
+    const data = encoder.encode(dataToHash);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-    const sig = this.keyPair.sign(hash);
-
-    return {
-      r: sig.r.toString('hex'),
-      s: sig.s.toString('hex')
-    };
+    const signature = this.keyPair.sign(hash);
+    
+    // Return DER format hex string
+    return signature.toDER('hex');
   }
 
   export() {
