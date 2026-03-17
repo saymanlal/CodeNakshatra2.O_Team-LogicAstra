@@ -7,10 +7,13 @@ let blocksPerPage = 20;
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await loadNetworkConfig();
+  await updateHeaderInfo(); // ✅ NEW
   loadWallet();
   updateStats();
-  setInterval(updateStats, 3000); // Update every 3 seconds
-  setInterval(updateLiveBlocks, 5000); // Update live blocks every 5 seconds
+  updateLiveBlocks(); // ✅ NEW - Call immediately
+  setInterval(updateStats, 3000);
+  setInterval(updateHeaderInfo, 5000); // ✅ NEW
+  setInterval(updateLiveBlocks, 5000);
 });
 
 // Load network configuration
@@ -43,6 +46,25 @@ async function loadNetworkConfig() {
     
   } catch (error) {
     console.error('Error loading network config:', error);
+  }
+}
+
+// ✅ NEW FUNCTION: Update header information
+async function updateHeaderInfo() {
+  try {
+    const res = await fetch(`${apiBase}/network/stats`);
+    const data = await res.json();
+    
+    document.getElementById('header-network').textContent = data.network || 'Unknown';
+    document.getElementById('header-chain').textContent = data.chainId || 'Unknown';
+    document.getElementById('header-node').textContent = data.nodeId ? data.nodeId.substring(0, 16) + '...' : 'Unknown';
+    document.getElementById('header-mode').textContent = data.mode ? data.mode.toUpperCase() : 'Unknown';
+  } catch (error) {
+    console.error('Error updating header:', error);
+    document.getElementById('header-network').textContent = 'Connection Error';
+    document.getElementById('header-chain').textContent = 'Check Console (F12)';
+    document.getElementById('header-node').textContent = 'Press F12';
+    document.getElementById('header-mode').textContent = 'Error';
   }
 }
 
@@ -109,31 +131,38 @@ function animateValue(id, value) {
 }
 
 // Update live blocks
+// ✅ FIXED: Update live blocks with proper date formatting
 async function updateLiveBlocks() {
   try {
-    const res = await fetch(`${apiBase}/blocks?limit=5`);
+    const res = await fetch(`${apiBase}/blocks?limit=10`);
     const data = await res.json();
     
-    const list = document.getElementById('live-blocks');
-    list.innerHTML = '';
+    const feed = document.getElementById('block-feed');
+    if (!feed) return; // Guard clause
     
-    const recentBlocks = data.blocks.slice(-5).reverse();
+    feed.innerHTML = '';
     
-    recentBlocks.forEach(block => {
-      const div = document.createElement('div');
-      div.className = 'block-item';
-      div.innerHTML = `
-        <h4>Block #${block.index}</h4>
-        <p>Hash: ${block.hash.substring(0, 32)}...</p>
-        <p>Validator: ${block.validator.substring(0, 16)}...</p>
-        <p>Transactions: ${block.transactions.length}</p>
-        <p>Time: ${new Date(block.timestamp).toLocaleString()}</p>
+    // ✅ FIX: Reverse to show newest first
+    const blocks = data.blocks.reverse();
+    
+    blocks.slice(0, 10).forEach(block => {
+      const item = document.createElement('div');
+      item.className = 'block-item';
+      
+      // ✅ FIX: Format timestamp properly
+      const date = new Date(block.timestamp);
+      const timeStr = date.toLocaleString();
+      
+      item.innerHTML = `
+        <div class="block-index">#${block.index}</div>
+        <div class="block-hash">${block.hash}</div>
+        <div class="block-time">${timeStr}</div>
       `;
-      div.onclick = () => viewBlock(block.index);
-      list.appendChild(div);
+      
+      feed.appendChild(item);
     });
   } catch (error) {
-    console.error('Error loading live blocks:', error);
+    console.error('Error updating block feed:', error);
   }
 }
 
@@ -152,32 +181,50 @@ function showExplorerTab(tab) {
   }
 }
 
+// ✅ FIXED: Load explorer blocks with proper ordering and dates
 async function loadBlocks(page = 1) {
   try {
     const res = await fetch(`${apiBase}/blocks?page=${page}&limit=${blocksPerPage}`);
     const data = await res.json();
     
-    const list = document.getElementById('blocks-list');
-    list.innerHTML = '';
+    const tbody = document.getElementById('explorer-blocks');
+    if (!tbody) return; // Guard clause
+    
+    tbody.innerHTML = '';
     
     if (data.blocks.length === 0) {
-      list.innerHTML = '<p>No blocks found</p>';
+      tbody.innerHTML = '<tr><td colspan="6">No blocks found</td></tr>';
       return;
     }
     
-    data.blocks.reverse().forEach(block => {
-      const div = document.createElement('div');
-      div.className = 'block-item';
-      div.innerHTML = `
-        <h4>Block #${block.index}</h4>
-        <p>Hash: ${block.hash}</p>
-        <p>Previous: ${block.previousHash}</p>
-        <p>Validator: ${block.validator}</p>
-        <p>Transactions: ${block.transactions.length}</p>
-        <p>Timestamp: ${new Date(block.timestamp).toLocaleString()}</p>
+    // ✅ FIX: Reverse to show newest first
+    const blocks = data.blocks.reverse();
+    
+    blocks.forEach(block => {
+      const row = document.createElement('tr');
+      
+      // ✅ FIX: Format timestamp properly
+      const date = new Date(block.timestamp);
+      const timeStr = date.toLocaleString();
+      
+      // Calculate total gas used
+      let gasUsed = 0;
+      if (block.transactions) {
+        block.transactions.forEach(tx => {
+          if (tx.gasUsed) gasUsed += tx.gasUsed;
+        });
+      }
+      
+      row.innerHTML = `
+        <td>#${block.index}</td>
+        <td class="mono">${block.hash.substring(0, 16)}...</td>
+        <td class="mono">${block.validator ? block.validator.substring(0, 16) + '...' : 'N/A'}</td>
+        <td>${block.transactions ? block.transactions.length : 0}</td>
+        <td>${gasUsed}</td>
+        <td>${timeStr}</td>
       `;
-      div.onclick = () => viewBlock(block.index);
-      list.appendChild(div);
+      
+      tbody.appendChild(row);
     });
     
     // Pagination
@@ -1074,31 +1121,66 @@ async function stakeTokens() {
 // ... existing code
 
 // Load network stats
+// ✅ FIXED: Load network stats
 async function loadNetworkStats() {
   try {
     const res = await fetch(`${apiBase}/network/stats`);
     const data = await res.json();
-
-    // Update stats
-    document.getElementById('net-peers').textContent = data.peers;
-    document.getElementById('net-validators').textContent = data.validators;
-    document.getElementById('net-height').textContent = data.blockHeight;
-    document.getElementById('net-blocktime').textContent = data.averageBlockTime;
-    document.getElementById('net-stake').textContent = data.totalStake + ' SAYM';
-    document.getElementById('net-mempool').textContent = data.mempool;
-
-    // Update node info
-    document.getElementById('node-id').textContent = data.nodeId || 'N/A';
-    document.getElementById('node-mode').textContent = (data.mode || 'unknown').toUpperCase();
-    document.getElementById('node-uptime').textContent = formatUptime(data.uptime);
-    document.getElementById('node-network').textContent = data.network;
-    document.getElementById('node-chainid').textContent = data.chainId;
-
+    
+    // Update stat cards
+    document.getElementById('net-peers').textContent = data.peers || 0;
+    document.getElementById('net-height').textContent = data.blockHeight || 0;
+    document.getElementById('net-blocktime').textContent = data.averageBlockTime || 0;
+    document.getElementById('net-mempool').textContent = data.mempool || 0;
+    
+    // Update network info table
+    document.getElementById('net-node-id').textContent = data.nodeId ? data.nodeId.substring(0, 32) + '...' : 'Unknown';
+    document.getElementById('net-mode').textContent = data.mode ? data.mode.toUpperCase() : 'Unknown';
+    document.getElementById('net-network').textContent = data.network || 'Unknown';
+    document.getElementById('net-chain').textContent = data.chainId || 'Unknown';
+    document.getElementById('net-uptime').textContent = formatUptime(data.uptime || 0);
+    
     // Update peer list
-    loadPeerList(data.peerList || []);
-
+    const peerListDiv = document.getElementById('peer-list');
+    peerListDiv.innerHTML = '';
+    
+    if (!data.peerList || data.peerList.length === 0) {
+      peerListDiv.innerHTML = '<p style="color: var(--mono-400); padding: 1rem;">No peers connected</p>';
+      return;
+    }
+    
+    data.peerList.forEach(peer => {
+      const peerDiv = document.createElement('div');
+      peerDiv.style.cssText = `
+        padding: 1rem;
+        border: var(--border);
+        margin-bottom: 0.5rem;
+        font-size: 12px;
+        font-family: 'SF Mono', monospace;
+      `;
+      
+      const lastSeenAgo = Math.floor((Date.now() - peer.lastSeen) / 1000);
+      
+      peerDiv.innerHTML = `
+        <div><strong>Node ID:</strong> ${peer.nodeId ? peer.nodeId.substring(0, 16) + '...' : 'Unknown'}</div>
+        <div><strong>Chain Height:</strong> ${peer.chainHeight || 'Unknown'}</div>
+        <div><strong>Last Seen:</strong> ${lastSeenAgo}s ago</div>
+      `;
+      
+      peerListDiv.appendChild(peerDiv);
+    });
+    
   } catch (error) {
     console.error('Error loading network stats:', error);
+    document.getElementById('net-peers').textContent = '0';
+    document.getElementById('net-height').textContent = '0';
+    document.getElementById('net-blocktime').textContent = '0';
+    document.getElementById('net-mempool').textContent = '0';
+    document.getElementById('net-node-id').textContent = 'Loading...';
+    document.getElementById('net-mode').textContent = 'Loading...';
+    document.getElementById('net-network').textContent = 'Loading...';
+    document.getElementById('net-chain').textContent = 'Loading...';
+    document.getElementById('net-uptime').textContent = 'Loading...';
   }
 }
 

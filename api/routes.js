@@ -367,33 +367,44 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     }
   });
 
+  // ✅ MISSING ENDPOINT - ADD THIS
   router.get('/network/stats', (req, res) => {
-    const stats = blockchain.getStats();
-    const p2pStats = p2pServer ? p2pServer.getNetworkStats() : { peers: 0, peerList: [] };
-    
-    let avgBlockTime = config.blockTime;
-    if (blockchain.chain.length > 10) {
-      const recent = blockchain.chain.slice(-10);
-      const timeDiff = recent[recent.length - 1].timestamp - recent[0].timestamp;
-      avgBlockTime = timeDiff / 9;
+    try {
+      const stats = blockchain.getStats();
+      const p2pStats = p2pServer ? p2pServer.getNetworkStats() : { 
+        peers: 0, 
+        peerList: [], 
+        nodeId: 'offline', 
+        mode: 'api' 
+      };
+      
+      let avgBlockTime = config.blockTime;
+      if (blockchain.chain.length > 10) {
+        const recent = blockchain.chain.slice(-10);
+        const timeDiff = recent[recent.length - 1].timestamp - recent[0].timestamp;
+        avgBlockTime = timeDiff / 9;
+      }
+      
+      res.json({
+        network: stats.network,
+        chainId: stats.chainId,
+        blockHeight: stats.blocks,
+        validators: stats.validators,
+        totalStake: stats.totalStake,
+        mempool: stats.mempool,
+        contracts: stats.contracts,
+        peers: p2pStats.peers,
+        peerList: p2pStats.peerList,
+        nodeId: p2pStats.nodeId,
+        mode: p2pStats.mode,
+        averageBlockTime: Math.round(avgBlockTime),
+        uptime: process.uptime(),
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Network stats error:', error);
+      res.status(500).json({ error: 'Failed to fetch network stats' });
     }
-    
-    res.json({
-      network: stats.network,
-      chainId: stats.chainId,
-      blockHeight: stats.blocks,
-      validators: stats.validators,
-      totalStake: stats.totalStake,
-      mempool: stats.mempool,
-      contracts: stats.contracts,
-      peers: p2pStats.peers,
-      peerList: p2pStats.peerList,
-      nodeId: p2pStats.nodeId,
-      mode: p2pStats.mode,
-      averageBlockTime: Math.round(avgBlockTime),
-      uptime: process.uptime(),
-      timestamp: Date.now()
-    });
   });
 
   router.get('/network/peers', (req, res) => {
