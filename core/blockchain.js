@@ -123,9 +123,9 @@ class Blockchain {
     
     const genesisBlock = new Block(
       0,
-      '0',
-      transactions,
       genesisConfig.timestamp,
+      transactions,
+      '0',
       'genesis-validator',
       0
     );
@@ -379,9 +379,9 @@ class Blockchain {
 
       const block = new Block(
         this.chain.length,
-        lastBlock.hash,
-        transactions,
         Date.now(),
+        transactions,
+        lastBlock.hash,
         validator,
         0
       );
