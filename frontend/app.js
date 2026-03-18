@@ -4,6 +4,20 @@ let currentWallet = null;
 let currentPage = 1;
 let blocksPerPage = 20;
 
+function formatBlockTimestamp(timestamp, fallback = 'Pending...') {
+  if (timestamp === null || timestamp === undefined || timestamp === '') {
+    return fallback;
+  }
+
+  const numericTimestamp = Number(timestamp);
+  if (!Number.isFinite(numericTimestamp)) {
+    return fallback;
+  }
+
+  const date = new Date(numericTimestamp);
+  return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString();
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   await loadNetworkConfig();
@@ -118,31 +132,17 @@ async function updateBlockFeed() {
     const feed = document.getElementById('block-feed');
     if (!feed) return;
     
-    // ✅ FIX: Get last 10 blocks (newest first)
-    const allBlocks = data.blocks;
-    const last10 = allBlocks.slice(-10).reverse();
-    
     // Clear and rebuild
     feed.innerHTML = '';
     
-    last10.forEach(block => {
+    data.blocks.forEach(block => {
       const item = document.createElement('div');
       item.className = 'block-item';
-      
-      // ✅ FIX: Proper date validation
-      const timestamp = block.timestamp;
-      let timeStr = 'Pending...';
-      if (timestamp && !isNaN(timestamp)) {
-        const date = new Date(timestamp);
-        if (!isNaN(date.getTime())) {
-          timeStr = date.toLocaleString();
-        }
-      }
       
       item.innerHTML = `
         <div class="block-index">#${block.index}</div>
         <div class="block-hash">${block.hash || 'Generating...'}</div>
-        <div class="block-time">${timeStr}</div>
+        <div class="block-time">${formatBlockTimestamp(block.timestamp, 'Pending...')}</div>
       `;
       
       feed.appendChild(item);
@@ -155,6 +155,7 @@ async function updateBlockFeed() {
 // Load explorer blocks with HOVER DETAILS
 async function loadExplorerBlocks(page = 1) {
   try {
+    currentPage = page;
     const res = await fetch(`${apiBase}/blocks?page=${page}&limit=20`);
     const data = await res.json();
     
@@ -163,22 +164,9 @@ async function loadExplorerBlocks(page = 1) {
     
     tbody.innerHTML = '';
     
-    // ✅ FIX: Get last 20 blocks (newest first)
-    const allBlocks = data.blocks;
-    const last20 = allBlocks.slice(-20).reverse();
-    
-    last20.forEach(block => {
+    data.blocks.forEach(block => {
       const row = document.createElement('tr');
-      
-      // ✅ FIX: Proper date validation
-      const timestamp = block.timestamp;
-      let timeStr = 'Invalid Date';
-      if (timestamp && !isNaN(timestamp)) {
-        const date = new Date(timestamp);
-        if (!isNaN(date.getTime())) {
-          timeStr = date.toLocaleString();
-        }
-      }
+      const timeStr = formatBlockTimestamp(block.timestamp, 'Pending...');
       
       // Calculate total gas used
       let gasUsed = 0;
@@ -252,8 +240,7 @@ function renderPagination(totalBlocks, currentPage) {
 
 // View block details (modal/expanded view)
 function viewBlockDetails(block) {
-  const date = new Date(block.timestamp);
-  const timeStr = isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
+  const timeStr = formatBlockTimestamp(block.timestamp, 'Pending...');
   
   let gasUsed = 0;
   if (block.transactions && Array.isArray(block.transactions)) {
@@ -1082,6 +1069,14 @@ setInterval(() => {
   const networkPage = document.getElementById('network');
   if (networkPage && networkPage.classList.contains('active')) {
     loadNetworkStats();
+  }
+}, 3000);
+
+// Auto-refresh explorer when on explorer page
+setInterval(() => {
+  const explorerPage = document.getElementById('explorer');
+  if (explorerPage && explorerPage.classList.contains('active')) {
+    loadExplorerBlocks(currentPage);
   }
 }, 3000);
 

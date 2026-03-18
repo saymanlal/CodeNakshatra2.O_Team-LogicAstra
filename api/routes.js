@@ -7,6 +7,25 @@ import crypto from 'crypto';
 export function setupRoutes(app, blockchain, p2pServer, config) {
   const router = express.Router();
 
+  function normalizeBlockForApi(block) {
+    const json = block.toJSON ? block.toJSON() : block;
+    const timestamp =
+      typeof json.timestamp === 'number' && Number.isFinite(json.timestamp)
+        ? json.timestamp
+        : (typeof json.previousHash === 'number' && Number.isFinite(json.previousHash)
+            ? json.previousHash
+            : null);
+
+    return {
+      ...json,
+      timestamp,
+      previousHash:
+        timestamp !== null && typeof json.timestamp !== 'number'
+          ? null
+          : json.previousHash
+    };
+  }
+
   // Network info
   router.get('/network', (req, res) => {
     const stats = blockchain.getStats();
@@ -31,10 +50,11 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   router.get('/blocks', (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
+    const allBlocks = blockchain.chain
+      .map(normalizeBlockForApi)
+      .sort((a, b) => b.index - a.index);
     const start = (page - 1) * limit;
     const end = start + limit;
-    
-    const allBlocks = blockchain.chain.map(b => b.toJSON());
     const paginatedBlocks = allBlocks.slice(start, end);
     
     res.json({
@@ -55,7 +75,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       return res.status(404).json({ error: 'Block not found' });
     }
 
-    res.json(block.toJSON());
+    res.json(normalizeBlockForApi(block));
   });
 
   // Transaction by ID
