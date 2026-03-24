@@ -2,15 +2,17 @@ import crypto from 'crypto';
 import Transaction from './transaction.js';
 
 class Block {
-  constructor(index, timestamp, transactions, previousHash, validator, chainId) {
+  constructor(index, timestamp, transactions, previousHash, validator, nonce = 0) {
     this.index = index;
     this.timestamp = timestamp;
-    this.transactions = transactions || [];
+    this.transactions = transactions;
     this.previousHash = previousHash;
     this.validator = validator;
-    this.chainId = chainId;
-    this.hash = this.calculateHash();
+    this.nonce = nonce;
+    this.chainId = null;
     this.gasUsed = 0;
+    this.stateRoot = null; // ✅ Phase 8: Merkle state root
+    this.hash = this.calculateHash();
   }
 
   calculateHash() {
@@ -19,10 +21,12 @@ class Block {
       .update(
         this.index +
         this.timestamp +
-        JSON.stringify(this.transactions.map(tx => tx.toJSON ? tx.toJSON() : tx)) +
+        JSON.stringify(this.transactions) +
         this.previousHash +
         this.validator +
-        this.chainId
+        (this.chainId || '') +
+        this.gasUsed +
+        (this.stateRoot || '') // ✅ Phase 8: Include state root in block hash
       )
       .digest('hex');
   }
@@ -31,35 +35,31 @@ class Block {
     return {
       index: this.index,
       timestamp: this.timestamp,
-      transactions: Array.isArray(this.transactions) 
-        ? this.transactions.map(tx => tx.toJSON ? tx.toJSON() : tx)
-        : [],
+      transactions: this.transactions.map(tx => tx.toJSON()),
       previousHash: this.previousHash,
       validator: this.validator,
       chainId: this.chainId,
-      hash: this.hash,
-      gasUsed: this.gasUsed || 0
+      gasUsed: this.gasUsed,
+      stateRoot: this.stateRoot, // ✅ Phase 8: Export state root
+      hash: this.hash
     };
   }
 
   static async fromJSON(data) {
-    const transactions = [];
-    for (const txData of data.transactions || []) {
-      transactions.push(new Transaction(txData));
-    }
-    
+    const Transaction = (await import('./transaction.js')).default;
+    const transactions = data.transactions.map(tx => Transaction.fromJSON(tx));
     const block = new Block(
       data.index,
       data.timestamp,
       transactions,
       data.previousHash,
       data.validator,
-      data.chainId
+      data.nonce || 0
     );
-    
-    block.hash = data.hash;
+    block.chainId = data.chainId;
     block.gasUsed = data.gasUsed || 0;
-    
+    block.stateRoot = data.stateRoot || null; // ✅ Phase 8: Import state root
+    block.hash = data.hash;
     return block;
   }
 }
