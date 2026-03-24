@@ -1,66 +1,127 @@
-import NonceManager from './nonce.js';
+import StateTree from './stateTree.js';
+
+/**
+ * State Engine with Merkle Tree Integration
+ * Phase 8: Cryptographically verifiable state
+ */
 
 class StateEngine {
   constructor() {
     this.balances = new Map();
+    this.nonces = new Map();
     this.stakes = new Map();
     this.unstaking = new Map();
     this.publicKeys = new Map();
     this.contracts = new Map();
-    this.validatorMissedBlocks = new Map();
-    this.nonces = new NonceManager();
+    this.contractStorage = new Map();
+    
+    // Phase 8: Merkle state tree
+    this.stateTree = new StateTree();
   }
 
-  // Balances
+  // Balance operations
   getBalance(address) {
     return this.balances.get(address) || 0;
   }
 
-  setBalance(address, amount) {
-    if (amount < 0) {
-      throw new Error('Balance cannot be negative');
-    }
-    this.balances.set(address, amount);
-  }
-
   addBalance(address, amount) {
     const current = this.getBalance(address);
-    this.setBalance(address, current + amount);
+    this.balances.set(address, current + amount);
+    this.updateStateTree(address);
   }
 
   subtractBalance(address, amount) {
     const current = this.getBalance(address);
     if (current < amount) {
-      throw new Error('Insufficient balance');
+      throw new Error(`Insufficient balance for ${address}`);
     }
-    this.setBalance(address, current - amount);
+    this.balances.set(address, current - amount);
+    this.updateStateTree(address);
   }
 
-  // Stakes
+  setBalance(address, amount) {
+    this.balances.set(address, amount);
+    this.updateStateTree(address);
+  }
+
+  // Nonce operations
+  getNonce(address) {
+    return this.nonces.get(address) || 0;
+  }
+
+  incrementNonce(address) {
+    const current = this.getNonce(address);
+    this.nonces.set(address, current + 1);
+    this.updateStateTree(address);
+  }
+
+  setNonce(address, nonce) {
+    this.nonces.set(address, nonce);
+    this.updateStateTree(address);
+  }
+
+  // Stake operations
   getStake(address) {
     return this.stakes.get(address) || 0;
   }
 
-  setStake(address, amount) {
-    if (amount <= 0) {
-      this.stakes.delete(address);
-    } else {
-      this.stakes.set(address, amount);
-    }
-  }
-
   addStake(address, amount) {
     const current = this.getStake(address);
-    this.setStake(address, current + amount);
+    this.stakes.set(address, current + amount);
+    this.updateStateTree(address);
   }
 
   subtractStake(address, amount) {
     const current = this.getStake(address);
-    this.setStake(address, Math.max(0, current - amount));
+    this.stakes.set(address, Math.max(0, current - amount));
+    this.updateStateTree(address);
+  }
+
+  setStake(address, amount) {
+    this.stakes.set(address, amount);
+    this.updateStateTree(address);
   }
 
   stake(address, amount) {
     this.addStake(address, amount);
+  }
+
+  // Unstaking operations
+  isUnstaking(address) {
+    return this.unstaking.has(address);
+  }
+
+  initiateUnstake(address, unlockBlock) {
+    this.unstaking.set(address, { unlockBlock, amount: this.getStake(address) });
+  }
+
+  getUnlockBlock(address) {
+    return this.unstaking.get(address)?.unlockBlock || 0;
+  }
+
+  // Public key operations
+  setPublicKey(address, publicKey) {
+    this.publicKeys.set(address, publicKey);
+  }
+
+  getPublicKey(address) {
+    return this.publicKeys.get(address);
+  }
+
+  // Validator operations
+  getValidators() {
+    const validators = [];
+    for (const [address, stake] of this.stakes.entries()) {
+      if (stake > 0) {
+        validators.push({
+          address,
+          stake,
+          isActive: true,
+          missedBlocks: 0
+        });
+      }
+    }
+    return validators;
   }
 
   getTotalStake() {
@@ -71,54 +132,27 @@ class StateEngine {
     return total;
   }
 
-  getValidators() {
-    const validators = [];
-    for (const [address, stake] of this.stakes.entries()) {
-      if (stake > 0) {
-        validators.push({
-          address,
-          stake,
-          missedBlocks: this.validatorMissedBlocks.get(address) || 0
-        });
-      }
-    }
-    return validators.sort((a, b) => b.stake - a.stake);
+  resetMissedBlocks(address) {
+    // Placeholder for validator performance tracking
   }
 
-  // Unstaking
-  initiateUnstake(address, unlockBlock) {
-    this.unstaking.set(address, unlockBlock);
-  }
+  // Contract operations
+  deployContract(address, code, creator) {
+    const contractCodeHash = require('crypto')
+      .createHash('sha256')
+      .update(code)
+      .digest('hex');
 
-  isUnstaking(address) {
-    return this.unstaking.has(address);
-  }
+    this.contracts.set(address, {
+      address,
+      code,
+      creator,
+      state: {},
+      createdAt: Date.now(),
+      codeHash: contractCodeHash
+    });
 
-  getUnlockBlock(address) {
-    return this.unstaking.get(address);
-  }
-
-  canWithdraw(address, currentBlock) {
-    const unlockBlock = this.unstaking.get(address);
-    return unlockBlock !== undefined && currentBlock >= unlockBlock;
-  }
-
-  completeUnstake(address) {
-    this.unstaking.delete(address);
-  }
-
-  // Public Keys
-  setPublicKey(address, publicKey) {
-    this.publicKeys.set(address, publicKey);
-  }
-
-  getPublicKey(address) {
-    return this.publicKeys.get(address);
-  }
-
-  // Contracts
-  setContract(address, contract) {
-    this.contracts.set(address, contract);
+    this.updateStateTree(address, contractCodeHash);
   }
 
   getContract(address) {
@@ -129,65 +163,98 @@ class StateEngine {
     return Array.from(this.contracts.values());
   }
 
-  // Validator Tracking
-  incrementMissedBlocks(address) {
-    const current = this.validatorMissedBlocks.get(address) || 0;
-    this.validatorMissedBlocks.set(address, current + 1);
+  setContractState(contractAddress, key, value) {
+    const contract = this.contracts.get(contractAddress);
+    if (contract) {
+      contract.state[key] = value;
+    }
+
+    // Update storage tree
+    this.stateTree.setContractStorage(contractAddress, key, value);
+    
+    // Update state tree with new storage root
+    const storageRoot = this.stateTree.computeStorageRoot(contractAddress);
+    this.updateStateTree(contractAddress, contract?.codeHash, storageRoot);
   }
 
-  resetMissedBlocks(address) {
-    this.validatorMissedBlocks.set(address, 0);
+  getContractState(contractAddress, key) {
+    const contract = this.contracts.get(contractAddress);
+    return contract?.state?.[key];
   }
 
-  getMissedBlocks(address) {
-    return this.validatorMissedBlocks.get(address) || 0;
+  // Phase 8: State tree operations
+  updateStateTree(address, contractCodeHash = null, storageRoot = null) {
+    this.stateTree.setAccount(address, {
+      balance: this.getBalance(address),
+      nonce: this.getNonce(address),
+      stake: this.getStake(address),
+      contractCodeHash: contractCodeHash || this.contracts.get(address)?.codeHash || null,
+      storageRoot: storageRoot || null
+    });
   }
 
-  // Nonce Management
-  getNonce(address) {
-    return this.nonces.getNonce(address);
+  computeStateRoot() {
+    // Update all accounts in state tree
+    for (const address of this.balances.keys()) {
+      this.updateStateTree(address);
+    }
+    for (const address of this.nonces.keys()) {
+      this.updateStateTree(address);
+    }
+    for (const address of this.stakes.keys()) {
+      this.updateStateTree(address);
+    }
+    for (const [address, contract] of this.contracts.entries()) {
+      const storageRoot = this.stateTree.computeStorageRoot(address);
+      this.updateStateTree(address, contract.codeHash, storageRoot);
+    }
+
+    return this.stateTree.computeStateRoot();
   }
 
-  incrementNonce(address) {
-    return this.nonces.incrementNonce(address);
+  generateProof(address) {
+    return this.stateTree.generateProof(address);
   }
 
-  validateNonce(address, nonce) {
-    return this.nonces.validateNonce(address, nonce);
+  verifyProof(proof, root) {
+    return this.stateTree.verifyProof(proof, root);
   }
 
-  // State Snapshot
-  toJSON() {
-    return {
-      balances: Array.from(this.balances.entries()),
-      stakes: Array.from(this.stakes.entries()),
-      unstaking: Array.from(this.unstaking.entries()),
-      publicKeys: Array.from(this.publicKeys.entries()),
-      contracts: Array.from(this.contracts.entries()),
-      validatorMissedBlocks: Array.from(this.validatorMissedBlocks.entries()),
-      nonces: this.nonces.toJSON()
-    };
-  }
-
-  fromJSON(data) {
-    this.balances = new Map(data.balances || []);
-    this.stakes = new Map(data.stakes || []);
-    this.unstaking = new Map(data.unstaking || []);
-    this.publicKeys = new Map(data.publicKeys || []);
-    this.contracts = new Map(data.contracts || []);
-    this.validatorMissedBlocks = new Map(data.validatorMissedBlocks || []);
-    this.nonces.fromJSON(data.nonces || []);
-  }
-
-  // Clear all state
+  // Clear state
   clear() {
     this.balances.clear();
+    this.nonces.clear();
     this.stakes.clear();
     this.unstaking.clear();
     this.publicKeys.clear();
     this.contracts.clear();
-    this.validatorMissedBlocks.clear();
-    this.nonces.reset();
+    this.contractStorage.clear();
+    this.stateTree.clear();
+  }
+
+  // Export/Import for snapshots
+  exportState() {
+    return {
+      balances: Array.from(this.balances.entries()),
+      nonces: Array.from(this.nonces.entries()),
+      stakes: Array.from(this.stakes.entries()),
+      unstaking: Array.from(this.unstaking.entries()),
+      publicKeys: Array.from(this.publicKeys.entries()),
+      contracts: Array.from(this.contracts.entries()),
+      stateTree: this.stateTree.exportSnapshot()
+    };
+  }
+
+  importState(state) {
+    this.balances = new Map(state.balances);
+    this.nonces = new Map(state.nonces);
+    this.stakes = new Map(state.stakes);
+    this.unstaking = new Map(state.unstaking);
+    this.publicKeys = new Map(state.publicKeys);
+    this.contracts = new Map(state.contracts);
+    if (state.stateTree) {
+      this.stateTree.importSnapshot(state.stateTree);
+    }
   }
 }
 

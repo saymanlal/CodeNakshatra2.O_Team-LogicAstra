@@ -37,7 +37,8 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       blockReward: config.blockReward,
       minStake: config.minStake,
       gasLimits: stats.gasLimits,
-      gasCosts: stats.gasCosts
+      gasCosts: stats.gasCosts,
+      stateRoot: stats.stateRoot // ✅ Phase 8
     });
   });
 
@@ -78,6 +79,88 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     res.json(normalizeBlockForApi(block));
   });
 
+  // ✅ Phase 8: Light client endpoint - Block header only
+  router.get('/light/block/:height', (req, res) => {
+    try {
+      const height = parseInt(req.params.height);
+      const block = blockchain.chain[height];
+      
+      if (!block) {
+        return res.status(404).json({ error: 'Block not found' });
+      }
+
+      // Return only header info for light clients
+      res.json({
+        index: block.index,
+        timestamp: block.timestamp,
+        previousHash: block.previousHash,
+        validator: block.validator,
+        hash: block.hash,
+        stateRoot: block.stateRoot,
+        gasUsed: block.gasUsed,
+        chainId: block.chainId,
+        transactionCount: block.transactions.length
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch block header' });
+    }
+  });
+
+  // ✅ Phase 8: Merkle proof endpoint
+  router.get('/proof/:address', (req, res) => {
+    try {
+      const { address } = req.params;
+      
+      // Compute current state root
+      const stateRoot = blockchain.state.computeStateRoot();
+      
+      // Generate proof
+      const proof = blockchain.state.generateProof(address);
+      
+      if (!proof) {
+        return res.status(404).json({ 
+          error: 'Account not found in state tree',
+          address 
+        });
+      }
+
+      res.json({
+        address,
+        proof,
+        stateRoot,
+        blockHeight: blockchain.chain.length - 1,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Proof generation error:', error);
+      res.status(500).json({ error: 'Failed to generate proof' });
+    }
+  });
+
+  // ✅ Phase 8: Verify proof endpoint
+  router.post('/proof/verify', (req, res) => {
+    try {
+      const { proof, stateRoot } = req.body;
+
+      if (!proof || !stateRoot) {
+        return res.status(400).json({ 
+          error: 'Missing proof or stateRoot' 
+        });
+      }
+
+      const isValid = blockchain.state.verifyProof(proof, stateRoot);
+
+      res.json({
+        valid: isValid,
+        address: proof.leaf?.key,
+        stateRoot
+      });
+    } catch (error) {
+      console.error('Proof verification error:', error);
+      res.status(500).json({ error: 'Failed to verify proof' });
+    }
+  });
+
   // Transaction by ID
   router.get('/transactions/:id', (req, res) => {
     const txId = req.params.id;
@@ -89,7 +172,8 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
           transaction: tx.toJSON(),
           blockIndex: block.index,
           blockHash: block.hash,
-          timestamp: block.timestamp
+          timestamp: block.timestamp,
+          stateRoot: block.stateRoot // ✅ Phase 8
         });
       }
     }
@@ -387,7 +471,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     }
   });
 
-  // ✅ MISSING ENDPOINT - ADD THIS
+  // Network stats
   router.get('/network/stats', (req, res) => {
     try {
       const stats = blockchain.getStats();
@@ -419,7 +503,8 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
         mode: p2pStats.mode,
         averageBlockTime: Math.round(avgBlockTime),
         uptime: process.uptime(),
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        stateRoot: stats.stateRoot // ✅ Phase 8
       });
     } catch (error) {
       console.error('Network stats error:', error);
