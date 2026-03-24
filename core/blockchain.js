@@ -7,6 +7,8 @@ import ProofOfStake from './pos.js';
 import ContractEngine from './contracts.js';
 import GasCalculator from './gas.js';
 import { Level } from 'level';
+import fs from 'fs';
+import path from 'path';
 
 const EC = elliptic.ec;
 const ec = new EC('secp256k1');
@@ -26,36 +28,85 @@ class Blockchain {
     const finalDbPath = dbPath || `./data/${config.chainId}`;
     this.db = new Level(finalDbPath, { valueEncoding: 'json' });
     
+    // ✅ Phase 8: Snapshot configuration
+    this.snapshotInterval = 100; // Save snapshot every 100 blocks
+    this.snapshotDir = `./data/snapshots/${config.chainId}`;
+    this.ensureSnapshotDir();
+    
     this.isProducing = false;
     this.mempoolLimit = 1000;
     this.addressTxCount = new Map();
     this.lastCleanup = Date.now();
   }
 
+  // ✅ Phase 8: Ensure snapshot directory exists
+  ensureSnapshotDir() {
+    if (!fs.existsSync('./data/snapshots')) {
+      fs.mkdirSync('./data/snapshots', { recursive: true });
+    }
+    if (!fs.existsSync(this.snapshotDir)) {
+      fs.mkdirSync(this.snapshotDir, { recursive: true });
+    }
+  }
+
   async initialize() {
     console.log('🔄 Initializing blockchain...');
     
     try {
-      const savedChain = await this.db.get('chain');
+      // ✅ Phase 8: Try loading from snapshot first
+      const snapshot = await this.loadLatestSnapshot();
       
-      if (savedChain && savedChain.length > 0) {
-        console.log(`📚 Loading existing blockchain...`);
+      if (snapshot) {
+        console.log(`📸 Loading from snapshot at block ${snapshot.blockHeight}...`);
+        this.state.importState(snapshot.state);
         
-        for (const blockData of savedChain) {
-          const block = await Block.fromJSON(blockData);
-          this.chain.push(block);
+        // Load remaining blocks after snapshot
+        const savedChain = await this.db.get('chain');
+        if (savedChain && savedChain.length > snapshot.blockHeight) {
+          for (let i = 0; i <= snapshot.blockHeight; i++) {
+            const block = await Block.fromJSON(savedChain[i]);
+            this.chain.push(block);
+          }
+          
+          // Replay only blocks after snapshot
+          for (let i = snapshot.blockHeight + 1; i < savedChain.length; i++) {
+            const block = await Block.fromJSON(savedChain[i]);
+            this.chain.push(block);
+            this.applyBlock(block);
+            
+            // ✅ Phase 8: Verify state root
+            const computedRoot = this.state.computeStateRoot();
+            if (block.stateRoot && block.stateRoot !== computedRoot) {
+              throw new Error(`State root mismatch at block ${block.index}. Expected: ${block.stateRoot}, Got: ${computedRoot}`);
+            }
+          }
+          
+          console.log(`✅ Loaded ${savedChain.length} blocks (${savedChain.length - snapshot.blockHeight} after snapshot)`);
         }
-        
-        console.log(`✅ Loaded ${savedChain.length} blocks from database`);
-        console.log('🔄 Rebuilding state from blockchain...');
-        this.replayState();
-        console.log('✅ State rebuilt successfully');
       } else {
-        this.createGenesisBlock();
+        // No snapshot - load full chain
+        const savedChain = await this.db.get('chain');
+        
+        if (savedChain && savedChain.length > 0) {
+          console.log(`📚 Loading existing blockchain...`);
+          
+          for (const blockData of savedChain) {
+            const block = await Block.fromJSON(blockData);
+            this.chain.push(block);
+          }
+          
+          console.log(`✅ Loaded ${savedChain.length} blocks from database`);
+          console.log('🔄 Rebuilding state from blockchain...');
+          await this.replayState();
+          console.log('✅ State rebuilt successfully');
+        } else {
+          this.createGenesisBlock();
+        }
       }
       
       console.log('✅ Blockchain initialization complete');
       console.log(`📊 Current height: ${this.chain.length}`);
+      console.log(`🌳 State root: ${this.state.computeStateRoot()}`);
       
     } catch (error) {
       if (error.code === 'LEVEL_NOT_FOUND') {
@@ -82,7 +133,6 @@ class Blockchain {
     
     console.log(`🚰 Genesis Faucet Address: ${faucetAddress}`);
   
-    // CRITICAL: Register faucet public key in state
     this.state.setPublicKey(faucetAddress, faucetPubKey);
     console.log(`✓ Faucet public key registered`);
     
@@ -108,7 +158,6 @@ class Blockchain {
         this.pos.addValidator(address, stakeAmount);
         
         console.log(`✓ Validator added: ${address.substring(0, 8)}... (Stake: ${stakeAmount})`);
-        console.log(`✓ Genesis validator created: ${address.substring(0, 8)}... with ${stakeAmount} SAYM stake`);
       } else {
         const seed = `genesis-${key}-${this.chainId}`;
         const hash = crypto.createHash('sha256').update(seed).digest('hex');
@@ -130,12 +179,15 @@ class Blockchain {
       0
     );
     
+    // ✅ Phase 8: Compute and set state root
+    genesisBlock.stateRoot = this.state.computeStateRoot();
     genesisBlock.hash = genesisBlock.calculateHash();
     
     this.chain.push(genesisBlock);
     this.saveBlock(genesisBlock);
     
     console.log('✅ Genesis block created');
+    console.log(`🌳 Genesis state root: ${genesisBlock.stateRoot}`);
     
     return genesisBlock;
   }
@@ -149,10 +201,17 @@ class Blockchain {
     await this.db.put('chain', chainData);
   }
 
-  replayState() {
+  // ✅ Phase 8: Replay state with verification
+  async replayState() {
     this.state.clear();
     for (const block of this.chain) {
       this.applyBlock(block);
+      
+      // Verify state root
+      const computedRoot = this.state.computeStateRoot();
+      if (block.stateRoot && block.stateRoot !== computedRoot) {
+        throw new Error(`State root mismatch at block ${block.index}. Expected: ${block.stateRoot}, Got: ${computedRoot}`);
+      }
     }
   }
 
@@ -389,12 +448,21 @@ class Blockchain {
       block.chainId = this.chainId;
       block.gasUsed = blockGasUsed;
 
+      // ✅ Phase 8: Apply block and compute state root
       this.applyBlock(block);
+      block.stateRoot = this.state.computeStateRoot();
+      block.hash = block.calculateHash(); // Recalculate with state root
+
       this.chain.push(block);
       this.state.resetMissedBlocks(validator);
       await this.saveChain();
 
-      console.log(`✅ Block #${block.index} | Validator: ${validator.substring(0, 8)}... | Txs: ${block.transactions.length} | Gas: ${blockGasUsed}`);
+      // ✅ Phase 8: Save snapshot every N blocks
+      if (block.index % this.snapshotInterval === 0 && block.index > 0) {
+        await this.saveSnapshot(block.index);
+      }
+
+      console.log(`✅ Block #${block.index} | Validator: ${validator.substring(0, 8)}... | Txs: ${block.transactions.length} | Gas: ${blockGasUsed} | StateRoot: ${block.stateRoot.substring(0, 8)}...`);
 
       this.isProducing = false;
       return block;
@@ -403,6 +471,76 @@ class Blockchain {
       console.error('Error creating block:', error);
       this.isProducing = false;
       return null;
+    }
+  }
+
+  // ✅ Phase 8: Snapshot system
+  async saveSnapshot(blockHeight) {
+    try {
+      const snapshot = {
+        blockHeight,
+        timestamp: Date.now(),
+        state: this.state.exportState(),
+        stateRoot: this.state.computeStateRoot()
+      };
+
+      const snapshotPath = path.join(this.snapshotDir, `snapshot-${blockHeight}.json`);
+      fs.writeFileSync(snapshotPath, JSON.stringify(snapshot, null, 2));
+
+      console.log(`📸 Snapshot saved at block ${blockHeight}`);
+
+      // Clean old snapshots (keep last 3)
+      this.cleanOldSnapshots();
+    } catch (error) {
+      console.error('Error saving snapshot:', error);
+    }
+  }
+
+  async loadLatestSnapshot() {
+    try {
+      const files = fs.readdirSync(this.snapshotDir);
+      const snapshots = files
+        .filter(f => f.startsWith('snapshot-') && f.endsWith('.json'))
+        .map(f => {
+          const height = parseInt(f.match(/snapshot-(\d+)\.json/)[1]);
+          return { file: f, height };
+        })
+        .sort((a, b) => b.height - a.height);
+
+      if (snapshots.length === 0) {
+        return null;
+      }
+
+      const latestSnapshot = snapshots[0];
+      const snapshotPath = path.join(this.snapshotDir, latestSnapshot.file);
+      const data = JSON.parse(fs.readFileSync(snapshotPath, 'utf8'));
+
+      return data;
+    } catch (error) {
+      console.error('Error loading snapshot:', error);
+      return null;
+    }
+  }
+
+  cleanOldSnapshots() {
+    try {
+      const files = fs.readdirSync(this.snapshotDir);
+      const snapshots = files
+        .filter(f => f.startsWith('snapshot-') && f.endsWith('.json'))
+        .map(f => {
+          const height = parseInt(f.match(/snapshot-(\d+)\.json/)[1]);
+          return { file: f, height };
+        })
+        .sort((a, b) => b.height - a.height);
+
+      // Keep only last 3 snapshots
+      snapshots.slice(3).forEach(snapshot => {
+        const snapshotPath = path.join(this.snapshotDir, snapshot.file);
+        fs.unlinkSync(snapshotPath);
+        console.log(`🗑️  Deleted old snapshot: ${snapshot.file}`);
+      });
+    } catch (error) {
+      console.error('Error cleaning snapshots:', error);
     }
   }
 
@@ -425,7 +563,8 @@ class Blockchain {
       mempool: this.mempool.length,
       validators: validatorCount,
       totalStake,
-      contracts: contractCount
+      contracts: contractCount,
+      stateRoot: this.state.computeStateRoot() // ✅ Phase 8
     };
   }
 
