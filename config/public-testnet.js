@@ -5,7 +5,7 @@ export default {
   p2pPort: parseInt(process.env.P2P_PORT) || null,
   blockTime: 5000,
   blockReward: 10,
-  minStake: 500,
+  minStake: 100,
   unstakeDelay: 50,
   slashPercentage: 0.10,
   maxMissedBlocks: 3,
