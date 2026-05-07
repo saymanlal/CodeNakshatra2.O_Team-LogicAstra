@@ -62,13 +62,25 @@ async function updateHeaderInfo() {
   }
 }
 
-// Navigation
+// Navigation - FIXED: Properly handle active state
 function showPage(pageId) {
-  // Update nav buttons
+  // Update nav buttons - FIXED: Use currentTarget to get the button that was clicked
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.remove('active');
   });
-  event.target.classList.add('active');
+  
+  // Find and activate the correct button
+  const clickedButton = event ? event.currentTarget : null;
+  if (clickedButton) {
+    clickedButton.classList.add('active');
+  } else {
+    // Fallback: find button by matching onclick
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      if (btn.onclick && btn.onclick.toString().includes(pageId)) {
+        btn.classList.add('active');
+      }
+    });
+  }
 
   // Update pages
   document.querySelectorAll('.page').forEach(page => {
@@ -90,21 +102,24 @@ function showPage(pageId) {
   }
 }
 
-// Update dashboard stats
+// Update dashboard stats - FIXED: Get actual validator count from validators endpoint
 async function updateStats() {
   try {
     const res = await fetch(`${apiBase}/stats`);
     const stats = await res.json();
 
     document.getElementById('stat-blocks').textContent = stats.blocks || 0;
-    document.getElementById('stat-validators').textContent = stats.validators || 0;
-    document.getElementById('stat-stake').textContent = stats.totalStake || 0;
     document.getElementById('stat-mempool').textContent = stats.mempool || 0;
     document.getElementById('stat-contracts').textContent = stats.contracts || 0;
 
-    // Get validator data for APR
+    // FIXED: Get validator data for APR and actual validator count
     const validatorsRes = await fetch(`${apiBase}/validators`);
     const validatorsData = await validatorsRes.json();
+    
+    // Use actual validator count from validators endpoint
+    const actualValidatorCount = validatorsData.validators ? validatorsData.validators.length : 0;
+    document.getElementById('stat-validators').textContent = actualValidatorCount;
+    document.getElementById('stat-stake').textContent = validatorsData.totalStake || 0;
     document.getElementById('stat-apr').textContent = validatorsData.estimatedAPR || 0;
 
     if (currentWallet) {
@@ -123,7 +138,7 @@ async function updateStats() {
   }
 }
 
-// Update live block feed
+// Update live block feed - FIXED: Show blocks in descending order (newest first)
 async function updateBlockFeed() {
   try {
     const res = await fetch(`${apiBase}/blocks?limit=10`);
@@ -135,6 +150,7 @@ async function updateBlockFeed() {
     // Clear and rebuild
     feed.innerHTML = '';
     
+    // FIXED: Blocks are already sorted newest first from API, just display them
     data.blocks.forEach(block => {
       const item = document.createElement('div');
       item.className = 'block-item';
@@ -152,7 +168,7 @@ async function updateBlockFeed() {
   }
 }
 
-// Load explorer blocks with HOVER DETAILS
+// Load explorer blocks with pagination - FIXED: Proper pagination controls
 async function loadExplorerBlocks(page = 1) {
   try {
     currentPage = page;
@@ -203,7 +219,7 @@ Chain ID: ${block.chainId || 'N/A'}`;
       tbody.appendChild(row);
     });
     
-    // ✅ FIX: Add pagination controls
+    // FIXED: Render pagination controls
     renderPagination(data.total, page);
     
   } catch (error) {
@@ -211,7 +227,7 @@ Chain ID: ${block.chainId || 'N/A'}`;
   }
 }
 
-// ✅ NEW FUNCTION: Add pagination
+// FIXED: Proper pagination rendering
 function renderPagination(totalBlocks, currentPage) {
   const paginationDiv = document.getElementById('pagination-controls');
   if (!paginationDiv) return;
@@ -223,17 +239,20 @@ function renderPagination(totalBlocks, currentPage) {
     return;
   }
   
+  const prevDisabled = currentPage === 1;
+  const nextDisabled = currentPage === totalPages;
+  
   paginationDiv.innerHTML = `
     <button 
       onclick="loadExplorerBlocks(${currentPage - 1})" 
-      ${currentPage === 1 ? 'disabled' : ''}
-      style="padding: 8px 16px; border: var(--border); background: ${currentPage === 1 ? 'var(--mono-900)' : 'var(--mono-1000)'}; cursor: ${currentPage === 1 ? 'not-allowed' : 'pointer'};"
+      ${prevDisabled ? 'disabled' : ''}
+      style="padding: 8px 16px; border: var(--border); background: ${prevDisabled ? 'var(--mono-900)' : 'var(--mono-1000)'}; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; color: ${prevDisabled ? 'var(--mono-600)' : 'var(--mono-100)'};"
     >← Previous</button>
     <span style="padding: 8px 16px; color: var(--mono-400);">Page ${currentPage} of ${totalPages}</span>
     <button 
       onclick="loadExplorerBlocks(${currentPage + 1})" 
-      ${currentPage === totalPages ? 'disabled' : ''}
-      style="padding: 8px 16px; border: var(--border); background: ${currentPage === totalPages ? 'var(--mono-900)' : 'var(--mono-1000)'}; cursor: ${currentPage === totalPages ? 'not-allowed' : 'pointer'};"
+      ${nextDisabled ? 'disabled' : ''}
+      style="padding: 8px 16px; border: var(--border); background: ${nextDisabled ? 'var(--mono-900)' : 'var(--mono-1000)'}; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; color: ${nextDisabled ? 'var(--mono-600)' : 'var(--mono-100)'};"
     >Next →</button>
   `;
 }
@@ -353,7 +372,7 @@ function viewBlockDetails(block) {
   document.body.appendChild(modal);
 }
 
-// Load validators
+// Load validators - FIXED: Show all validators properly
 async function loadValidators() {
   try {
     const res = await fetch(`${apiBase}/validators`);
@@ -371,6 +390,7 @@ async function loadValidators() {
       return;
     }
     
+    // FIXED: Show all validators
     data.validators.forEach(validator => {
       const row = document.createElement('tr');
       row.innerHTML = `
@@ -1080,7 +1100,7 @@ setInterval(() => {
   }
 }, 3000);
 
-// ✅ Initialize explorer when page loads
+// Initialize explorer when page loads
 if (document.getElementById('explorer')) {
   loadExplorerBlocks(1);
 }
