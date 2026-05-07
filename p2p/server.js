@@ -10,6 +10,18 @@ export class P2PServer {
     this.nodeId = crypto.randomBytes(16).toString('hex');
   }
 
+  normalizePeerUrl(address) {
+    if (!address) {
+      return null;
+    }
+
+    if (address.startsWith('ws://') || address.startsWith('wss://')) {
+      return address;
+    }
+
+    return `ws://${address}/p2p`;
+  }
+
   listen(httpServer = null) {
     try {
       if (httpServer) {
@@ -182,16 +194,17 @@ export class P2PServer {
 
   connectToPeer(url) {
     try {
-      console.log(`🔗 Connecting to peer: ${url}`);
-      const ws = new WebSocket(url);
+      const peerUrl = this.normalizePeerUrl(url);
+      console.log(`🔗 Connecting to peer: ${peerUrl}`);
+      const ws = new WebSocket(peerUrl);
 
       ws.on('open', () => {
-        console.log(`✅ Connected to peer: ${url}`);
+        console.log(`✅ Connected to peer: ${peerUrl}`);
         this.handleConnection(ws);
       });
 
       ws.on('error', (error) => {
-        console.error(`❌ Peer connection failed ${url}:`, error.message);
+        console.error(`❌ Peer connection failed ${peerUrl}:`, error.message);
       });
 
     } catch (error) {

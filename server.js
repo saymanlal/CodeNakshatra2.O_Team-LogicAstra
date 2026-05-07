@@ -25,6 +25,7 @@ async function startServer() {
     const args = process.argv.slice(2);
     let networkFlag = 'testnet';
     let modeFlag = 'validator';
+    let bootstrapFlag = null;
 
     for (let i = 0; i < args.length; i++) {
       if (args[i] === '--network' && args[i + 1]) {
@@ -33,10 +34,26 @@ async function startServer() {
       if (args[i] === '--mode' && args[i + 1]) {
         modeFlag = args[i + 1];
       }
+      if (args[i] === '--bootstrap' && args[i + 1]) {
+        bootstrapFlag = args[i + 1];
+      }
     }
 
     const config = loadConfig(networkFlag);
-    const mode = modeFlag;
+    const modeAliases = {
+      full: 'fullnode',
+      fullnode: 'fullnode',
+      validator: 'validator',
+      observer: 'observer'
+    };
+    const mode = modeAliases[modeFlag] || modeFlag;
+    const cliBootstrapPeers = bootstrapFlag
+      ? bootstrapFlag.split(',').map(peer => peer.trim()).filter(Boolean)
+      : [];
+
+    if (cliBootstrapPeers.length > 0) {
+      config.bootstrapPeers = cliBootstrapPeers;
+    }
 
     console.log('\n');
     console.log('╔════════════════════════════════════════╗');
@@ -92,7 +109,7 @@ async function startServer() {
       console.log(`🔗 Mode: ${mode.toUpperCase()}`);
       
       // Start P2P after HTTP server is listening
-      if (mode === 'validator' || mode === 'full') {
+      if (mode === 'validator' || mode === 'fullnode') {
         try {
           p2pServer.listen(server);
         } catch (error) {
