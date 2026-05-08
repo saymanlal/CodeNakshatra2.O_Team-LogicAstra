@@ -1,4 +1,5 @@
-// Browser crypto doesn't work in Node.js, so we use native crypto
+// cli/wallet-cli.js
+
 import crypto from 'crypto';
 import elliptic from 'elliptic';
 
@@ -15,6 +16,10 @@ export class SaymanWalletCLI {
 
   async initialize() {
     if (this.privateKey) {
+      if (!/^[a-fA-F0-9]{64}$/.test(this.privateKey)) {
+        throw new Error('Invalid private key format');
+      }
+
       this.keyPair = ec.keyFromPrivate(this.privateKey, 'hex');
     } else {
       this.keyPair = ec.genKeyPair();
@@ -28,24 +33,54 @@ export class SaymanWalletCLI {
   }
 
   deriveAddress(publicKey) {
-    const hash = crypto.createHash('sha256').update(publicKey).digest('hex');
+    const hash = crypto
+      .createHash('sha256')
+      .update(publicKey)
+      .digest('hex');
+
     return hash.substring(0, 40);
   }
 
-  async signTransaction(txData) {
-    const txString = JSON.stringify({
+  calculateTransactionHash(txData) {
+    // MUST MATCH:
+    // frontend/crypto-client.js
+    // wallet/wallet.js
+    // core/transaction.js
+
+    const normalizedTx = {
       type: txData.type,
       timestamp: txData.timestamp,
-      data: txData.data
-    });
+      data: txData.data,
+      gasLimit: txData.gasLimit,
+      gasPrice: txData.gasPrice,
+      nonce: txData.nonce
+    };
 
-    const hash = crypto.createHash('sha256').update(txString).digest('hex');
-    const sig = this.keyPair.sign(hash);
+    return crypto
+      .createHash('sha256')
+      .update(JSON.stringify(normalizedTx))
+      .digest('hex');
+  }
+
+  async signTransaction(txData) {
+    if (!this.keyPair) {
+      throw new Error('Wallet not initialized');
+    }
+
+    const hash = this.calculateTransactionHash(txData);
+
+    const signature = this.keyPair.sign(hash);
 
     return {
-      r: sig.r.toString('hex'),
-      s: sig.s.toString('hex')
+      r: signature.r.toString('hex'),
+      s: signature.s.toString('hex')
     };
+  }
+
+  verifySignature(signature, txData) {
+    const hash = this.calculateTransactionHash(txData);
+
+    return this.keyPair.verify(hash, signature);
   }
 
   export() {
