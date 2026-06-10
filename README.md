@@ -1,408 +1,511 @@
-# 🌳 SAYMAN BLOCKCHAIN - PHASE 8: MERKLE STATE TREE
+# ⛓️ SAYMAN BLOCKCHAIN — PHASE 9: SMART CONTRACT PLATFORM
 
-**Cryptographically Verifiable State with Light Client Support**
-
----
-
-## 🎯 What's New in Phase 8
-
-Phase 8 introduces **Merkle-based state verification**, making the blockchain:
-- ✅ **Cryptographically verifiable** - Every state transition is provable
-- ✅ **Trustless** - Blocks include state roots that can be independently verified
-- ✅ **Light client ready** - Clients can verify accounts without full blockchain
-- ✅ **Deterministic** - Same transactions always produce same state root
-- ✅ **Optimized** - Snapshot system for fast node initialization
+**JavaScript-native Smart Contracts · Proof-of-Report · Civic Intelligence Layer**
 
 ---
 
-## 🌳 State Root Explained
+## 🎯 What's New in Phase 9
 
-### What is a State Root?
+Phase 9 transforms SAYMAN from a Merkle-verified coin chain (Phase 8) into a **full JavaScript smart contract platform** with a purpose-built civic intelligence layer for dApps like CrowdPulse.
 
-A **state root** is a single hash that represents the entire blockchain state at a specific block height. It's computed using a **Merkle tree** of all account states.
-```
-State Root = MerkleRoot(all account hashes)
-
-Each account = { address, balance, nonce, stake, contractCodeHash, storageRoot }
-```
-
-### How It Works
-
-1. **Account Hashing**: Each account's data is hashed
-2. **Tree Building**: Accounts are sorted by address and organized into a Merkle tree
-3. **Root Computation**: The root hash is computed bottom-up
-4. **Block Inclusion**: The state root is included in the block and hashed
-```javascript
-Block {
-  index: 1234,
-  timestamp: 1234567890,
-  transactions: [...],
-  previousHash: "abc123...",
-  validator: "0x456...",
-  stateRoot: "7f8e9d...",  // ✅ Merkle root of all state
-  hash: "2a3b4c..."
-}
-```
+| Feature | Phase 8 | Phase 9 |
+|---|---|---|
+| Smart contracts | Basic (broken sandbox) | ✅ Full JS sandbox, events, returns |
+| `msg.sender` | ❌ Crashed | ✅ Available in all contracts |
+| Return values | ❌ Discarded | ✅ Captured and returned |
+| Event system | ❌ Missing | ✅ `emit()` + queryable log |
+| Contract metadata | ❌ None | ✅ Name, version, ABI stored |
+| External dApp repos | ❌ Not possible | ✅ SDK + deploy scripts |
+| Reputation engine | ❌ Missing | ✅ Built into StateEngine |
+| Native report txs | ❌ Missing | ✅ `REPORT_CREATE/VERIFY/RESOLVE` |
+| Contract registry | ❌ None | ✅ `GET /api/contracts` |
 
 ---
 
-## 🔐 Merkle Proofs
+## 📁 Repository Structure After Phase 9
 
-### What is a Merkle Proof?
-
-A **Merkle proof** allows you to prove an account exists in the state tree without downloading the entire state.
-
-### Generating a Proof
-```bash
-GET /api/proof/0x1234567890abcdef
 ```
+sayman-chain/                ← This repo (blockchain node)
+├── core/
+│   ├── blockchain.js        ← ✅ Updated: new tx types, event API, report index
+│   ├── contracts.js         ← ✅ Updated: events, returns, msg.sender, ABI
+│   ├── state.js             ← ✅ Updated: reputation, event log, fixed crypto import
+│   ├── transaction.js       ← ✅ Updated: REPORT_CREATE/VERIFY/RESOLVE, REPUTATION_UPDATE
+│   ├── block.js             (unchanged)
+│   ├── gas.js               (unchanged)
+│   ├── merkle.js            (unchanged)
+│   ├── pos.js               (unchanged)
+│   └── stateTree.js         (unchanged)
+├── contracts/
+│   ├── example.js           ← ✅ Rewritten: new contract = { methods: {} } style
+│   └── token.js             ← ✅ Rewritten: msg.sender fixed
+├── sdk/
+│   ├── client.js            ← 🆕 SaymanClient SDK
+│   └── index.js             ← 🆕 SDK entry point
+└── api/
+    └── routes.js            ← Add new Phase 9 routes (see section below)
 
-Response:
-```json
-{
-  "address": "0x1234567890abcdef",
-  "proof": {
-    "leaf": {
-      "key": "0x1234567890abcdef",
-      "balance": 1000,
-      "nonce": 5,
-      "stake": 500,
-      "contractCodeHash": null,
-      "storageRoot": null
-    },
-    "leafHash": "a1b2c3...",
-    "proof": [
-      { "hash": "d4e5f6...", "position": "left" },
-      { "hash": "g7h8i9...", "position": "right" }
-    ],
-    "root": "7f8e9d..."
-  },
-  "stateRoot": "7f8e9d...",
-  "blockHeight": 1234
-}
-```
-
-### Verifying a Proof
-```bash
-POST /api/proof/verify
-{
-  "proof": { ... },
-  "stateRoot": "7f8e9d..."
-}
-```
-
-Response:
-```json
-{
-  "valid": true,
-  "address": "0x1234567890abcdef",
-  "stateRoot": "7f8e9d..."
-}
+crowdpulse/                  ← Separate dApp repo
+├── contracts/
+│   ├── ReportRegistry.js    ← 🆕 Civic report storage contract
+│   ├── ReputationManager.js ← 🆕 Trust score contract
+│   └── RewardManager.js     ← 🆕 Points and badges contract
+├── scripts/
+│   └── deploy.js            ← 🆕 Deploy all contracts to SAYMAN
+├── backend/
+│   └── index.js             ← 🆕 Express API bridge + AI verification
+├── frontend/
+│   └── index.html           ← 🆕 Working demo UI
+└── deployed.json            ← Auto-generated after deployment
 ```
 
 ---
 
-## 💡 Light Clients
+## 🔧 Critical Bug Fixes in Phase 9
 
-Light clients can verify blockchain state without downloading all blocks or state.
-
-### How Light Clients Work
-
-1. **Download block headers only** (much smaller than full blocks)
-2. **Get state root** from block header
-3. **Request Merkle proof** for specific accounts
-4. **Verify proof** against state root
-
-### Light Client Endpoint
-```bash
-GET /api/light/block/1234
-```
-
-Response (header only):
-```json
-{
-  "index": 1234,
-  "timestamp": 1234567890,
-  "previousHash": "abc123...",
-  "validator": "0x456...",
-  "hash": "2a3b4c...",
-  "stateRoot": "7f8e9d...",
-  "gasUsed": 50000,
-  "chainId": "sayman-public-testnet-1",
-  "transactionCount": 10
-}
-```
-
-### Example: Verify Your Balance (Light Client)
+### 1. `msg.sender` was undefined → crash
+**Before:**
 ```javascript
-// 1. Get latest block header
-const header = await fetch('/api/light/block/1234').then(r => r.json());
-
-// 2. Get proof for your account
-const proof = await fetch('/api/proof/0xYourAddress').then(r => r.json());
-
-// 3. Verify proof matches state root
-const verification = await fetch('/api/proof/verify', {
-  method: 'POST',
-  body: JSON.stringify({
-    proof: proof.proof,
-    stateRoot: header.stateRoot
-  })
-}).then(r => r.json());
-
-if (verification.valid) {
-  console.log('✅ Your balance is verified:', proof.proof.leaf.balance);
-}
+// token.js — BROKEN
+const from = msg.sender;  // ReferenceError: msg is not defined
 ```
-
----
-
-## 📸 Snapshot System
-
-### What are Snapshots?
-
-**Snapshots** are periodic saves of the complete blockchain state. They allow nodes to start quickly without replaying all blocks from genesis.
-
-### How Snapshots Work
-
-- **Saved every 100 blocks** (configurable)
-- **Stored in** `data/snapshots/`
-- **Contains**: Full state + state root
-- **Automatic cleanup**: Keeps last 3 snapshots
-
-### Snapshot Files
-```
-data/snapshots/sayman-public-testnet-1/
-  ├── snapshot-100.json
-  ├── snapshot-200.json
-  └── snapshot-300.json
-```
-
-### Fast Node Initialization
-
-1. Node loads latest snapshot (e.g., block 300)
-2. Node replays only blocks 301-400
-3. Result: **10x faster startup**
-
----
-
-## 🔧 Block Validation (Phase 8)
-
-A block is now valid **only if**:
-
-1. ✅ All transactions are valid
-2. ✅ Gas calculations are correct
-3. ✅ Balances are non-negative
-4. ✅ **State root matches computed state** ← NEW!
-
-### Validation Process
+**After:** `msg.sender` is now fully exposed in the sandbox:
 ```javascript
-// After applying transactions:
-const computedRoot = blockchain.state.computeStateRoot();
-
-if (block.stateRoot !== computedRoot) {
-  // ❌ REJECT BLOCK - State root mismatch
-  throw new Error('Invalid state root');
-}
-
-// ✅ Block is valid
+const sandbox = {
+  msg: { sender: from, caller: from },
+  caller: from,
+  // ...
+};
 ```
 
----
-
-## 📚 Contract Storage Roots
-
-Smart contracts now have their own **storage roots** in the state tree.
+### 2. Return values were silently discarded
+**Before:** `getCount()` returned a value that was thrown away.
+**After:**
 ```javascript
-Account (Contract) {
-  address: "0xContractAddress",
-  balance: 100,
-  nonce: 0,
-  stake: 0,
-  contractCodeHash: "abc123...",  // Hash of contract code
-  storageRoot: "def456..."        // ✅ Merkle root of contract storage
-}
+sandbox.__returnValue = undefined;
+// script executes: __returnValue = contract.methods.getCount(args)
+returnValue = sandbox.__returnValue;  // ✅ captured
 ```
 
-### Why Storage Roots?
-
-- **Deterministic contract state**: Same storage always produces same root
-- **Verifiable storage**: Prove a storage value exists without full state
-- **Light client support**: Verify contract data with proofs
-
----
-
-## 🚀 API Changes (Phase 8)
-
-### New Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/proof/:address` | Generate Merkle proof for account |
-| `POST /api/proof/verify` | Verify a Merkle proof |
-| `GET /api/light/block/:height` | Get block header only (light client) |
-
-### Updated Endpoints
-
-| Endpoint | Change |
-|----------|--------|
-| `GET /api/network` | Now includes `stateRoot` |
-| `GET /api/stats` | Now includes `stateRoot` |
-| `GET /api/blocks/:index` | Blocks now include `stateRoot` |
-| `GET /api/network/stats` | Now includes `stateRoot` |
-
----
-
-## 🎯 Use Cases
-
-### 1. Trustless Verification
-Verify blockchain state without trusting the node:
+### 3. `require('crypto')` crashed in ES module context
+**Before** (state.js):
 ```javascript
-const proof = await getProof(myAddress);
-const isValid = await verifyProof(proof, blockStateRoot);
-// No trust needed - cryptographically verified!
+const contractCodeHash = require('crypto')  // ❌ crashes in ESM
+  .createHash('sha256').update(code).digest('hex');
 ```
-
-### 2. Light Wallets
-Mobile wallets that don't need full blockchain:
+**After:**
 ```javascript
-// Download only block headers (~1KB each)
-// Verify your account with Merkle proof
-// Total data: <100KB vs full node: >1GB
+import crypto from 'crypto';  // ✅ at top of file, used everywhere
 ```
 
-### 3. Cross-Chain Verification
-Other blockchains can verify Sayman state:
+### 4. Contract state was accessed wrong
+**Before:** Contracts used `state.count` but sandbox exposed `contract.state`.
+**After:** Sandbox directly exposes `state: contract.state`, so `state.count` works.
+
+### 5. Old flat-function contracts broken by new style
+Phase 9 supports **both** contract styles simultaneously:
 ```javascript
-// Relay block header to other chain
-// Prove account state with Merkle proof
-// Enable trustless bridges!
-```
-
-### 4. Fast Sync
-New nodes start in minutes, not hours:
-```javascript
-// Load snapshot from block 10,000
-// Replay only blocks 10,001-10,500
-// Full node ready in <5 minutes
-```
-
----
-
-## 🔬 Technical Details
-
-### Merkle Tree Construction
-
-1. **Sort accounts by address** (deterministic ordering)
-2. **Hash each account**:
-```javascript
-   hash(JSON.stringify({
-     address, balance, nonce, stake,
-     contractCodeHash, storageRoot
-   }))
-```
-3. **Build tree bottom-up**:
-```
-   Level 0: [h1, h2, h3, h4, h5, h6, h7, h8]
-   Level 1: [h(h1+h2), h(h3+h4), h(h5+h6), h(h7+h8)]
-   Level 2: [h(h12+h34), h(h56+h78)]
-   Level 3: [h(h1234+h5678)]  ← ROOT
-```
-
-### Proof Structure
-```javascript
-{
-  leaf: { /* account data */ },
-  leafHash: "a1b2c3...",
-  proof: [
-    { hash: "sibling1", position: "left" },
-    { hash: "sibling2", position: "right" },
-    ...
-  ],
-  root: "7f8e9d..."
-}
-```
-
-### Verification Algorithm
-```javascript
-let currentHash = leafHash;
-for (const step of proof) {
-  if (step.position === 'left') {
-    currentHash = hash(step.hash + currentHash);
-  } else {
-    currentHash = hash(currentHash + step.hash);
+// Style A (Phase 9 — preferred):
+const contract = {
+  methods: {
+    createReport(args) { ... }
   }
-}
-return currentHash === root; // ✅ Valid if match
+};
+
+// Style B (backward compatible — old style still works):
+function createReport(args) { ... }
 ```
 
 ---
 
-## 📦 Deployment (Phase 8)
+## 📝 Writing Smart Contracts (Phase 9)
 
-### 1. Install Dependencies
-```bash
-npm install
+Contracts are plain JavaScript files. Drop them anywhere — no compiler, no Solidity.
+
+### Sandbox globals available inside every contract:
+
+| Global | Type | Description |
+|---|---|---|
+| `state` | object | Contract's persistent state (read/write directly) |
+| `msg.sender` | string | Address of the caller |
+| `caller` | string | Same as `msg.sender` |
+| `args` | object | Arguments passed to this method call |
+| `blockTimestamp` | number | Current block timestamp (ms) |
+| `getState(key)` | function | Read a state key (metered) |
+| `setState(key, value)` | function | Write a state key (metered) |
+| `emit(event, data)` | function | Emit a named event (stored permanently) |
+| `transfer(to, amount)` | function | Transfer SAYM from contract balance |
+| `getBalance(address)` | function | Read any address balance |
+| `require(condition, msg)` | function | Assert, throw on failure |
+| `hash(data)` | function | SHA256 hash of any value |
+| `console.log(...)` | function | Debug logging |
+
+### Full contract example:
+
+```javascript
+// contracts/MyContract.js
+
+const contract = {
+  methods: {
+
+    // Create an item
+    create(args) {
+      require(args.id,    'ID is required');
+      require(args.name,  'Name is required');
+
+      const items = getState('items') || {};
+      require(!items[args.id], 'Item already exists');
+
+      items[args.id] = {
+        id:        args.id,
+        name:      args.name,
+        owner:     msg.sender,
+        createdAt: blockTimestamp
+      };
+
+      setState('items', items);
+      emit('ITEM_CREATED', { id: args.id, owner: msg.sender });
+
+      return items[args.id];
+    },
+
+    // Transfer ownership
+    transfer(args) {
+      const items = getState('items') || {};
+      require(items[args.id],              'Item not found');
+      require(items[args.id].owner === msg.sender, 'Not your item');
+
+      items[args.id].owner = args.to;
+      setState('items', items);
+      emit('ITEM_TRANSFERRED', { id: args.id, from: msg.sender, to: args.to });
+    },
+
+    // Read (no gas for pure reads via SDK)
+    getItem(args) {
+      return (getState('items') || {})[args.id] || null;
+    }
+
+  }
+};
 ```
 
-### 2. Initialize Blockchain
+---
+
+## 🚀 Deploying Contracts from an External Repo
+
+This is the key Phase 9 improvement: **your dApp lives in its own repo** and deploys contracts to SAYMAN exactly like a real blockchain.
+
+### Step 1 — Install the SAYMAN SDK
+
 ```bash
+# Option A: npm link (local development)
+cd sayman-chain/sdk
+npm link
+
+cd my-dapp
+npm link @sayman/sdk
+
+# Option B: direct install
+npm install /path/to/sayman-chain/sdk
+```
+
+### Step 2 — Write your deploy script
+
+```javascript
+// my-dapp/scripts/deploy.js
+import fs from 'fs';
+import { SaymanClient } from '@sayman/sdk';
+
+const client = new SaymanClient({ rpcUrl: 'http://localhost:10000' });
+
+const wallet = {
+  address:   process.env.DEPLOYER_ADDRESS,
+  publicKey: process.env.DEPLOYER_PUBLIC_KEY,
+  sign: (hash) => myWallet.sign(hash)
+};
+
+const code = fs.readFileSync('./contracts/MyContract.js', 'utf8');
+
+const contractAddress = await client.deployContract({
+  name:    'MyContract',
+  version: '1.0.0',
+  code,
+  wallet,
+  gasLimit: 200000,
+  gasPrice: 1
+});
+
+console.log('Deployed at:', contractAddress);
+```
+
+### Step 3 — Call your contract
+
+```javascript
+// State-changing call
+await client.callContract({
+  contractAddress,
+  method: 'create',
+  args:   { id: 'item-1', name: 'My Item' },
+  wallet,
+  gasLimit: 50000
+});
+
+// Read-only state
+const item = await client.readState(contractAddress, 'items');
+```
+
+### Step 4 — Listen to events
+
+```javascript
+const events = await client.getEvents({
+  contractAddress,
+  eventName: 'ITEM_CREATED',
+  limit: 50
+});
+```
+
+---
+
+## 🏙️ CrowdPulse — Full Demo Walkthrough
+
+CrowdPulse is the first dApp built on SAYMAN. It's in a **completely separate repo** and demonstrates the full contract lifecycle.
+
+### Architecture
+
+```
+Citizen App (frontend/index.html)
+        ↓
+CrowdPulse Backend (backend/index.js)  ← AI verify, REST API, CORS
+        ↓
+SAYMAN Blockchain (RPC)
+        ↓  ↑
+  Smart Contracts (on-chain)
+   ├── ReportRegistry
+   ├── ReputationManager
+   └── RewardManager
+        ↓
+  IPFS (off-chain evidence storage)
+```
+
+### Quick Start
+
+#### 1. Start the SAYMAN node
+
+```bash
+cd sayman-chain
 node server.js --network public-testnet --mode validator
 ```
 
-The node will:
-- Try to load latest snapshot
-- If no snapshot, replay full chain
-- Compute state roots for all blocks
-- Verify state root integrity
-
-### 3. Check State Root
+Verify it's running:
 ```bash
 curl http://localhost:10000/api/stats
+# → { "blocks": 12, "contracts": 0, "stateRoot": "abc..." }
 ```
 
-Response includes:
-```json
-{
-  "stateRoot": "7f8e9d1234...",
-  "blocks": 1500,
-  ...
-}
+#### 2. Deploy CrowdPulse contracts
+
+```bash
+cd crowdpulse
+
+# Set your deployer key (or use the dev default)
+export DEPLOYER_PRIVATE_KEY=your_private_key_hex
+
+node scripts/deploy.js --network local
+```
+
+Expected output:
+```
+╔══════════════════════════════════════╗
+║  CrowdPulse Contract Deployer v1.0   ║
+╚══════════════════════════════════════╝
+
+Network:   local
+RPC:       http://localhost:10000
+Deployer:  1a2b3c4d5e6f...
+Balance:   50000 SAYM
+
+Deploying ReportRegistry...    ✅ 7f3a1b2c9d8e...
+Deploying ReputationManager... ✅ 4e2b1c0a8f7d...
+Deploying RewardManager...     ✅ 9d8c7b6a5e4f...
+
+📄 Manifest saved → crowdpulse/deployed.json
+```
+
+#### 3. Start the CrowdPulse backend
+
+```bash
+cd crowdpulse/backend
+npm install
+SAYMAN_RPC=http://localhost:10000 node index.js
+# → API: http://localhost:3001
+```
+
+#### 4. Open the frontend
+
+```bash
+# Just open in browser — no build step needed
+open crowdpulse/frontend/index.html
+```
+
+### Full Demo Flow (for judges)
+
+**Scenario: Pothole reported on Main Street**
+
+1. **Open frontend** → see live block height ticking
+2. **Fill in form**: Category = Road Damage, Severity = High, description
+3. **Click "Run AI Verification"** → confidence score appears (e.g. 91%)
+4. **Click "Submit to SAYMAN Chain"** → transaction sent
+5. **Report appears** in live feed with `OPEN` status
+6. **Check Events tab** → `REPORT_CREATED` event visible on-chain
+7. **Check SAYMAN explorer** → `GET /api/contracts/{address}/state` shows the report
+8. **Authority resolves** (via API) → status changes to `RESOLVED` on-chain
+9. **Reporter gains reputation** → `REPUTATION_INCREASED` event appears
+10. **State root changes** → every state change is cryptographically committed
+
+### What this proves to judges:
+
+- Smart contracts deployed from a **separate repo** to a **live chain**
+- Events emitted by contracts, **queryable via API**
+- State changes **permanently recorded** with Merkle proof
+- AI + blockchain working together — AI result stored on-chain
+- Full lifecycle: submit → verify → resolve → reward
+
+---
+
+## 🌐 New API Routes for Phase 9
+
+Add these to `api/routes.js`:
+
+```javascript
+// Contract registry
+GET  /api/contracts
+GET  /api/contracts/:address
+GET  /api/contracts/:address/state
+GET  /api/contracts/:address/state/:key
+GET  /api/contracts/:address/events
+
+// Events
+GET  /api/events?contract=&event=&limit=
+
+// Reputation
+GET  /api/reputation/:address
+
+// Native reports
+GET  /api/reports?category=&status=&limit=
+GET  /api/reports/:id
+
+// Account (needed by SDK)
+GET  /api/account/:address   → { balance, nonce, stake, reputation }
 ```
 
 ---
 
-## 🎉 Phase 8 Achievements
+## 🔐 Security Notes
 
-✅ **Merkle state tree** - Cryptographic state verification  
-✅ **State roots in blocks** - Every block provably correct  
-✅ **Merkle proofs** - Verify accounts without full state  
-✅ **Light client support** - Mobile-friendly verification  
-✅ **Snapshot system** - 10x faster node startup  
-✅ **Contract storage roots** - Deterministic smart contracts  
-✅ **Backward compatible** - All Phase 7 features work  
+### VM Sandbox
+Contracts run inside Node.js `vm.Script` with:
+- 5-second execution timeout
+- Isolated context — no access to `require`, `process`, `fs`
+- Gas metering on every `getState` / `setState` call
+- Memory constrained by V8 context isolation
 
----
+When asked by mentors:
+> *"How do you prevent infinite loops?"*
 
-## 🚀 What's Next?
+Answer: **Execution timeout (5000ms) + gas limit per transaction. A contract that exceeds either is rejected and its state changes rolled back.**
 
-**Phase 9 Ideas:**
-- State pruning (remove old state)
-- Beam sync (sync only recent state)
-- Snapshot compression (smaller files)
-- Cross-chain state proofs
-- Zero-knowledge state proofs
+> *"What if a contract calls `require('fs')`?"*
+
+Answer: **The VM sandbox has no `require`. It throws `ReferenceError: require is not defined`. Only the explicitly injected sandbox globals are available.**
 
 ---
 
-## 📖 Further Reading
+## 📦 Transaction Types (Complete List)
 
-- [Merkle Trees Explained](https://en.wikipedia.org/wiki/Merkle_tree)
-- [Ethereum State Tree](https://ethereum.org/en/developers/docs/data-structures-and-encoding/patricia-merkle-trie/)
-- [Light Clients](https://www.parity.io/blog/what-is-a-light-client/)
+| Type | Who sends | Gas | Signature |
+|---|---|---|---|
+| `GENESIS` | Chain | No | No |
+| `REWARD` | Chain | No | No |
+| `REWARD_FEE` | Chain | No | No |
+| `SLASH` | Chain | No | No |
+| `REPUTATION_UPDATE` | Chain | No | No |
+| `TRANSFER` | User | Yes | Yes |
+| `STAKE` | User | Yes | Yes |
+| `UNSTAKE` | User | Yes | Yes |
+| `CONTRACT_DEPLOY` | User | Yes | Yes |
+| `CONTRACT_CALL` | User | Yes | Yes |
+| `CONTRACT_UPGRADE` | User | Yes | Yes |
+| `REPORT_CREATE` | User | Yes | Yes |
+| `REPORT_VERIFY` | User | Yes | Yes |
+| `REPORT_RESOLVE` | User | Yes | Yes |
 
 ---
 
-**Phase 8 Complete! 🎉**
+## 🏆 Hackathon Pitch Points
 
-State verification is now cryptographically secure and trustless.
+### Why your own blockchain?
+> "Ethereum charges $5–50 per transaction for civic reports — unviable for mass adoption. SAYMAN has near-zero fees, native Proof-of-Report transaction types, and a reputation layer built into consensus. This isn't a Solidity port; this is a chain redesigned around civic intelligence."
+
+### Why JavaScript contracts?
+> "JavaScript has 20 million developers globally. Solidity has under 50,000. We reduce the barrier for civic developers from 6 months of learning a new language to 0 days. Any JS developer can deploy a dApp on SAYMAN today."
+
+### Why blockchain for reporting?
+> "Citizens don't trust authorities. Authorities don't trust citizen data. NGOs don't trust either. Blockchain provides a single, tamper-proof source of truth that no single actor controls. Once a report is submitted, nobody — not even the chain operator — can delete it."
+
+### One-liner:
+> "CrowdPulse transforms millions of citizens into a real-time decentralized sensor network, powered by AI verification and secured by the SAYMAN Blockchain — the first chain purpose-built for civic intelligence."
+
+---
+
+## 📸 Snapshot System (Phase 8, still active)
+
+- Saved every 100 blocks to `data/snapshots/`
+- Restores in seconds instead of replaying full chain
+- Phase 9 adds `reputation` and `eventLog` to snapshot exports
+
+---
+
+## 🔬 State Root (Phase 8+)
+
+Every block includes a `stateRoot` — a Merkle hash of all accounts, contract storage, and reputation scores. This makes every state transition cryptographically provable.
+
+```
+Block #1234
+  stateRoot: "7f8e9d1234..." ← hash of entire world state
+  hash:      "2a3b4c5d..."   ← block hash (includes stateRoot)
+```
+
+---
+
+## 🚀 Phase 10 Ideas
+
+- Cross-contract calls (`callContract(address, method, args)` from within a contract)
+- Contract upgrade mechanism (proxy pattern)
+- ZK proof of report existence (without revealing location)
+- Multi-sig authority wallets
+- On-chain governance voting for report priorities
+- IPFS integration built into node (auto-pin evidence)
+
+---
+
+## ✅ Phase 9 Achievements
+
+- ✅ `msg.sender` fixed — contracts no longer crash
+- ✅ Return values captured from contract methods
+- ✅ `emit()` event system — permanent, queryable log
+- ✅ Contract metadata (name, version, ABI) on-chain
+- ✅ Both contract styles supported (new + backward compat)
+- ✅ Reputation engine in StateEngine
+- ✅ `REPORT_CREATE / VERIFY / RESOLVE` native tx types
+- ✅ `REPUTATION_UPDATE` system transaction
+- ✅ External dApp SDK (`@sayman/sdk`)
+- ✅ CrowdPulse contracts deployable from separate repo
+- ✅ Full demo: frontend + backend + contracts + chain
+- ✅ `require('crypto')` ESM crash fixed
+- ✅ `exportState()` includes reputation + events (snapshots work)
+- ✅ `getContractRegistry()` API
+- ✅ Backward compatible — all Phase 8 features intact
+
+---
+
+**Phase 9 Complete. SAYMAN is now a full JavaScript smart contract platform. 🎉**
