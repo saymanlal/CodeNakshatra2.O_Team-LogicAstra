@@ -1,40 +1,25 @@
 services:
-   # Main Blockchain Node (Validator)
   - type: web
     name: sayman-blockchain
     env: node
     region: oregon
     plan: free
     buildCommand: npm install
-    startCommand: node server.js --network testnet --mode fullnode
+    startCommand: node server.js --network public-testnet --mode validator
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
-      - key: P2P_PORT
-        value: 6001
-    healthCheckPath: /health
-    autoDeploy: true
-    
-  # Full Node + Explorer UI
-  - type: web
-    name: sayman-explorer
-    env: node
-    region: oregon
-    plan: free
-    buildCommand: npm install
-    startCommand: node server.js --network public-testnet --mode fullnode
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 10000
-      - key: P2P_PORT
-        value: 6002
+      - key: DB_PATH
+        value: /var/data/sayman-db
     healthCheckPath: /api/stats
-    
-  # Faucet Server
+    autoDeploy: true
+    disk:
+      name: sayman-data
+      mountPath: /var/data
+      sizeGB: 1
+
   - type: web
     name: sayman-faucet
     env: node
@@ -46,5 +31,5 @@ services:
       - key: FAUCET_PORT
         value: 10000
       - key: FAUCET_AMOUNT
-        value: 100
+        value: 1000
     healthCheckPath: /health
