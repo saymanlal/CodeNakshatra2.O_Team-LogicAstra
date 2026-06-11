@@ -23,6 +23,12 @@ const ec = new EC('secp256k1');
  *  - getReputation() public API
  *  - getContractRegistry() — list all deployed contracts with metadata
  *  - addTransaction() validates new tx types
+ *
+ * Fix (Phase 9.1):
+ *  - pendingNonces Map tracks mempool-level nonces separately from confirmed state
+ *    so sequential txs in the same block (e.g. deploying 3 contracts at once) work correctly.
+ *    Every real L1 (Ethereum, Solana, Cosmos) does this. Without it, only the first tx
+ *    per block per address is accepted because confirmed nonce hasn't updated yet.
  */
 
 class Blockchain {
@@ -44,10 +50,17 @@ class Blockchain {
     this.snapshotDir      = `./data/snapshots/${config.chainId}`;
     this.ensureSnapshotDir();
 
-    this.isProducing   = false;
-    this.mempoolLimit  = 1000;
+    this.isProducing    = false;
+    this.mempoolLimit   = 1000;
     this.addressTxCount = new Map();
-    this.lastCleanup   = Date.now();
+    this.lastCleanup    = Date.now();
+
+    // ─── Phase 9.1 fix: mempool-level pending nonce tracking ────────────────
+    // Tracks (confirmedNonce + queued mempool txs) per address so that multiple
+    // txs submitted before the next block are accepted with sequential nonces.
+    // Reset to empty after every block is mined (confirmed nonces take over).
+    this.pendingNonces = new Map();
+    // ────────────────────────────────────────────────────────────────────────
 
     // ✅ Phase 9: in-memory report index for fast queries
     this.reportIndex = new Map();
@@ -273,7 +286,12 @@ class Blockchain {
         }
       }
 
+      // ─── Phase 9.1: clear mempool AND pending nonces together ─────────────
+      // pendingNonces must reset here — confirmed nonces (from applyBlock below)
+      // are now the source of truth for the next round of txs.
       this.mempool = [];
+      this.pendingNonces.clear();
+      // ──────────────────────────────────────────────────────────────────────
 
       transactions.push(Transaction.createReward(validator, this.config.blockReward));
 
@@ -435,14 +453,31 @@ class Blockchain {
       throw new Error('Invalid transaction signature');
     }
 
-    const expectedNonce = this.state.getNonce(tx.data.from);
+    // ─── Phase 9.1: pending nonce tracking ──────────────────────────────────
+    // confirmedNonce = what is committed on-chain (state after last block).
+    // pendingNonce   = confirmedNonce + number of txs already queued in mempool
+    //                  from this address this round.
+    // expectedNonce  = the next slot to fill (whichever is higher wins, so a
+    //                  fresh address with nothing pending still gets 0).
+    //
+    // Why: the second and third tx in a batch arrive BEFORE the block is mined,
+    // so state.getNonce() still returns 0 for all three. Without pendingNonces
+    // the node rejects nonce=1 and nonce=2 with "Expected: 0".
+    const confirmedNonce = this.state.getNonce(tx.data.from);
+    const pendingNonce   = this.pendingNonces.get(tx.data.from) ?? confirmedNonce;
+    const expectedNonce  = Math.max(confirmedNonce, pendingNonce);
+
     if (tx.nonce !== expectedNonce) {
       throw new Error(`Invalid nonce. Expected: ${expectedNonce}, Got: ${tx.nonce}`);
     }
 
+    // Advance the pending cursor so the next tx from this address uses nonce+1
+    this.pendingNonces.set(tx.data.from, expectedNonce + 1);
+    // ────────────────────────────────────────────────────────────────────────
+
     this.gas.validateGasParams(tx);
 
-    const minGas    = this.gas.calculateTransactionGas(tx);
+    const minGas = this.gas.calculateTransactionGas(tx);
     if (tx.gasLimit < minGas) {
       throw new Error(`Gas limit too low. Minimum: ${minGas}`);
     }
@@ -636,15 +671,15 @@ class Blockchain {
       : 0;
 
     return {
-      network:       this.networkName,
-      chainId:       this.chainId,
-      blocks:        this.chain.length,
-      mempool:       this.mempool.length,
-      validators:    validatorCount,
+      network:    this.networkName,
+      chainId:    this.chainId,
+      blocks:     this.chain.length,
+      mempool:    this.mempool.length,
+      validators: validatorCount,
       totalStake,
-      contracts:     contractCount,
-      reports:       this.reportIndex.size,       // ✅ Phase 9
-      stateRoot:     this.state.computeStateRoot()
+      contracts:  contractCount,
+      reports:    this.reportIndex.size,        // ✅ Phase 9
+      stateRoot:  this.state.computeStateRoot()
     };
   }
 
