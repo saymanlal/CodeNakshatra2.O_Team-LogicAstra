@@ -7,7 +7,7 @@ class GasCalculator {
       TRANSFER: 6,
       STAKE: 50,
       UNSTAKE: 50,
-      CONTRACT_DEPLOY: 500,
+      CONTRACT_DEPLOY: 5,
       CONTRACT_CALL_BASE: 100,
       STATE_READ: 5,
       STATE_WRITE: 20,
@@ -36,7 +36,7 @@ class GasCalculator {
       
       case 'CONTRACT_DEPLOY':
         const codeSize = tx.data.code.length;
-        return this.gasCosts.CONTRACT_DEPLOY + Math.floor(codeSize / 10);
+        return this.gasCosts.CONTRACT_DEPLOY + Math.floor(codeSize / 1000);
       
       case 'CONTRACT_CALL':
         // Base cost + estimated execution
