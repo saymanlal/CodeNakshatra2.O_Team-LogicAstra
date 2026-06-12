@@ -27,8 +27,12 @@ const ec = new EC('secp256k1');
  * Fix (Phase 9.1):
  *  - pendingNonces Map tracks mempool-level nonces separately from confirmed state
  *    so sequential txs in the same block (e.g. deploying 3 contracts at once) work correctly.
- *    Every real L1 (Ethereum, Solana, Cosmos) does this. Without it, only the first tx
- *    per block per address is accepted because confirmed nonce hasn't updated yet.
+ *
+ * Fix (Phase 9.2):
+ *  - pendingNonces cursor is only advanced AFTER all validation (sig, gas, balance) passes.
+ *    Previously the cursor advanced before balance checks, so a failing tx consumed a nonce
+ *    slot and every retry arrived with a stale nonce → "Expected: 1, Got: 0".
+ *  - GasCalculator property renamed gasCosts → costs (see gas.js); references here updated.
  */
 
 class Blockchain {
@@ -55,10 +59,12 @@ class Blockchain {
     this.addressTxCount = new Map();
     this.lastCleanup    = Date.now();
 
-    // ─── Phase 9.1 fix: mempool-level pending nonce tracking ────────────────
+    // ─── Phase 9.1: mempool-level pending nonce tracking ────────────────────
     // Tracks (confirmedNonce + queued mempool txs) per address so that multiple
     // txs submitted before the next block are accepted with sequential nonces.
     // Reset to empty after every block is mined (confirmed nonces take over).
+    //
+    // Phase 9.2: cursor is advanced only after ALL validation passes (see addTransaction).
     this.pendingNonces = new Map();
     // ────────────────────────────────────────────────────────────────────────
 
@@ -453,16 +459,9 @@ class Blockchain {
       throw new Error('Invalid transaction signature');
     }
 
-    // ─── Phase 9.1: pending nonce tracking ──────────────────────────────────
-    // confirmedNonce = what is committed on-chain (state after last block).
-    // pendingNonce   = confirmedNonce + number of txs already queued in mempool
-    //                  from this address this round.
-    // expectedNonce  = the next slot to fill (whichever is higher wins, so a
-    //                  fresh address with nothing pending still gets 0).
-    //
-    // Why: the second and third tx in a batch arrive BEFORE the block is mined,
-    // so state.getNonce() still returns 0 for all three. Without pendingNonces
-    // the node rejects nonce=1 and nonce=2 with "Expected: 0".
+    // ─── Phase 9.1 / 9.2: pending nonce tracking ────────────────────────────
+    // Read the pending cursor BEFORE any further checks so we can report the
+    // correct expected nonce in the error message.
     const confirmedNonce = this.state.getNonce(tx.data.from);
     const pendingNonce   = this.pendingNonces.get(tx.data.from) ?? confirmedNonce;
     const expectedNonce  = Math.max(confirmedNonce, pendingNonce);
@@ -471,8 +470,11 @@ class Blockchain {
       throw new Error(`Invalid nonce. Expected: ${expectedNonce}, Got: ${tx.nonce}`);
     }
 
-    // Advance the pending cursor so the next tx from this address uses nonce+1
-    this.pendingNonces.set(tx.data.from, expectedNonce + 1);
+    // ⚠️  Phase 9.2 fix: do NOT advance pendingNonces here.
+    // The cursor is advanced only after ALL remaining checks (gas + balance) pass,
+    // at the very bottom of this function. Previously the cursor advanced here,
+    // so any tx rejected by the balance check still consumed a nonce slot —
+    // every retry then arrived with a stale nonce and hit "Expected: 1, Got: 0".
     // ────────────────────────────────────────────────────────────────────────
 
     this.gas.validateGasParams(tx);
@@ -523,6 +525,10 @@ class Blockchain {
         }
         break;
     }
+
+    // ─── Phase 9.2: advance cursor only now — all checks passed ─────────────
+    this.pendingNonces.set(tx.data.from, expectedNonce + 1);
+    // ────────────────────────────────────────────────────────────────────────
 
     this.mempool.push(tx);
     this.addressTxCount.set(tx.data.from, addressCount + 1);

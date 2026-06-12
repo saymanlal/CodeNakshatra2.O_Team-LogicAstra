@@ -13,6 +13,14 @@ import vm from 'vm';
  *  - New contract style: `contract = { methods: { ... } }`
  *  - Backward-compatible with old flat function style
  *  - Execution memory limit added
+ *
+ * Fix (Phase 9.2):
+ *  - All this.gas.costs.* references are now valid because GasCalculator
+ *    exposes its table as `this.costs` (renamed from `this.gasCosts`).
+ *    Previously every gas charge in deploy/call evaluated to NaN because
+ *    `this.gas.costs` was undefined — leading to the deployer's wallet
+ *    passing the pre-flight balance check (gasLimit * gasPrice looked fine)
+ *    but then the block production step deducting NaN, corrupting state.
  */
 
 class ContractEngine {
@@ -37,10 +45,10 @@ class ContractEngine {
     let name, version, abi, code;
 
     if (typeof contractPayload === 'string') {
-      code = contractPayload;
-      name = 'UnnamedContract';
+      code    = contractPayload;
+      name    = 'UnnamedContract';
       version = '1.0.0';
-      abi = this._extractABI(code);
+      abi     = this._extractABI(code);
     } else {
       code    = contractPayload.code;
       name    = contractPayload.name    || 'UnnamedContract';
@@ -48,25 +56,30 @@ class ContractEngine {
       abi     = contractPayload.abi     || this._extractABI(code);
     }
 
+    if (!code) {
+      throw new Error('Contract code is required for deployment');
+    }
+
     const contractAddress = this.generateContractAddress(from, timestamp);
     const codeHash = crypto.createHash('sha256').update(code).digest('hex');
 
     const contract = {
-      address: contractAddress,
+      address:   contractAddress,
       name,
       version,
       abi,
       code,
       codeHash,
-      creator: from,
-      state: {},
+      creator:   from,
+      state:     {},
       createdAt: timestamp
     };
 
     this.contracts.set(contractAddress, contract);
     this.state.deployContract(contractAddress, code, from, { name, version, abi, codeHash });
 
-    gasTracker.gasUsed += this.gas.costs.contractDeploy + (code.length * this.gas.costs.storageByte);
+    // ✅ Phase 9.2: this.gas.costs is now defined (GasCalculator renamed gasCosts → costs)
+    gasTracker.gasUsed += this.gas.costs.contractDeploy + Math.floor(code.length * this.gas.costs.storageByte);
 
     console.log(`📜 Contract deployed: [${name} v${version}] ${contractAddress.substring(0, 8)}... by ${from.substring(0, 8)}... | CodeHash: ${codeHash.substring(0, 8)}...`);
 
@@ -84,7 +97,8 @@ class ContractEngine {
       throw new Error(`Contract not found: ${contractAddress}`);
     }
 
-    gasTracker.gasUsed += this.gas.costs.contractCall;
+    // ✅ Phase 9.2: this.gas.costs.contractCall is now defined
+    gasTracker.gasUsed += this.gas.costs.contractCall || this.gas.costs.CONTRACT_CALL_BASE;
 
     // Captured events from this call
     const callEvents = [];
@@ -100,24 +114,24 @@ class ContractEngine {
         caller: from
       },
 
-      caller: from,
-      args: args || {},
+      caller:         from,
+      args:           args || {},
       method,
       blockTimestamp: Date.now(),
 
       console: {
-        log: (...a) => console.log('[Contract Log]', ...a),
+        log:   (...a) => console.log('[Contract Log]', ...a),
         error: (...a) => console.error('[Contract Error]', ...a)
       },
 
       // ✅ Fix 3: emit() event support
       emit: (eventName, data) => {
         const event = {
-          contract: contractAddress,
+          contract:     contractAddress,
           contractName: contract.name || 'Unknown',
-          event: eventName,
-          data: data || {},
-          timestamp: Date.now()
+          event:        eventName,
+          data:         data || {},
+          timestamp:    Date.now()
         };
         callEvents.push(event);
         this.events.push(event);
@@ -194,7 +208,7 @@ class ContractEngine {
       sandbox.__returnValue = undefined;
 
       script.runInContext(context, {
-        timeout: 5000,
+        timeout:       5000,
         breakOnSigint: true
       });
 
@@ -242,14 +256,12 @@ class ContractEngine {
   }
 
   /**
-   * Simple ABI extractor — reads method names from contract code
-   * Supports both styles
+   * Simple ABI extractor — reads method names from contract code.
+   * Supports both styles.
    */
   _extractABI(code) {
     const methods = [];
 
-    // Style A: contract = { methods: { methodName(
-    const styleARegex = /(\w+)\s*\(/g;
     // Style B: function methodName(
     const styleBRegex = /function\s+(\w+)\s*\(/g;
 
