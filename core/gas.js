@@ -40,8 +40,8 @@ class GasCalculator {
       UNSTAKE:            50,
 
       // Contract operations
-      contractDeploy:     500,   // ContractEngine: this.gas.costs.contractDeploy
-      CONTRACT_DEPLOY:    500,
+      contractDeploy:     5,   // ContractEngine: this.gas.costs.contractDeploy
+      CONTRACT_DEPLOY:    5,
 
       contractCall:       100,   // ContractEngine: this.gas.costs.contractCall (unused directly but kept for symmetry)
       CONTRACT_CALL_BASE: 100,
