@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sayman Wallet</string>
+    <string name="title_activity_main">Sayman Wallet</string>
+    <string name="package_name">com.krushn.saymanwallet</string>
+    <string name="custom_url_scheme">com.krushn.saymanwallet</string>
+</resources>

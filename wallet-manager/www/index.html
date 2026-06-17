@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sayman Wallet Manager - Multi-Wallet Swiss Design</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js"></script>
+  <style>
+    :root {
+      --mono-000: #000000;
+      --mono-100: #1a1a1a;
+      --mono-200: #333333;
+      --mono-300: #4d4d4d;
+      --mono-400: #666666;
+      --mono-500: #808080;
+      --mono-600: #999999;
+      --mono-700: #b3b3b3;
+      --mono-800: #cccccc;
+      --mono-900: #e6e6e6;
+      --mono-950: #f5f5f5;
+      --mono-1000: #ffffff;
+      --grid: 8px;
+      --border: 1px solid var(--mono-800);
+      --success: #10b981;
+      --error: #ef4444;
+      --warning: #f59e0b;
+      --testnet: #3b82f6;
+      --mainnet: #8b5cf6;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--mono-100);
+      background: var(--mono-1000);
+      letter-spacing: -0.01em;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: calc(var(--grid) * 4);
+    }
+
+    h1 { font-size: 32px; font-weight: 500; margin-bottom: calc(var(--grid) * 1); letter-spacing: -0.02em; }
+    h2 { font-size: 24px; font-weight: 500; margin-bottom: calc(var(--grid) * 2); }
+    h3 { font-size: 18px; font-weight: 500; margin-bottom: calc(var(--grid) * 2); }
+
+    .header {
+      border-bottom: var(--border);
+      padding-bottom: calc(var(--grid) * 4);
+      margin-bottom: calc(var(--grid) * 4);
+    }
+
+    .header-subtitle {
+      color: var(--mono-400);
+      font-size: 14px;
+      margin-bottom: calc(var(--grid) * 2);
+    }
+
+    .network-selector {
+      display: flex;
+      gap: calc(var(--grid) * 2);
+      margin-top: calc(var(--grid) * 3);
+      border: var(--border);
+    }
+
+    .network-btn {
+      flex: 1;
+      padding: calc(var(--grid) * 2) calc(var(--grid) * 3);
+      border: none;
+      border-right: var(--border);
+      background: var(--mono-1000);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      transition: all 0.15s;
+    }
+
+    .network-btn:last-child {
+      border-right: none;
+    }
+
+    .network-btn:hover {
+      background: var(--mono-950);
+    }
+
+    .network-btn.active {
+      background: var(--mono-100);
+      color: var(--mono-1000);
+    }
+
+    .network-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 9px;
+      margin-left: 8px;
+      font-weight: 600;
+    }
+
+    .badge-testnet {
+      background: var(--testnet);
+      color: white;
+    }
+
+    .badge-mainnet {
+      background: var(--mainnet);
+      color: white;
+    }
+
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: calc(var(--grid) * 2);
+      margin-bottom: calc(var(--grid) * 4);
+      padding: calc(var(--grid) * 3);
+      border: var(--border);
+      background: var(--mono-950);
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--grid) * 1);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mono-400);
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wallet-list {
+      display: grid;
+      gap: calc(var(--grid) * 2);
+      margin-bottom: calc(var(--grid) * 4);
+    }
+
+    .wallet-card {
+      border: var(--border);
+      padding: calc(var(--grid) * 3);
+      transition: all 0.15s;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: calc(var(--grid) * 3);
+      align-items: start;
+      position: relative;
+    }
+
+    .wallet-card:hover {
+      background: var(--mono-950);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .wallet-card.active {
+      border-color: var(--mono-100);
+      background: var(--mono-950);
+    }
+
+    .wallet-card.active::before {
+      content: '●';
+      position: absolute;
+      left: calc(var(--grid) * 1);
+      top: calc(var(--grid) * 3);
+      color: var(--success);
+      font-size: 20px;
+    }
+
+    .wallet-main {
+      padding-left: calc(var(--grid) * 3);
+    }
+
+    .wallet-header {
+      display: flex;
+      align-items: center;
+      gap: calc(var(--grid) * 2);
+      margin-bottom: calc(var(--grid) * 2);
+      flex-wrap: wrap;
+    }
+
+    .wallet-name {
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .wallet-tag {
+      padding: 2px 8px;
+      border: var(--border);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .wallet-address {
+      font-family: 'SF Mono', monospace;
+      font-size: 12px;
+      color: var(--mono-400);
+      margin-bottom: calc(var(--grid) * 2);
+      word-break: break-all;
+    }
+
+    .wallet-balance-row {
+      display: flex;
+      gap: calc(var(--grid) * 4);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .balance-item {
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--grid) * 0.5);
+    }
+
+    .balance-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mono-400);
+    }
+
+    .balance-value {
+      font-size: 24px;
+      font-weight: 400;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .balance-unit {
+      font-size: 14px;
+      color: var(--mono-400);
+      margin-left: calc(var(--grid) * 1);
+    }
+
+    .wallet-actions {
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--grid) * 1);
+      min-width: 140px;
+    }
+
+    .btn {
+      padding: calc(var(--grid) * 2) calc(var(--grid) * 3);
+      border: var(--border);
+      background: var(--mono-1000);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      transition: all 0.15s;
+      text-align: center;
+    }
+
+    .btn:hover {
+      background: var(--mono-100);
+      color: var(--mono-1000);
+    }
+
+    .btn-primary {
+      background: var(--mono-100);
+      color: var(--mono-1000);
+    }
+
+    .btn-primary:hover {
+      background: var(--mono-200);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+      border-color: var(--success);
+    }
+
+    .btn-success:hover {
+      background: #059669;
+    }
+
+    .btn-danger {
+      border-color: var(--error);
+      color: var(--error);
+    }
+
+    .btn-danger:hover {
+      background: var(--error);
+      color: var(--mono-1000);
+    }
+
+    .btn-small {
+      padding: calc(var(--grid) * 1) calc(var(--grid) * 2);
+      font-size: 10px;
+    }
+
+    .input-group {
+      margin-bottom: calc(var(--grid) * 3);
+    }
+
+    .input-label {
+      display: block;
+      margin-bottom: calc(var(--grid) * 1);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mono-400);
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: calc(var(--grid) * 2);
+      border: var(--border);
+      background: var(--mono-1000);
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--mono-100);
+      transition: border-color 0.15s;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--mono-400);
+    }
+
+    textarea {
+      min-height: 100px;
+      font-family: 'SF Mono', monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+
+    .section {
+      margin-bottom: calc(var(--grid) * 6);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: calc(var(--grid) * 3);
+      padding-bottom: calc(var(--grid) * 2);
+      border-bottom: var(--border);
+      flex-wrap: wrap;
+      gap: calc(var(--grid) * 2);
+    }
+
+    .alert {
+      padding: calc(var(--grid) * 2);
+      border: var(--border);
+      margin-bottom: calc(var(--grid) * 2);
+      margin-top: calc(var(--grid) * 2);
+    }
+
+    .alert-success {
+      border-color: var(--success);
+      background: #ecfdf5;
+      color: #065f46;
+    }
+
+    .alert-error {
+      border-color: var(--error);
+      background: #fef2f2;
+      color: #991b1b;
+    }
+
+    .alert-warning {
+      border-color: var(--warning);
+      background: #fffbeb;
+      color: #92400e;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--mono-1000);
+      border: var(--border);
+      padding: calc(var(--grid) * 4);
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: calc(var(--grid) * 3);
+      padding-bottom: calc(var(--grid) * 2);
+      border-bottom: var(--border);
+    }
+
+    .modal-close {
+      cursor: pointer;
+      font-size: 24px;
+      color: var(--mono-400);
+      transition: color 0.15s;
+    }
+
+    .modal-close:hover {
+      color: var(--mono-100);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: calc(var(--grid) * 3);
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: var(--border);
+      margin-bottom: calc(var(--grid) * 3);
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: calc(var(--grid) * 2) calc(var(--grid) * 3);
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--mono-400);
+      transition: all 0.15s;
+    }
+
+    .tab-btn:hover {
+      color: var(--mono-100);
+    }
+
+    .tab-btn.active {
+      color: var(--mono-100);
+      border-bottom-color: var(--mono-100);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .tx-history {
+      border: var(--border);
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .tx-item {
+      padding: calc(var(--grid) * 2);
+      border-bottom: 1px solid var(--mono-900);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: calc(var(--grid) * 2);
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .tx-item:last-child {
+      border-bottom: none;
+    }
+
+    .tx-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .tx-icon.send {
+      background: #fee2e2;
+      color: var(--error);
+    }
+
+    .tx-icon.receive {
+      background: #dcfce7;
+      color: var(--success);
+    }
+
+    .tx-icon.stake {
+      background: #e0e7ff;
+      color: var(--testnet);
+    }
+
+    .tx-details {
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--grid) * 0.5);
+    }
+
+    .tx-type {
+      font-weight: 500;
+      color: var(--mono-100);
+    }
+
+    .tx-address {
+      font-family: 'SF Mono', monospace;
+      font-size: 10px;
+      color: var(--mono-400);
+    }
+
+    .tx-amount {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+
+    .faucet-section {
+      padding: calc(var(--grid) * 4);
+      border: 2px dashed var(--mono-800);
+      background: var(--mono-950);
+      text-align: center;
+    }
+
+    .faucet-icon {
+      font-size: 48px;
+      margin-bottom: calc(var(--grid) * 2);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: calc(var(--grid) * 8);
+      color: var(--mono-400);
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: calc(var(--grid) * 2);
+      opacity: 0.3;
+    }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: calc(var(--grid) * 1);
+      padding: calc(var(--grid) * 1) calc(var(--grid) * 2);
+      border: var(--border);
+      background: var(--mono-1000);
+      cursor: pointer;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      transition: all 0.15s;
+    }
+
+    .copy-btn:hover {
+      background: var(--mono-950);
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--mono-900);
+      border-top-color: var(--mono-100);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: calc(var(--grid) * 2) calc(var(--grid) * 3);
+      background: var(--mono-100);
+      color: var(--mono-1000);
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      z-index: 10000;
+      animation: slideIn 0.3s ease;
+      max-width: 400px;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .wallet-card { grid-template-columns: 1fr; }
+      .wallet-actions { flex-direction: row; flex-wrap: wrap; }
+      .network-selector { flex-direction: column; }
+      .network-btn { border-right: none; border-bottom: var(--border); }
+      .wallet-balance-row { flex-direction: column; align-items: flex-start; }
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #invoice-content, #invoice-content * {
+        visibility: visible;
+      }
+      #invoice-content {
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>SAYMAN WALLET MANAGER</h1>
+      <p class="header-subtitle">Multi-Wallet Management / Network Separation / Client-Side Security</p>
+      
+      <div class="network-selector">
+        <button class="network-btn active" data-network="testnet" onclick="switchNetwork('testnet')">
+          Testnet
+          <span class="network-badge badge-testnet">TEST</span>
+        </button>
+        <button class="network-btn" data-network="public-testnet" onclick="switchNetwork('public-testnet')">
+          Public Testnet
+          <span class="network-badge badge-testnet">PUBLIC</span>
+        </button>
+        <button class="network-btn" data-network="mainnet" onclick="switchNetwork('mainnet')">
+          Mainnet
+          <span class="network-badge badge-mainnet">LIVE</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="stat-label">Total Wallets</div>
+        <div class="stat-value" id="total-wallets">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Total Balance</div>
+        <div class="stat-value" id="total-balance">0 <span style="font-size: 14px; color: var(--mono-400);">SAYM</span></div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Total Staked</div>
+        <div class="stat-value" id="total-staked">0 <span style="font-size: 14px; color: var(--mono-400);">SAYM</span></div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Active Network</div>
+        <div class="stat-value" id="active-network" style="font-size: 14px;">Testnet</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <h2>Your Wallets (<span id="wallet-count">0</span>)</h2>
+        <div style="display: flex; gap: calc(var(--grid) * 2); flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="openModal('create')">+ Create Wallet</button>
+          <button class="btn" onclick="openModal('import')">↓ Import Wallet</button>
+          <button class="btn" onclick="exportAllWallets()">↑ Export All</button>
+        </div>
+      </div>
+
+      <div id="wallet-list" class="wallet-list">
+        <div class="empty-state">
+          <div class="empty-icon">👛</div>
+          <p>No wallets yet. Create your first wallet to get started.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="active-wallet-section" style="display: none;">
+      <div class="section-header">
+        <h2>Wallet Operations</h2>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('send')">Send</button>
+        <button class="tab-btn" onclick="showTab('stake')">Stake</button>
+        <button class="tab-btn" onclick="showTab('faucet')">Faucet</button>
+        <button class="tab-btn" onclick="showTab('history')">History</button>
+      </div>
+
+      <div id="tab-send" class="tab-content active">
+        <div class="grid-2">
+          <div class="input-group">
+            <label class="input-label">To Address</label>
+            <input type="text" id="send-to" placeholder="Enter recipient address">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Amount (SAYM)</label>
+            <input type="number" id="send-amount" placeholder="0.00" step="0.01">
+          </div>
+        </div>
+        <button class="btn btn-success" onclick="sendTransaction()">Send Transaction</button>
+        <div id="send-result"></div>
+      </div>
+
+      <div id="tab-stake" class="tab-content">
+        <div class="input-group">
+          <label class="input-label">Amount (SAYM)</label>
+          <input type="number" id="stake-amount" placeholder="Minimum stake required" step="0.01">
+          <small style="color: var(--mono-400); font-size: 11px; margin-top: 4px; display: block;">
+            Testnet: 100 SAYM minimum | Public Testnet: 500 SAYM minimum
+          </small>
+        </div>
+        <div style="display: flex; gap: calc(var(--grid) * 2);">
+          <button class="btn btn-success" onclick="stakeTokens()">Stake</button>
+          <button class="btn btn-danger" onclick="unstakeTokens()">Unstake All</button>
+        </div>
+        <div id="stake-result"></div>
+      </div>
+
+      <div id="tab-faucet" class="tab-content">
+        <div class="faucet-section">
+          <div class="faucet-icon">🚰</div>
+          <h3>Get Free Test Tokens</h3>
+          <p style="color: var(--mono-400); margin: calc(var(--grid) * 2) 0;">
+            Request 100 SAYM tokens for testing purposes (Testnet only)
+          </p>
+          <button class="btn btn-success" onclick="claimFaucet()" style="display: inline-block;">
+            Claim Faucet
+          </button>
+          <div id="faucet-result"></div>
+          <div style="margin-top: 16px;">
+            <a href="https://sayman-faucet.vercel.app" target="_blank" style="color: var(--testnet); text-decoration: none; font-size: 12px;">
+              Visit Standalone Faucet Site →
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-history" class="tab-content">
+        <div id="tx-history-list" class="tx-history">
+          <div class="empty-state" style="padding: calc(var(--grid) * 4);">
+            <p>No transaction history available</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Wallet Modal -->
+  <div id="create-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Create New Wallet</h2>
+        <span class="modal-close" onclick="closeModal('create')">&times;</span>
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">Wallet Name (Optional)</label>
+        <input type="text" id="wallet-name" placeholder="My Wallet">
+      </div>
+
+      <button class="btn btn-primary" onclick="createWallet()">Generate Wallet</button>
+      
+      <div id="create-result"></div>
+    </div>
+  </div>
+
+  <!-- Import Wallet Modal -->
+  <div id="import-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Import Wallet</h2>
+        <span class="modal-close" onclick="closeModal('import')">&times;</span>
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">Wallet Name (Optional)</label>
+        <input type="text" id="import-name" placeholder="Imported Wallet">
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Private Key</label>
+        <textarea id="import-key" placeholder="Enter your 64-character private key"></textarea>
+      </div>
+
+      <button class="btn btn-primary" onclick="importWallet()">Import Wallet</button>
+      
+      <div id="import-result"></div>
+    </div>
+  </div>
+
+  <!-- Wallet Details Modal -->
+  <div id="details-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Wallet Details</h2>
+        <span class="modal-close" onclick="closeModal('details')">&times;</span>
+      </div>
+      
+      <div id="wallet-details-content"></div>
+    </div>
+  </div>
+
+  <!-- Invoice Modal -->
+  <div id="invoice-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Payment Invoice</h2>
+        <span class="modal-close" onclick="closeModal('invoice')">&times;</span>
+      </div>
+      
+      <div id="invoice-content"></div>
+    </div>
+  </div>
+
+  <script src="crypto-client.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
