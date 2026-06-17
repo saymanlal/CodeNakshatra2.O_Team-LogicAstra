@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sayman Wallet Manager</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+    </script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+    <!-- LOADING SCREEN -->
+    <div id="loading-screen">
+        <div class="loader-ring"></div>
+        <p class="loader-text">Initializing Wallet...</p>
+    </div>
+
+    <!-- APP SHELL -->
+    <div id="app" class="hidden">
+
+        <!-- TOP BAR -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <img src="../assets/sayman-logo.svg" alt="Sayman" class="logo-icon" />
+                <span class="brand">Sayman</span>
+                <span class="network-badge" id="networkBadge">testnet</span>
+            </div>
+            <div class="topbar-right">
+                <button class="btn-icon" id="scanQrBtn" title="Scan QR">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                        <line x1="10" y1="7" x2="14" y2="7" />
+                        <line x1="7" y1="10" x2="7" y2="14" />
+                        <line x1="17" y1="10" x2="17" y2="14" />
+                        <line x1="10" y1="17" x2="14" y2="17" />
+                    </svg>
+                </button>
+                <button class="btn-icon" id="themeToggle" title="Toggle theme">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5" />
+                        <line x1="12" y1="1" x2="12" y2="3" />
+                        <line x1="12" y1="21" x2="12" y2="23" />
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                        <line x1="1" y1="12" x2="3" y2="12" />
+                        <line x1="21" y1="12" x2="23" y2="12" />
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN GRID -->
+        <main class="main-grid">
+
+            <!-- LEFT SIDEBAR - Wallet List -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h3>Wallets</h3>
+                    <button class="btn-sm btn-primary" id="addWalletBtn">+ New</button>
+                </div>
+                <div class="wallet-list" id="walletList">
+                    <!-- dynamically rendered -->
+                </div>
+                <div class="sidebar-actions">
+                    <button class="btn-sm btn-outline" id="importWalletBtn">Import JSON</button>
+                    <button class="btn-sm btn-outline" id="exportAllBtn">Export All</button>
+                </div>
+            </aside>
+
+            <!-- CENTER - Dashboard -->
+            <section class="dashboard">
+                <!-- Wallet Summary -->
+                <div class="summary-cards" id="summaryCards">
+                    <div class="card stat-card">
+                        <span class="stat-label">Total Balance</span>
+                        <span class="stat-value" id="totalBalance">0.00</span>
+                        <span class="stat-sub">SAY</span>
+                    </div>
+                    <div class="card stat-card">
+                        <span class="stat-label">Wallets</span>
+                        <span class="stat-value" id="walletCount">0</span>
+                    </div>
+                    <div class="card stat-card">
+                        <span class="stat-label">Transactions</span>
+                        <span class="stat-value" id="txCount">0</span>
+                    </div>
+                </div>
+
+                <!-- Chart Row -->
+                <div class="chart-row">
+                    <div class="card chart-card">
+                        <h4>Spending Overview</h4>
+                        <canvas id="spendingChart" height="150"></canvas>
+                    </div>
+                    <div class="card chart-card">
+                        <h4>Monthly Activity</h4>
+                        <canvas id="monthlyChart" height="150"></canvas>
+                    </div>
+                </div>
+
+                <!-- Active Wallet Detail -->
+                <div class="card wallet-detail" id="walletDetail">
+                    <div class="detail-header">
+                        <div>
+                            <h3 id="detailName">Select a wallet</h3>
+                            <span class="address-mono" id="detailAddress">0x...</span>
+                        </div>
+                        <div class="detail-actions">
+                            <button class="btn-sm btn-outline" id="exportWalletBtn">Export</button>
+                            <button class="btn-sm btn-outline" id="showQrBtn">QR</button>
+                        </div>
+                    </div>
+                    <div class="detail-balance">
+                        <span class="balance-number" id="detailBalance">0.00</span>
+                        <span class="balance-currency">SAY</span>
+                    </div>
+                    <div class="detail-tx-list" id="detailTxList">
+                        <p class="empty-state">No transactions yet</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ===== MODALS ===== -->
+
+    <!-- Add Wallet Modal -->
+    <div class="modal-overlay" id="addWalletModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create Wallet</h3>
+                <button class="modal-close" data-modal="addWalletModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>Wallet Name</label>
+                <input type="text" id="newWalletName" placeholder="e.g. Main Savings" />
+                <div style="margin-top: 12px;">
+                    <button class="btn-primary" id="createWalletBtn">Generate</button>
+                    <button class="btn-outline" id="importPrivateKeyBtn">Import Private Key</button>
+                </div>
+                <div id="privateKeyInputArea" class="hidden" style="margin-top:12px;">
+                    <label>Private Key (hex)</label>
+                    <input type="text" id="privateKeyInput" placeholder="0x..." />
+                    <button class="btn-primary" id="importKeyConfirmBtn" style="margin-top:8px;">Import</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Modal -->
+    <div class="modal-overlay" id="qrModal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3>Wallet QR</h3>
+                <button class="modal-close" data-modal="qrModal">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <div id="qrCodeContainer"></div>
+                <p class="address-mono" id="qrAddress" style="margin-top:8px;"></p>
+                <button class="btn-sm btn-outline" id="downloadQrBtn">Download PNG</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scan QR Modal -->
+    <div class="modal-overlay" id="scanQrModal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3>Scan QR Code</h3>
+                <button class="modal-close" data-modal="scanQrModal">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <div id="reader" style="width:100%; max-width:300px; margin:0 auto;"></div>
+                <p style="margin-top:12px; font-size:0.9rem; opacity:0.7;">Point camera at a QR code to import wallet</p>
+                <button class="btn-sm btn-outline" id="uploadQrBtn">Upload Image</button>
+                <input type="file" id="qrFileInput" accept="image/*" style="display:none;" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Import JSON Modal -->
+    <div class="modal-overlay" id="importJsonModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Import Wallet JSON</h3>
+                <button class="modal-close" data-modal="importJsonModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.9rem; opacity:0.7; margin-bottom:12px;">
+                    Upload a JSON file exported from Sayman Wallet.
+                </p>
+                <input type="file" id="jsonFileInput" accept=".json" />
+                <div style="margin-top:12px;">
+                    <button class="btn-primary" id="importJsonConfirmBtn">Import</button>
+                </div>
+                <div id="jsonImportStatus" style="margin-top:12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="crypto-client.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
