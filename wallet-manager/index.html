@@ -1,325 +1,520 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sayman Wallet Manager - Premium Edition</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sayman Wallet Manager Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+    </script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js">
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- LOADING SCREEN -->
-  <div id="loading-screen">
-    <div class="loader-ring"></div>
-    <p class="loader-text">Initializing Wallet Manager...</p>
-    <p class="loader-sub">Secure • Multi-Wallet • Advanced Analytics</p>
-  </div>
-
-  <!-- APP SHELL -->
-  <div id="app" class="hidden">
-
-    <!-- TOP BAR -->
-    <header class="topbar">
-      <div class="topbar-left">
-        <img src="../assets/sayman-logo.svg" alt="Sayman" class="logo-icon" />
-        <span class="brand">Sayman</span>
-        <span class="version-tag">v2.0</span>
-        <span class="network-badge" id="networkBadge">testnet</span>
-      </div>
-      <div class="topbar-right">
-        <button class="btn-icon" id="scanQrBtn" title="Scan QR">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/>
-            <rect x="14" y="14" width="7" height="7" rx="1"/>
-            <line x1="10" y1="7" x2="14" y2="7"/>
-            <line x1="7" y1="10" x2="7" y2="14"/>
-            <line x1="17" y1="10" x2="17" y2="14"/>
-            <line x1="10" y1="17" x2="14" y2="17"/>
-          </svg>
-        </button>
-        <button class="btn-icon" id="exportAllBtn" title="Export All">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-        </button>
-        <button class="btn-icon" id="themeToggle" title="Toggle theme">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/>
-            <line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-          </svg>
-        </button>
-      </div>
-    </header>
-
-    <!-- NETWORK SELECTOR -->
-    <div class="network-bar">
-      <button class="network-btn active" data-network="testnet" onclick="switchNetwork('testnet')">
-        Testnet
-        <span class="badge badge-testnet">TEST</span>
-      </button>
-      <button class="network-btn" data-network="public-testnet" onclick="switchNetwork('public-testnet')">
-        Public Testnet
-        <span class="badge badge-testnet">PUBLIC</span>
-      </button>
-      <button class="network-btn" data-network="mainnet" onclick="switchNetwork('mainnet')">
-        Mainnet
-        <span class="badge badge-mainnet">LIVE</span>
-      </button>
+    <!-- PREMIUM LOADING SCREEN -->
+    <div id="loadingOverlay">
+        <div class="loader-wrapper">
+            <div class="loader-icon">
+                <i class="fas fa-wallet"></i>
+            </div>
+            <div class="loader-spinner"></div>
+            <p class="loader-title">Sayman Wallet</p>
+            <p class="loader-sub">Initializing secure environment...</p>
+            <div class="loader-progress">
+                <div class="loader-progress-bar" id="progressBar"></div>
+            </div>
+            <p class="loader-percent" id="progressText">0%</p>
+        </div>
     </div>
 
-    <!-- MAIN GRID -->
-    <main class="main-grid">
+    <!-- MAIN APP -->
+    <div id="app">
 
-      <!-- LEFT SIDEBAR -->
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <h3>Wallets</h3>
-          <button class="btn-sm btn-primary" id="addWalletBtn">+ New</button>
+        <!-- TOP NAVIGATION -->
+        <nav class="navbar">
+            <div class="nav-left">
+                <div class="nav-brand-wrapper">
+                    <i class="fas fa-wallet nav-icon"></i>
+                    <span class="nav-brand">Sayman</span>
+                    <span class="nav-version">Pro v2.0</span>
+                </div>
+                <div class="nav-network">
+                    <select id="networkSelect" class="network-select">
+                        <option value="testnet"><i class="fas fa-flask"></i> Testnet</option>
+                        <option value="public-testnet"><i class="fas fa-globe"></i> Public Testnet</option>
+                        <option value="mainnet"><i class="fas fa-lock"></i> Mainnet</option>
+                    </select>
+                </div>
+            </div>
+            <div class="nav-right">
+                <button class="nav-btn" id="exportAllBtn">
+                    <i class="fas fa-file-export"></i>
+                    Export All
+                </button>
+                <button class="nav-btn" id="scanQrNavBtn">
+                    <i class="fas fa-qrcode"></i>
+                    Scan QR
+                </button>
+                <button class="nav-btn nav-btn-icon" id="refreshBtn" title="Refresh">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- MAIN LAYOUT -->
+        <div class="main-layout">
+
+            <!-- SIDEBAR -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <h3><i class="fas fa-list-ul"></i> Wallets</h3>
+                    <button class="btn-primary-sm" id="addWalletBtn">
+                        <i class="fas fa-plus"></i> New
+                    </button>
+                </div>
+
+                <div class="wallet-search">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="walletSearch" placeholder="Search wallets..." />
+                </div>
+
+                <div class="wallet-list" id="walletList">
+                    <!-- Rendered dynamically -->
+                </div>
+
+                <div class="sidebar-footer">
+                    <button class="btn-outline-sm" id="importJsonBtn">
+                        <i class="fas fa-file-import"></i> Import JSON
+                    </button>
+                    <button class="btn-outline-sm" id="importQrBtn">
+                        <i class="fas fa-qrcode"></i> Import QR
+                    </button>
+                </div>
+            </aside>
+
+            <!-- CONTENT -->
+            <main class="content">
+
+                <!-- STATS ROW -->
+                <div class="stats-grid">
+                    <div class="stat-card stat-card-animated" style="animation-delay:0.1s">
+                        <div class="stat-icon" style="background:#eef2ff;color:#4f6ef7;">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-label">Total Balance</span>
+                            <span class="stat-value" id="totalBalance">0.00</span>
+                            <span class="stat-currency">SAY</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card-animated" style="animation-delay:0.2s">
+                        <div class="stat-icon" style="background:#fef3c7;color:#f59e0b;">
+                            <i class="fas fa-wallet"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-label">Wallets</span>
+                            <span class="stat-value" id="walletCount">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card-animated" style="animation-delay:0.3s">
+                        <div class="stat-icon" style="background:#d1fae5;color:#10b981;">
+                            <i class="fas fa-exchange-alt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-label">Transactions</span>
+                            <span class="stat-value" id="txCount">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card-animated" style="animation-delay:0.4s">
+                        <div class="stat-icon" style="background:#fce4ec;color:#ef4444;">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-label">Total Staked</span>
+                            <span class="stat-value" id="totalStaked">0.00</span>
+                            <span class="stat-currency">SAY</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CHARTS ROW -->
+                <div class="charts-row">
+                    <div class="chart-card chart-card-animated" style="animation-delay:0.3s">
+                        <div class="chart-header">
+                            <h4><i class="fas fa-chart-bar"></i> Spending Overview</h4>
+                            <div class="chart-periods">
+                                <button class="period-btn active" data-period="7">7D</button>
+                                <button class="period-btn" data-period="30">30D</button>
+                                <button class="period-btn" data-period="90">90D</button>
+                                <button class="period-btn" data-period="365">1Y</button>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="spendingChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card chart-card-animated" style="animation-delay:0.4s">
+                        <div class="chart-header">
+                            <h4><i class="fas fa-chart-line"></i> Monthly Activity</h4>
+                            <div class="chart-periods">
+                                <button class="period-btn active" data-period="6">6M</button>
+                                <button class="period-btn" data-period="12">1Y</button>
+                                <button class="period-btn" data-period="24">2Y</button>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="monthlyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WALLET DETAIL -->
+                <div class="detail-card detail-card-animated" style="animation-delay:0.5s" id="walletDetail">
+                    <div class="detail-header">
+                        <div class="detail-info">
+                            <div class="detail-name-wrapper">
+                                <h3 id="detailName">Select a Wallet</h3>
+                                <span class="detail-status" id="detailStatus">
+                                    <i class="fas fa-circle"></i> Inactive
+                                </span>
+                            </div>
+                            <div class="detail-address-wrapper">
+                                <span class="address-mono" id="detailAddress">0x0000000000000000000000000000000000000000</span>
+                                <button class="copy-btn" onclick="copyAddress()" title="Copy Address">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="detail-actions">
+                            <button class="btn-outline-sm" id="exportWalletBtn">
+                                <i class="fas fa-file-export"></i> Export
+                            </button>
+                            <button class="btn-outline-sm" id="showQrBtn">
+                                <i class="fas fa-qrcode"></i> QR
+                            </button>
+                            <button class="btn-outline-sm" id="viewDetailsBtn">
+                                <i class="fas fa-info-circle"></i> Details
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="detail-balance-row">
+                        <div class="balance-main">
+                            <span class="balance-number" id="detailBalance">0.00</span>
+                            <span class="balance-currency">SAY</span>
+                        </div>
+                        <div class="balance-meta">
+                            <div class="meta-item">
+                                <span class="meta-label"><i class="fas fa-lock"></i> Staked</span>
+                                <span class="meta-value" id="detailStaked">0.00</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label"><i class="fas fa-hashtag"></i> Nonce</span>
+                                <span class="meta-value" id="detailNonce">0</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label"><i class="fas fa-network-wired"></i> Network</span>
+                                <span class="meta-value" id="detailNetwork">Testnet</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TABS -->
+                    <div class="detail-tabs">
+                        <button class="tab-btn active" data-tab="history">
+                            <i class="fas fa-history"></i> History
+                        </button>
+                        <button class="tab-btn" data-tab="send">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                        <button class="tab-btn" data-tab="stake">
+                            <i class="fas fa-lock"></i> Stake
+                        </button>
+                        <button class="tab-btn" data-tab="analytics">
+                            <i class="fas fa-chart-pie"></i> Analytics
+                        </button>
+                    </div>
+
+                    <!-- TAB: HISTORY -->
+                    <div class="tab-panel active" id="tab-history">
+                        <div class="history-filters">
+                            <div class="filter-group">
+                                <select id="txTypeFilter">
+                                    <option value="all"><i class="fas fa-list"></i> All Types</option>
+                                    <option value="TRANSFER"><i class="fas fa-exchange-alt"></i> Transfers</option>
+                                    <option value="STAKE"><i class="fas fa-lock"></i> Stakes</option>
+                                    <option value="UNSTAKE"><i class="fas fa-unlock"></i> Unstakes</option>
+                                    <option value="REWARD"><i class="fas fa-gift"></i> Rewards</option>
+                                </select>
+                                <select id="txDateFilter">
+                                    <option value="all"><i class="fas fa-calendar"></i> All Time</option>
+                                    <option value="today"><i class="fas fa-calendar-day"></i> Today</option>
+                                    <option value="week"><i class="fas fa-calendar-week"></i> This Week</option>
+                                    <option value="month"><i class="fas fa-calendar-alt"></i> This Month</option>
+                                    <option value="year"><i class="fas fa-calendar-year"></i> This Year</option>
+                                    <option value="custom"><i class="fas fa-calendar-plus"></i> Custom Range</option>
+                                </select>
+                                <input type="date" id="txDateFrom" style="display:none;" />
+                                <input type="date" id="txDateTo" style="display:none;" />
+                                <button class="btn-outline-sm" id="applyFilterBtn">
+                                    <i class="fas fa-filter"></i> Apply
+                                </button>
+                                <button class="btn-outline-sm" id="resetFilterBtn">
+                                    <i class="fas fa-undo"></i> Reset
+                                </button>
+                            </div>
+                            <div class="tx-summary">
+                                <span><i class="fas fa-coins"></i> Total: <strong id="txTotalAmount">0.00</strong> SAY</span>
+                                <span><i class="fas fa-list"></i> Count: <strong id="txTotalCount">0</strong></span>
+                            </div>
+                        </div>
+                        <div class="tx-list" id="detailTxList">
+                            <div class="empty-state">
+                                <i class="fas fa-inbox"></i>
+                                <p>No transactions found</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: SEND -->
+                    <div class="tab-panel" id="tab-send">
+                        <div class="send-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-user"></i> Recipient Address</label>
+                                    <input type="text" id="sendTo" placeholder="0x..." />
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-coins"></i> Amount (SAY)</label>
+                                    <input type="number" id="sendAmount" placeholder="0.00" step="0.01" />
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-gas-pump"></i> Gas Price (optional)</label>
+                                    <input type="number" id="sendGasPrice" placeholder="Auto" step="1" />
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-tachometer-alt"></i> Gas Limit (optional)</label>
+                                    <input type="number" id="sendGasLimit" placeholder="Auto" step="1" />
+                                </div>
+                            </div>
+                            <button class="btn-primary" id="sendBtn">
+                                <i class="fas fa-paper-plane"></i> Send Transaction
+                            </button>
+                            <div id="sendResult"></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: STAKE -->
+                    <div class="tab-panel" id="tab-stake">
+                        <div class="stake-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-coins"></i> Amount to Stake (SAY)</label>
+                                    <input type="number" id="stakeAmount" placeholder="Enter amount" step="0.01" />
+                                    <small class="helper-text"><i class="fas fa-info-circle"></i> Minimum: 100 SAY on Testnet, 500 SAY on Public Testnet</small>
+                                </div>
+                            </div>
+                            <div class="stake-actions">
+                                <button class="btn-primary" id="stakeBtn">
+                                    <i class="fas fa-lock"></i> Stake Tokens
+                                </button>
+                                <button class="btn-danger" id="unstakeBtn">
+                                    <i class="fas fa-unlock"></i> Unstake All
+                                </button>
+                                <button class="btn-outline-sm" id="claimRewardsBtn">
+                                    <i class="fas fa-gift"></i> Claim Rewards
+                                </button>
+                            </div>
+                            <div id="stakeResult"></div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: ANALYTICS -->
+                    <div class="tab-panel" id="tab-analytics">
+                        <div class="analytics-grid">
+                            <div class="analytics-card">
+                                <h5><i class="fas fa-chart-pie"></i> Spending by Category</h5>
+                                <canvas id="categoryChart"></canvas>
+                            </div>
+                            <div class="analytics-card">
+                                <h5><i class="fas fa-chart-area"></i> Net Worth Over Time</h5>
+                                <canvas id="netWorthChart"></canvas>
+                            </div>
+                            <div class="analytics-card full-width">
+                                <h5><i class="fas fa-calendar-alt"></i> Transaction Activity</h5>
+                                <div id="heatmapContainer">
+                                    <div id="heatmapGrid"></div>
+                                </div>
+                            </div>
+                            <div class="analytics-card full-width">
+                                <h5><i class="fas fa-chart-simple"></i> Annual Summary</h5>
+                                <div id="annualSummary"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
         </div>
-        <div class="wallet-list" id="walletList"></div>
-        <div class="sidebar-actions">
-          <button class="btn-sm btn-outline" id="importJsonBtn">Import JSON</button>
-          <button class="btn-sm btn-outline" id="importQrBtn">Scan QR</button>
-        </div>
-      </aside>
+    </div>
 
-      <!-- CENTER - DASHBOARD -->
-      <section class="dashboard">
+    <!-- ===== MODALS ===== -->
 
-        <!-- STATS BAR -->
-        <div class="stats-bar">
-          <div class="stat-item">
-            <span class="stat-label">Total Balance</span>
-            <span class="stat-value" id="totalBalance">0.00</span>
-            <span class="stat-unit">SAY</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Wallets</span>
-            <span class="stat-value" id="walletCount">0</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Transactions</span>
-            <span class="stat-value" id="txCount">0</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Total Staked</span>
-            <span class="stat-value" id="totalStaked">0.00</span>
-            <span class="stat-unit">SAY</span>
-          </div>
-        </div>
-
-        <!-- CHARTS ROW -->
-        <div class="chart-row">
-          <div class="card chart-card">
-            <div class="chart-header">
-              <h4>Spending Overview</h4>
-              <div class="chart-controls">
-                <button class="chart-period-btn active" data-period="7">7D</button>
-                <button class="chart-period-btn" data-period="30">30D</button>
-                <button class="chart-period-btn" data-period="90">90D</button>
-              </div>
+    <!-- Add Wallet Modal -->
+    <div class="modal-overlay" id="addWalletModal">
+        <div class="modal modal-animated">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus-circle"></i> Create New Wallet</h3>
+                <button class="modal-close" data-modal="addWalletModal">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <canvas id="spendingChart" height="160"></canvas>
-          </div>
-          <div class="card chart-card">
-            <div class="chart-header">
-              <h4>Monthly Activity</h4>
-              <div class="chart-controls">
-                <button class="chart-period-btn active" data-period="6">6M</button>
-                <button class="chart-period-btn" data-period="12">1Y</button>
-              </div>
-            </div>
-            <canvas id="monthlyChart" height="160"></canvas>
-          </div>
-        </div>
-
-        <!-- ACTIVE WALLET DETAIL -->
-        <div class="card wallet-detail" id="walletDetail">
-          <div class="detail-header">
-            <div class="detail-info">
-              <h3 id="detailName">Select a wallet</h3>
-              <span class="address-mono" id="detailAddress">0x...</span>
-            </div>
-            <div class="detail-actions">
-              <button class="btn-sm btn-outline" id="exportWalletBtn">Export</button>
-              <button class="btn-sm btn-outline" id="showQrBtn">QR</button>
-              <button class="btn-sm btn-outline" id="generateInvoiceBtn">Invoice</button>
-            </div>
-          </div>
-          <div class="detail-balance-row">
-            <div class="balance-main">
-              <span class="balance-number" id="detailBalance">0.00</span>
-              <span class="balance-currency">SAY</span>
-            </div>
-            <div class="balance-stats">
-              <span class="balance-stat">
-                <span class="stat-label-sm">Staked</span>
-                <span id="detailStaked">0.00</span>
-              </span>
-              <span class="balance-stat">
-                <span class="stat-label-sm">Nonce</span>
-                <span id="detailNonce">0</span>
-              </span>
-            </div>
-          </div>
-          <div class="detail-tabs">
-            <button class="detail-tab active" data-tab="history">History</button>
-            <button class="detail-tab" data-tab="send">Send</button>
-            <button class="detail-tab" data-tab="stake">Stake</button>
-          </div>
-          <div class="detail-content">
-            <div id="tab-history" class="detail-panel active">
-              <div id="detailTxList">
-                <p class="empty-state">No transactions yet</p>
-              </div>
-            </div>
-            <div id="tab-send" class="detail-panel">
-              <div class="send-form">
+            <div class="modal-body">
                 <div class="form-group">
-                  <label>To Address</label>
-                  <input type="text" id="sendTo" placeholder="Enter recipient address" />
+                    <label><i class="fas fa-tag"></i> Wallet Name</label>
+                    <input type="text" id="newWalletName" placeholder="e.g. Main Wallet" />
                 </div>
-                <div class="form-group">
-                  <label>Amount (SAY)</label>
-                  <input type="number" id="sendAmount" placeholder="0.00" step="0.01" />
+                <div class="form-actions">
+                    <button class="btn-primary" id="createWalletBtn">
+                        <i class="fas fa-plus"></i> Generate New
+                    </button>
+                    <button class="btn-outline-sm" id="importPrivateKeyBtn">
+                        <i class="fas fa-key"></i> Import Private Key
+                    </button>
                 </div>
-                <button class="btn-primary" id="sendBtn">Send Transaction</button>
-                <div id="sendResult"></div>
-              </div>
+                <div id="privateKeyArea" class="hidden">
+                    <div class="form-group">
+                        <label><i class="fas fa-key"></i> Private Key (hex)</label>
+                        <input type="text" id="privateKeyInput" placeholder="64 character hex string" />
+                    </div>
+                    <button class="btn-primary" id="importKeyConfirmBtn">
+                        <i class="fas fa-check"></i> Import
+                    </button>
+                </div>
+                <div id="createResult"></div>
             </div>
-            <div id="tab-stake" class="detail-panel">
-              <div class="stake-form">
-                <div class="form-group">
-                  <label>Amount to Stake (SAY)</label>
-                  <input type="number" id="stakeAmount" placeholder="Minimum stake required" step="0.01" />
-                  <small class="helper-text">Testnet: 100 SAY minimum | Public Testnet: 500 SAY minimum</small>
-                </div>
-                <div class="stake-actions">
-                  <button class="btn-primary" id="stakeBtn">Stake</button>
-                  <button class="btn-danger" id="unstakeBtn">Unstake All</button>
-                </div>
-                <div id="stakeResult"></div>
-              </div>
+        </div>
+    </div>
+
+    <!-- Wallet Details Modal -->
+    <div class="modal-overlay" id="detailsModal">
+        <div class="modal modal-lg modal-animated">
+            <div class="modal-header">
+                <h3><i class="fas fa-info-circle"></i> Wallet Details</h3>
+                <button class="modal-close" data-modal="detailsModal">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-          </div>
+            <div class="modal-body" id="detailsContent">
+                <!-- Rendered dynamically -->
+            </div>
         </div>
-      </section>
-    </main>
-  </div>
-
-  <!-- ===== MODALS ===== -->
-
-  <!-- Add Wallet Modal -->
-  <div class="modal-overlay" id="addWalletModal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>Create Wallet</h3>
-        <button class="modal-close" data-modal="addWalletModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Wallet Name</label>
-          <input type="text" id="newWalletName" placeholder="e.g. Main Savings" />
-        </div>
-        <div class="form-actions">
-          <button class="btn-primary" id="createWalletBtn">Generate</button>
-          <button class="btn-outline" id="importPrivateKeyBtn">Import Private Key</button>
-        </div>
-        <div id="privateKeyInputArea" class="hidden">
-          <div class="form-group">
-            <label>Private Key (hex)</label>
-            <input type="text" id="privateKeyInput" placeholder="0x..." />
-          </div>
-          <button class="btn-primary" id="importKeyConfirmBtn">Import</button>
-        </div>
-        <div id="createResult"></div>
-      </div>
     </div>
-  </div>
 
-  <!-- QR Modal -->
-  <div class="modal-overlay" id="qrModal">
-    <div class="modal modal-sm">
-      <div class="modal-header">
-        <h3>Wallet QR Code</h3>
-        <button class="modal-close" data-modal="qrModal">&times;</button>
-      </div>
-      <div class="modal-body" style="text-align:center;">
-        <div id="qrCodeContainer"></div>
-        <p class="address-mono" id="qrAddress" style="margin-top:8px;"></p>
-        <div class="qr-actions">
-          <button class="btn-sm btn-outline" id="downloadQrBtn">Download PNG</button>
-          <button class="btn-sm btn-outline" id="shareQrBtn">Share</button>
+    <!-- QR Modal -->
+    <div class="modal-overlay" id="qrModal">
+        <div class="modal modal-sm modal-animated">
+            <div class="modal-header">
+                <h3><i class="fas fa-qrcode"></i> Wallet QR Code</h3>
+                <button class="modal-close" data-modal="qrModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <div id="qrContainer"></div>
+                <p class="address-mono" id="qrAddressDisplay"></p>
+                <div class="qr-actions">
+                    <button class="btn-outline-sm" id="downloadQrBtn">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                    <button class="btn-outline-sm" id="shareQrBtn">
+                        <i class="fas fa-share-alt"></i> Share
+                    </button>
+                    <button class="btn-outline-sm" id="printQrBtn">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
 
-  <!-- Scan QR Modal -->
-  <div class="modal-overlay" id="scanQrModal">
-    <div class="modal modal-sm">
-      <div class="modal-header">
-        <h3>Scan QR Code</h3>
-        <button class="modal-close" data-modal="scanQrModal">&times;</button>
-      </div>
-      <div class="modal-body" style="text-align:center;">
-        <div id="qrReader" style="width:100%; max-width:300px; margin:0 auto;"></div>
-        <p class="helper-text">Point camera at a QR code to import wallet</p>
-        <div class="qr-actions">
-          <button class="btn-sm btn-outline" id="uploadQrBtn">Upload Image</button>
-          <input type="file" id="qrFileInput" accept="image/*" style="display:none;" />
+    <!-- Scan QR Modal -->
+    <div class="modal-overlay" id="scanQrModal">
+        <div class="modal modal-sm modal-animated">
+            <div class="modal-header">
+                <h3><i class="fas fa-qrcode"></i> Scan QR Code</h3>
+                <button class="modal-close" data-modal="scanQrModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <div id="qrScanner" style="width:100%; max-width:300px; margin:0 auto;"></div>
+                <p class="helper-text"><i class="fas fa-camera"></i> Position QR code in frame to scan</p>
+                <div class="qr-actions">
+                    <button class="btn-outline-sm" id="uploadQrBtn">
+                        <i class="fas fa-upload"></i> Upload Image
+                    </button>
+                    <input type="file" id="qrFileInput" accept="image/*" style="display:none;" />
+                    <button class="btn-outline-sm" id="stopScanBtn" style="display:none;">
+                        <i class="fas fa-stop"></i> Stop
+                    </button>
+                </div>
+                <div id="scanResult"></div>
+            </div>
         </div>
-        <div id="scanResult"></div>
-      </div>
     </div>
-  </div>
 
-  <!-- Import JSON Modal -->
-  <div class="modal-overlay" id="importJsonModal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>Import Wallet JSON</h3>
-        <button class="modal-close" data-modal="importJsonModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p class="helper-text">Upload a JSON file exported from Sayman Wallet.</p>
-        <input type="file" id="jsonFileInput" accept=".json" />
-        <div class="form-actions">
-          <button class="btn-primary" id="importJsonConfirmBtn">Import</button>
+    <!-- Import JSON Modal -->
+    <div class="modal-overlay" id="importJsonModal">
+        <div class="modal modal-animated">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-import"></i> Import Wallet JSON</h3>
+                <button class="modal-close" data-modal="importJsonModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="helper-text"><i class="fas fa-info-circle"></i> Upload a JSON file exported from Sayman Wallet Manager.</p>
+                <div class="file-upload-wrapper">
+                    <input type="file" id="jsonFileInput" accept=".json" />
+                    <label for="jsonFileInput" class="file-upload-label">
+                        <i class="fas fa-cloud-upload-alt"></i> Choose File
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button class="btn-primary" id="importJsonConfirmBtn">
+                        <i class="fas fa-check"></i> Import
+                    </button>
+                </div>
+                <div id="jsonImportStatus"></div>
+            </div>
         </div>
-        <div id="jsonImportStatus"></div>
-      </div>
     </div>
-  </div>
 
-  <!-- Invoice Modal -->
-  <div class="modal-overlay" id="invoiceModal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>Payment Invoice</h3>
-        <button class="modal-close" data-modal="invoiceModal">&times;</button>
-      </div>
-      <div class="modal-body" id="invoiceContent">
-        <!-- Rendered dynamically -->
-      </div>
+    <!-- Transaction Detail Modal -->
+    <div class="modal-overlay" id="txDetailModal">
+        <div class="modal modal-sm modal-animated">
+            <div class="modal-header">
+                <h3><i class="fas fa-receipt"></i> Transaction Details</h3>
+                <button class="modal-close" data-modal="txDetailModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="txDetailContent">
+                <!-- Rendered dynamically -->
+            </div>
+        </div>
     </div>
-  </div>
 
-  <script src="crypto-client.js"></script>
-  <script src="app.js"></script>
+    <script src="crypto-client.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
