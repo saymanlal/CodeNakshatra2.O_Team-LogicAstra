@@ -1434,29 +1434,30 @@
             showToast('Please select a wallet first', 'error');
             return;
         }
-
+    
         try {
             const amount = parseFloat(dom.stakeAmount.value);
-
+    
             if (!amount || amount <= 0) {
                 showToast('Please enter a valid amount', 'error');
                 return;
             }
-
-            if (amount > (activeWallet.balance || 0)) {
-                showToast('Insufficient balance', 'error');
+    
+            if (amount < 100) {
+                showToast('Minimum stake is 100 SAY', 'error');
                 return;
             }
-
+    
             showLoading('Preparing stake...');
-
+    
             const wallet = new SaymanWallet(activeWallet.privateKey);
             await wallet.initialize();
-
+    
             const addressRes = await fetch(`${getApiBase()}/address/${wallet.address}`);
             const addressData = await addressRes.json();
             const nonce = addressData.nonce || 0;
-
+    
+            // Get real gas estimate from blockchain
             const gasEstimate = await fetch(`${getApiBase()}/estimate-gas`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1466,40 +1467,53 @@
                 })
             });
             const gas = await gasEstimate.json();
-
+    
+            // Calculate actual gas fee from blockchain response
+            const gasLimit = gas.recommendedGasLimit || 21000;
+            const gasPrice = gas.minGasPrice || 1;
+            const gasFeeInSAY = (gasLimit * gasPrice) / 1e18;
+    
+            // Check balance including dynamic gas fee
+            const totalNeeded = amount + gasFeeInSAY;
+            if (totalNeeded > (activeWallet.balance || 0)) {
+                hideLoading();
+                showToast(`Insufficient balance. Need ${formatBalance(totalNeeded)} SAY (${formatBalance(amount)} + ${formatBalance(gasFeeInSAY)} gas)`, 'error');
+                return;
+            }
+    
             hideLoading();
             showLoading('Signing stake...');
-
+    
             const txData = {
                 type: 'STAKE',
                 data: { from: wallet.address, amount },
                 timestamp: Date.now(),
-                gasLimit: gas.recommendedGasLimit || 21000,
-                gasPrice: gas.minGasPrice || 1,
+                gasLimit: gasLimit,
+                gasPrice: gasPrice,
                 nonce: nonce
             };
-
+    
             const signature = await wallet.signTransaction(txData);
-
+    
             const signedTx = {
                 ...txData,
                 signature: signature,
                 publicKey: wallet.publicKey
             };
-
+    
             hideLoading();
             showLoading('Broadcasting...');
-
+    
             const res = await fetch(`${getApiBase()}/broadcast`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(signedTx)
             });
-
+    
             const result = await res.json();
-
+    
             hideLoading();
-
+    
             if (result.success) {
                 const txHash = result.txId || '0x' + generateId().padStart(64, '0');
                 dom.stakeResult.innerHTML = `
@@ -1507,10 +1521,11 @@
                         <i class="fas fa-check-circle"></i>
                         <strong>Stake Transaction Broadcast!</strong><br>
                         <small>TX ID: ${txHash.substring(0, 16)}...</small>
+                        <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAY</small>
                     </div>
                 `;
                 
-                activeWallet.balance = (activeWallet.balance || 0) - amount;
+                activeWallet.balance = (activeWallet.balance || 0) - amount - gasFeeInSAY;
                 activeWallet.stake = (activeWallet.stake || 0) + amount;
                 activeWallet.transactions.push({
                     type: 'STAKE',
@@ -1518,18 +1533,16 @@
                     time: Date.now(),
                     txId: txHash,
                     blockNumber: currentBlock,
-                    gasPrice: txData.gasPrice,
-                    gasLimit: txData.gasLimit,
+                    gasPrice: gasPrice,
+                    gasLimit: gasLimit,
+                    gasFee: gasFeeInSAY,
                     data: { from: activeWallet.address, amount }
                 });
                 saveState();
                 
                 dom.stakeAmount.value = '';
-                showToast('Tokens staked!', 'success');
-
-                const rewardTime = calculateRewardTime(activeWallet.stake);
-                dom.stakeRewardTime.value = `~${rewardTime} (${blockTime}s per block)`;
-
+                showToast(`Staked ${formatBalance(amount)} SAY (gas: ${formatBalance(gasFeeInSAY)} SAY)`, 'success');
+    
                 setTimeout(() => {
                     loadTransactionHistory();
                     fetchBlockInfo();
