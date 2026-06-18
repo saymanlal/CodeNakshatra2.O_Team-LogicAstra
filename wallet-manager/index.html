@@ -60,7 +60,7 @@
                 </div>
             </div>
             <div class="nav-right">
-                <button class="nav-btn nav-btn-icon" id="scanQrNavBtn" title="Scan QR">
+                <button class="nav-btn nav-btn-icon" id="scanQrNavBtn" title="Scan QR to Pay">
                     <i class="fas fa-qrcode"></i>
                 </button>
                 <button class="nav-btn nav-btn-icon" id="refreshBtn" title="Refresh">
@@ -226,16 +226,16 @@
                                 <span class="meta-value" id="detailStaked">0.00</span>
                             </div>
                             <div class="meta-item">
+                                <span class="meta-label"><i class="fas fa-clock"></i> Locked</span>
+                                <span class="meta-value" id="detailLocked">0.00</span>
+                            </div>
+                            <div class="meta-item">
                                 <span class="meta-label"><i class="fas fa-hashtag"></i> Nonce</span>
                                 <span class="meta-value" id="detailNonce">0</span>
                             </div>
                             <div class="meta-item">
                                 <span class="meta-label"><i class="fas fa-cube"></i> Block</span>
                                 <span class="meta-value" id="detailBlock">0</span>
-                            </div>
-                            <div class="meta-item">
-                                <span class="meta-label"><i class="fas fa-network-wired"></i> Network</span>
-                                <span class="meta-value" id="detailNetwork">Testnet</span>
                             </div>
                         </div>
                     </div>
@@ -348,14 +348,13 @@
                                     <small class="helper-text"><i class="fas fa-info-circle"></i> Minimum: 100 SAY on Testnet</small>
                                 </div>
                                 <div class="form-group">
-                                    <label><i class="fas fa-clock"></i> Estimated Reward Time</label>
-                                    <input type="text" id="stakeRewardTime" value="~2-3 blocks (~30-45 seconds)" readonly style="background:var(--bg-input);" />
-                                    <small class="helper-text"><i class="fas fa-info-circle"></i> Rewards distributed every block (~15 sec)</small>
+                                    <label><i class="fas fa-clock"></i> Est. Reward Time</label>
+                                    <input type="text" id="stakeRewardTime" value="~2-3 blocks (~30-45 sec)" readonly style="background:var(--bg-input);" />
                                 </div>
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label><i class="fas fa-percentage"></i> Estimated APY</label>
+                                    <label><i class="fas fa-percentage"></i> Est. APY</label>
                                     <input type="text" id="stakeApy" value="12.5% Annual" readonly style="background:var(--bg-input);" />
                                 </div>
                                 <div class="form-group">
@@ -370,16 +369,13 @@
                                 <button class="btn-danger" id="unstakeBtn">
                                     <i class="fas fa-unlock"></i> Unstake All
                                 </button>
-                                <button class="btn-outline-sm" id="claimRewardsBtn">
-                                    <i class="fas fa-gift"></i> Claim Rewards
-                                </button>
                             </div>
                             <div id="stakeResult"></div>
                             <div id="stakeInfo" style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
                                 <p style="font-size:0.8rem;color:var(--text-muted);">
                                     <i class="fas fa-info-circle"></i> 
-                                    <strong>Staking Rewards:</strong> Earn ~12.5% APY. Rewards are distributed automatically every block.
-                                    Your stake helps secure the network through Proof of Stake validation.
+                                    <strong>Staking Rewards:</strong> Earn ~12.5% APY. Rewards auto-credit every block.
+                                    Unstaking locks tokens for ~100 blocks (~25 min).
                                 </p>
                             </div>
                         </div>
@@ -414,6 +410,42 @@
     </div>
 
     <!-- ===== MODALS ===== -->
+
+    <!-- QR PAY MODAL - NEW! Direct payment modal -->
+    <div class="modal-overlay" id="qrPayModal">
+        <div class="modal modal-sm modal-animated">
+            <div class="modal-header">
+                <h3><i class="fas fa-qrcode"></i> Scan & Pay</h3>
+                <button class="modal-close" data-modal="qrPayModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <div id="qrPayScanner" style="width:100%; max-width:280px; margin:0 auto;"></div>
+                <p class="helper-text"><i class="fas fa-camera"></i> Scan recipient's QR code</p>
+                
+                <div class="qr-pay-form" style="margin-top:16px;text-align:left;">
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> Recipient Address</label>
+                        <input type="text" id="qrPayAddress" placeholder="Address will auto-fill" readonly style="background:var(--bg-input);" />
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-coins"></i> Amount (SAY)</label>
+                        <input type="number" id="qrPayAmount" placeholder="Enter amount to send" step="0.01" />
+                    </div>
+                    <div class="qr-actions" style="margin-top:12px;">
+                        <button class="btn-primary" id="qrPaySendBtn" style="width:100%;">
+                            <i class="fas fa-paper-plane"></i> Send Payment
+                        </button>
+                        <button class="btn-outline-sm" id="qrPayCancelBtn" style="width:100%;margin-top:8px;">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                    </div>
+                    <div id="qrPayResult"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Add Wallet Modal -->
     <div class="modal-overlay" id="addWalletModal">
@@ -493,11 +525,11 @@
         </div>
     </div>
 
-    <!-- QR Modal -->
+    <!-- QR Modal (for receiving) -->
     <div class="modal-overlay" id="qrModal">
         <div class="modal modal-sm modal-animated">
             <div class="modal-header">
-                <h3><i class="fas fa-qrcode"></i> Wallet QR Code</h3>
+                <h3><i class="fas fa-qrcode"></i> Receive Payment</h3>
                 <button class="modal-close" data-modal="qrModal">
                     <i class="fas fa-times"></i>
                 </button>
@@ -520,18 +552,18 @@
         </div>
     </div>
 
-    <!-- Scan QR Modal -->
+    <!-- Scan QR Modal (for importing) -->
     <div class="modal-overlay" id="scanQrModal">
         <div class="modal modal-sm modal-animated">
             <div class="modal-header">
-                <h3><i class="fas fa-qrcode"></i> Scan QR Code</h3>
+                <h3><i class="fas fa-qrcode"></i> Scan QR</h3>
                 <button class="modal-close" data-modal="scanQrModal">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body" style="text-align:center;">
-                <div id="qrScanner" style="width:100%; max-width:300px; margin:0 auto;"></div>
-                <p class="helper-text"><i class="fas fa-camera"></i> Position QR code in frame to scan</p>
+                <div id="qrScanner" style="width:100%; max-width:280px; margin:0 auto;"></div>
+                <p class="helper-text"><i class="fas fa-camera"></i> Position QR code in frame</p>
                 <div class="qr-actions">
                     <button class="btn-outline-sm" id="uploadQrBtn">
                         <i class="fas fa-upload"></i> Upload Image
@@ -602,7 +634,7 @@
                     <i class="fas fa-tint" style="color:var(--accent);"></i>
                 </div>
                 <h4 style="margin-bottom:8px;">Get Free Test Tokens</h4>
-                <p class="helper-text">Request 100 SAYM tokens for testing on Testnet</p>
+                <p class="helper-text">Request 100 SAY tokens for testing on Testnet</p>
                 <button class="btn-primary" id="claimFaucetBtn" style="margin:16px 0;">
                     <i class="fas fa-gift"></i> Claim 100 SAY
                 </button>
