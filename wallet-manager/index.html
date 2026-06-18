@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sayman Wallet Manager Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>PUKY Wallet - Professional Universal Key Yielder</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js">
     </script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js">
@@ -25,8 +25,8 @@
                 <i class="fas fa-wallet"></i>
             </div>
             <div class="loader-spinner"></div>
-            <p class="loader-title">Sayman Wallet</p>
-            <p class="loader-sub">Initializing secure environment...</p>
+            <p class="loader-title">PUKY Wallet</p>
+            <p class="loader-sub">Professional Universal Key Yielder</p>
             <div class="loader-progress">
                 <div class="loader-progress-bar" id="progressBar"></div>
             </div>
@@ -34,16 +34,22 @@
         </div>
     </div>
 
+    <!-- MOBILE MENU OVERLAY -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
     <!-- MAIN APP -->
     <div id="app">
 
         <!-- TOP NAVIGATION -->
         <nav class="navbar">
             <div class="nav-left">
+                <button class="mobile-menu-btn" id="mobileMenuBtn">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <div class="nav-brand-wrapper">
                     <i class="fas fa-wallet nav-icon"></i>
-                    <span class="nav-brand">Sayman</span>
-                    <span class="nav-version">Pro v2.0</span>
+                    <span class="nav-brand">PUKY</span>
+                    <span class="nav-version">Pro v3.0</span>
                 </div>
                 <div class="nav-network">
                     <select id="networkSelect" class="network-select">
@@ -54,16 +60,14 @@
                 </div>
             </div>
             <div class="nav-right">
-                <button class="nav-btn" id="exportAllBtn">
-                    <i class="fas fa-file-export"></i>
-                    Export All
-                </button>
-                <button class="nav-btn" id="scanQrNavBtn">
+                <button class="nav-btn nav-btn-icon" id="scanQrNavBtn" title="Scan QR">
                     <i class="fas fa-qrcode"></i>
-                    Scan QR
                 </button>
                 <button class="nav-btn nav-btn-icon" id="refreshBtn" title="Refresh">
                     <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="nav-btn" id="exportAllBtn">
+                    <i class="fas fa-file-export"></i> <span class="nav-btn-text">Export</span>
                 </button>
             </div>
         </nav>
@@ -95,6 +99,9 @@
                     </button>
                     <button class="btn-outline-sm" id="importQrBtn">
                         <i class="fas fa-qrcode"></i> Import QR
+                    </button>
+                    <button class="btn-outline-sm" id="faucetBtn">
+                        <i class="fas fa-tint"></i> Faucet
                     </button>
                 </div>
             </aside>
@@ -184,6 +191,9 @@
                                 <span class="detail-status" id="detailStatus">
                                     <i class="fas fa-circle"></i> Inactive
                                 </span>
+                                <button class="btn-outline-sm" id="editWalletBtn" style="padding:2px 8px;font-size:0.6rem;">
+                                    <i class="fas fa-edit"></i>
+                                </button>
                             </div>
                             <div class="detail-address-wrapper">
                                 <span class="address-mono" id="detailAddress">0x0000000000000000000000000000000000000000</span>
@@ -220,6 +230,10 @@
                                 <span class="meta-value" id="detailNonce">0</span>
                             </div>
                             <div class="meta-item">
+                                <span class="meta-label"><i class="fas fa-cube"></i> Block</span>
+                                <span class="meta-value" id="detailBlock">0</span>
+                            </div>
+                            <div class="meta-item">
                                 <span class="meta-label"><i class="fas fa-network-wired"></i> Network</span>
                                 <span class="meta-value" id="detailNetwork">Testnet</span>
                             </div>
@@ -247,11 +261,12 @@
                         <div class="history-filters">
                             <div class="filter-group">
                                 <select id="txTypeFilter">
-                                    <option value="all"><i class="fas fa-list"></i> All Types</option>
+                                    <option value="all"><i class="fas fa-list"></i> All</option>
                                     <option value="TRANSFER"><i class="fas fa-exchange-alt"></i> Transfers</option>
                                     <option value="STAKE"><i class="fas fa-lock"></i> Stakes</option>
                                     <option value="UNSTAKE"><i class="fas fa-unlock"></i> Unstakes</option>
                                     <option value="REWARD"><i class="fas fa-gift"></i> Rewards</option>
+                                    <option value="FAUCET"><i class="fas fa-tint"></i> Faucet</option>
                                 </select>
                                 <select id="txDateFilter">
                                     <option value="all"><i class="fas fa-calendar"></i> All Time</option>
@@ -259,7 +274,7 @@
                                     <option value="week"><i class="fas fa-calendar-week"></i> This Week</option>
                                     <option value="month"><i class="fas fa-calendar-alt"></i> This Month</option>
                                     <option value="year"><i class="fas fa-calendar-year"></i> This Year</option>
-                                    <option value="custom"><i class="fas fa-calendar-plus"></i> Custom Range</option>
+                                    <option value="custom"><i class="fas fa-calendar-plus"></i> Custom</option>
                                 </select>
                                 <input type="date" id="txDateFrom" style="display:none;" />
                                 <input type="date" id="txDateTo" style="display:none;" />
@@ -289,7 +304,12 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label><i class="fas fa-user"></i> Recipient Address</label>
-                                    <input type="text" id="sendTo" placeholder="0x..." />
+                                    <div style="display:flex;gap:8px;">
+                                        <input type="text" id="sendTo" placeholder="0x..." style="flex:1;" />
+                                        <button class="btn-outline-sm" id="scanQrSendBtn" title="Scan QR to fill address">
+                                            <i class="fas fa-qrcode"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label><i class="fas fa-coins"></i> Amount (SAY)</label>
@@ -298,17 +318,22 @@
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label><i class="fas fa-gas-pump"></i> Gas Price (optional)</label>
+                                    <label><i class="fas fa-gas-pump"></i> Gas Price</label>
                                     <input type="number" id="sendGasPrice" placeholder="Auto" step="1" />
                                 </div>
                                 <div class="form-group">
-                                    <label><i class="fas fa-tachometer-alt"></i> Gas Limit (optional)</label>
+                                    <label><i class="fas fa-tachometer-alt"></i> Gas Limit</label>
                                     <input type="number" id="sendGasLimit" placeholder="Auto" step="1" />
                                 </div>
                             </div>
-                            <button class="btn-primary" id="sendBtn">
-                                <i class="fas fa-paper-plane"></i> Send Transaction
-                            </button>
+                            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                                <button class="btn-primary" id="sendBtn">
+                                    <i class="fas fa-paper-plane"></i> Send Transaction
+                                </button>
+                                <button class="btn-outline-sm" id="clearSendBtn">
+                                    <i class="fas fa-eraser"></i> Clear
+                                </button>
+                            </div>
                             <div id="sendResult"></div>
                         </div>
                     </div>
@@ -320,7 +345,22 @@
                                 <div class="form-group">
                                     <label><i class="fas fa-coins"></i> Amount to Stake (SAY)</label>
                                     <input type="number" id="stakeAmount" placeholder="Enter amount" step="0.01" />
-                                    <small class="helper-text"><i class="fas fa-info-circle"></i> Minimum: 100 SAY on Testnet, 500 SAY on Public Testnet</small>
+                                    <small class="helper-text"><i class="fas fa-info-circle"></i> Minimum: 100 SAY on Testnet</small>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-clock"></i> Estimated Reward Time</label>
+                                    <input type="text" id="stakeRewardTime" value="~2-3 blocks (~30-45 seconds)" readonly style="background:var(--bg-input);" />
+                                    <small class="helper-text"><i class="fas fa-info-circle"></i> Rewards distributed every block (~15 sec)</small>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-percentage"></i> Estimated APY</label>
+                                    <input type="text" id="stakeApy" value="12.5% Annual" readonly style="background:var(--bg-input);" />
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-cube"></i> Current Block</label>
+                                    <input type="text" id="stakeBlock" value="Loading..." readonly style="background:var(--bg-input);" />
                                 </div>
                             </div>
                             <div class="stake-actions">
@@ -335,6 +375,13 @@
                                 </button>
                             </div>
                             <div id="stakeResult"></div>
+                            <div id="stakeInfo" style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+                                <p style="font-size:0.8rem;color:var(--text-muted);">
+                                    <i class="fas fa-info-circle"></i> 
+                                    <strong>Staking Rewards:</strong> Earn ~12.5% APY. Rewards are distributed automatically every block.
+                                    Your stake helps secure the network through Proof of Stake validation.
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -400,6 +447,33 @@
                     </button>
                 </div>
                 <div id="createResult"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Wallet Modal -->
+    <div class="modal-overlay" id="editWalletModal">
+        <div class="modal modal-sm modal-animated">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Edit Wallet</h3>
+                <button class="modal-close" data-modal="editWalletModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> Wallet Name</label>
+                    <input type="text" id="editWalletName" placeholder="Enter new name" />
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                    <button class="btn-primary" id="saveWalletNameBtn">
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                    <button class="btn-danger" id="deleteWalletBtn">
+                        <i class="fas fa-trash"></i> Delete Wallet
+                    </button>
+                </div>
+                <div id="editResult"></div>
             </div>
         </div>
     </div>
@@ -482,7 +556,7 @@
                 </button>
             </div>
             <div class="modal-body">
-                <p class="helper-text"><i class="fas fa-info-circle"></i> Upload a JSON file exported from Sayman Wallet Manager.</p>
+                <p class="helper-text"><i class="fas fa-info-circle"></i> Upload a JSON file exported from PUKY Wallet.</p>
                 <div class="file-upload-wrapper">
                     <input type="file" id="jsonFileInput" accept=".json" />
                     <label for="jsonFileInput" class="file-upload-label">
@@ -501,7 +575,7 @@
 
     <!-- Transaction Detail Modal -->
     <div class="modal-overlay" id="txDetailModal">
-        <div class="modal modal-sm modal-animated">
+        <div class="modal modal-lg modal-animated">
             <div class="modal-header">
                 <h3><i class="fas fa-receipt"></i> Transaction Details</h3>
                 <button class="modal-close" data-modal="txDetailModal">
@@ -510,6 +584,32 @@
             </div>
             <div class="modal-body" id="txDetailContent">
                 <!-- Rendered dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Faucet Modal -->
+    <div class="modal-overlay" id="faucetModal">
+        <div class="modal modal-sm modal-animated">
+            <div class="modal-header">
+                <h3><i class="fas fa-tint"></i> Faucet</h3>
+                <button class="modal-close" data-modal="faucetModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <div style="font-size:48px;margin-bottom:16px;">
+                    <i class="fas fa-tint" style="color:var(--accent);"></i>
+                </div>
+                <h4 style="margin-bottom:8px;">Get Free Test Tokens</h4>
+                <p class="helper-text">Request 100 SAYM tokens for testing on Testnet</p>
+                <button class="btn-primary" id="claimFaucetBtn" style="margin:16px 0;">
+                    <i class="fas fa-gift"></i> Claim 100 SAY
+                </button>
+                <div id="faucetResult"></div>
+                <div class="helper-text" style="margin-top:8px;">
+                    <i class="fas fa-info-circle"></i> You can claim once per hour
+                </div>
             </div>
         </div>
     </div>
