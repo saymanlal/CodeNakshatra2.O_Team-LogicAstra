@@ -1778,3 +1778,231 @@ body {
 .gap-2 {
     gap: 16px;
 }
+
+/* ===== ADDITIONAL STYLES FOR PUKY WALLET ===== */
+
+/* Brand Icon */
+.brand-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+/* Sidebar - Fix blur issue */
+.sidebar {
+    background: var(--bg-secondary);
+    z-index: 60;
+    backdrop-filter: none !important;
+}
+
+.mobile-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 45;
+    backdrop-filter: blur(4px);
+}
+
+.mobile-overlay.active {
+    display: block;
+}
+
+/* Sidebar open state */
+.sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+}
+
+/* QR Pay Scanner */
+#qrPayScanner {
+    width: 100%;
+    max-width: 280px;
+    margin: 0 auto;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--bg-input);
+}
+
+#qrPayScanner video {
+    width: 100% !important;
+    height: auto !important;
+    border-radius: var(--radius-sm);
+}
+
+/* QR Pay Form */
+.qr-pay-form {
+    margin-top: 16px;
+}
+
+.qr-pay-form .form-group {
+    margin-bottom: 10px;
+}
+
+.qr-pay-form .form-group input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    outline: none;
+    font-family: var(--font);
+    transition: all var(--transition);
+}
+
+.qr-pay-form .form-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.08);
+}
+
+.qr-pay-form .form-group input:read-only {
+    cursor: default;
+    opacity: 0.8;
+}
+
+/* Lock Timer Animation */
+.lock-timer {
+    color: var(--warning);
+    font-weight: 600;
+    animation: pulse-timer 1s ease-in-out infinite;
+}
+
+@keyframes pulse-timer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.lock-timer.unlocked {
+    color: var(--success);
+    animation: none;
+}
+
+/* ===== RESPONSIVE FIXES ===== */
+@media (max-width: 768px) {
+    .modal {
+        max-width: 95%;
+        margin: 8px;
+        border-radius: var(--radius);
+    }
+    
+    #qrPayScanner {
+        max-width: 240px;
+    }
+    
+    .qr-pay-form .form-group input {
+        font-size: 0.8rem;
+        padding: 6px 10px;
+    }
+    
+    .sidebar {
+        width: 85%;
+        max-width: 300px;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal {
+        max-width: 98%;
+        border-radius: var(--radius-sm);
+    }
+    
+    #qrPayScanner {
+        max-width: 200px;
+    }
+    
+    .qr-pay-form .form-group input {
+        font-size: 0.75rem;
+        padding: 5px 8px;
+    }
+    
+    .sidebar {
+        width: 90%;
+        max-width: 280px;
+    }
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeScale {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-animated {
+    animation: fadeScale 0.3s ease forwards;
+}
+
+.sidebar.open {
+    animation: slideInLeft 0.3s ease forwards;
+}
+
+.toast-container {
+    animation: slideInRight 0.4s ease forwards;
+}
+
+/* ===== GLOW EFFECTS ===== */
+.glow {
+    box-shadow: 0 0 20px rgba(79, 110, 247, 0.15);
+}
+
+.glow:hover {
+    box-shadow: 0 0 30px rgba(79, 110, 247, 0.25);
+}
+
+/* ===== TRANSACTION ROW ANIMATION ===== */
+.tx-item {
+    transition: all var(--transition);
+}
+
+.tx-item:hover {
+    transform: translateX(4px);
+    background: var(--bg-hover);
+}
+
+/* ===== STAT CARD HOVER ===== */
+.stat-card {
+    transition: all var(--transition);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow);
+}
+
+/* ===== BUTTON PRESS EFFECT ===== */
+.btn-primary:active,
+.btn-primary-sm:active,
+.btn-outline-sm:active {
+    transform: scale(0.97);
+}

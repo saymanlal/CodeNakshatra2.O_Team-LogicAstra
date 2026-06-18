@@ -1,7 +1,7 @@
 // ============================================================
-//  PUKY Wallet Manager Pro — FINAL COMPLETE FIX
-//  All issues resolved: Gas fee, Faucet filter, Unstake lock,
-//  QR Pay modal, Auto-rewards, Animations
+//  PUKY Wallet Pro v3.0 - Universal Crypto Vault
+//  Features: Multi-chain support, QR Pay, Unstake Timer,
+//  Dynamic Gas, Wow Animations
 // ============================================================
 
 (function() {
@@ -28,6 +28,74 @@
     let lockTimers = {};
     let qrPayScannerInstance = null;
     let isQrPayScanning = false;
+    let unstakeCountdownInterval = null;
+
+    // ===== MULTI-CHAIN SUPPORT =====
+    const chainConfigs = {
+        'sayman': {
+            name: 'Sayman',
+            symbol: 'SAY',
+            decimals: 18,
+            icon: 'fa-wallet',
+            color: '#4f6ef7'
+        },
+        'ethereum': {
+            name: 'Ethereum',
+            symbol: 'ETH',
+            decimals: 18,
+            icon: 'fa-ethereum',
+            color: '#627eea'
+        },
+        'bitcoin': {
+            name: 'Bitcoin',
+            symbol: 'BTC',
+            decimals: 8,
+            icon: 'fa-btc',
+            color: '#f7931a'
+        },
+        'arbitrum': {
+            name: 'Arbitrum',
+            symbol: 'ARB',
+            decimals: 18,
+            icon: 'fa-layer-group',
+            color: '#28a0f0'
+        },
+        'cardano': {
+            name: 'Cardano',
+            symbol: 'ADA',
+            decimals: 6,
+            icon: 'fa-robot',
+            color: '#0033ad'
+        },
+        'binance': {
+            name: 'Binance Smart Chain',
+            symbol: 'BNB',
+            decimals: 18,
+            icon: 'fa-bolt',
+            color: '#f3ba2f'
+        },
+        'polygon': {
+            name: 'Polygon',
+            symbol: 'MATIC',
+            decimals: 18,
+            icon: 'fa-hexagon',
+            color: '#8247e5'
+        },
+        'monad': {
+            name: 'Monad',
+            symbol: 'MONAD',
+            decimals: 18,
+            icon: 'fa-cube',
+            color: '#7c3aed'
+        },
+        'solana': {
+            name: 'Solana',
+            symbol: 'SOL',
+            decimals: 9,
+            icon: 'fa-sun',
+            color: '#9945ff'
+        }
+    };
 
     // ===== API ENDPOINTS =====
     const networkEndpoints = {
@@ -84,7 +152,6 @@
         mobileMenuBtn: $('#mobileMenuBtn'),
         mobileOverlay: $('#mobileOverlay'),
         sidebar: $('#sidebar'),
-        // modals
         addWalletModal: $('#addWalletModal'),
         editWalletModal: $('#editWalletModal'),
         detailsModal: $('#detailsModal'),
@@ -99,7 +166,6 @@
         txDetailContent: $('#txDetailContent'),
         editWalletName: $('#editWalletName'),
         editResult: $('#editResult'),
-        // buttons
         addWalletBtn: $('#addWalletBtn'),
         importJsonBtn: $('#importJsonBtn'),
         importQrBtn: $('#importQrBtn'),
@@ -147,14 +213,12 @@
         scanResult: $('#scanResult'),
         faucetResult: $('#faucetResult'),
         detailsContent: $('#detailsContent'),
-        // QR Pay
         qrPayScanner: $('#qrPayScanner'),
         qrPayAddress: $('#qrPayAddress'),
         qrPayAmount: $('#qrPayAmount'),
         qrPaySendBtn: $('#qrPaySendBtn'),
         qrPayCancelBtn: $('#qrPayCancelBtn'),
         qrPayResult: $('#qrPayResult'),
-        // filters
         txTypeFilter: $('#txTypeFilter'),
         txDateFilter: $('#txDateFilter'),
         txDateFrom: $('#txDateFrom'),
@@ -163,7 +227,6 @@
         resetFilterBtn: $('#resetFilterBtn'),
         txTotalAmount: $('#txTotalAmount'),
         txTotalCount: $('#txTotalCount'),
-        // analytics
         annualSummary: $('#annualSummary'),
         heatmapGrid: $('#heatmapGrid'),
         qrScanner: $('#qrScanner'),
@@ -203,30 +266,13 @@
         return activeWallet;
     }
 
-    // Calculate reward based on stake amount and time
-    function calculateReward(stakeAmount, blocksElapsed) {
-        const annualReward = stakeAmount * (stakingAPY / 100);
-        const blocksPerYear = (365 * 24 * 60 * 60) / blockTime;
-        const perBlockReward = annualReward / blocksPerYear;
-        return perBlockReward * blocksElapsed;
+    // ===== CHAIN CONFIG HELPERS =====
+    function getChainConfig(chain) {
+        return chainConfigs[chain] || chainConfigs['sayman'];
     }
 
-    // Calculate remaining lock time
-    function getLockRemaining(lockBlock) {
-        if (!lockBlock) return null;
-        const remaining = Math.max(0, lockBlock - currentBlock);
-        const remainingSeconds = remaining * blockTime;
-        return { remaining, remainingSeconds };
-    }
-
-    function formatLockTime(seconds) {
-        if (seconds <= 0) return 'Unlocked';
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        if (mins > 0) {
-            return `${mins}m ${secs}s`;
-        }
-        return `${secs}s`;
+    function getChainSymbol(chain) {
+        return getChainConfig(chain).symbol;
     }
 
     // ===== STORAGE =====
@@ -244,19 +290,20 @@
                     stake: w.stake || 0,
                     lockedAmount: w.lockedAmount || 0,
                     lockBlock: w.lockBlock || null,
+                    chain: w.chain || 'sayman',
                     createdAt: w.createdAt || Date.now(),
                     networkType: w.networkType || getNetworkType()
                 })),
                 activeWalletId: activeWallet ? activeWallet.id : null,
                 network: currentNetwork,
             };
-            localStorage.setItem('sayman_wallet_state', JSON.stringify(data));
+            localStorage.setItem('puky_wallet_state', JSON.stringify(data));
         } catch (e) { /* ignore */ }
     }
 
     function loadState() {
         try {
-            const raw = localStorage.getItem('sayman_wallet_state');
+            const raw = localStorage.getItem('puky_wallet_state');
             if (!raw) return false;
             const data = JSON.parse(raw);
             wallets = data.wallets || [];
@@ -269,7 +316,7 @@
     }
 
     // ===== WALLET FACTORY =====
-    async function createWalletFromPrivateKey(privateKey, name) {
+    async function createWalletFromPrivateKey(privateKey, name, chain = 'sayman') {
         const wallet = new SaymanWallet(privateKey);
         await wallet.initialize();
         return {
@@ -283,12 +330,13 @@
             lockedAmount: 0,
             lockBlock: null,
             transactions: [],
+            chain: chain,
             createdAt: Date.now(),
             networkType: getNetworkType()
         };
     }
 
-    async function generateNewWallet(name) {
+    async function generateNewWallet(name, chain = 'sayman') {
         const wallet = new SaymanWallet();
         await wallet.initialize();
         return {
@@ -302,6 +350,7 @@
             lockedAmount: 0,
             lockBlock: null,
             transactions: [],
+            chain: chain,
             createdAt: Date.now(),
             networkType: getNetworkType()
         };
@@ -314,6 +363,7 @@
         renderDetail();
         updateCharts();
         updateAnalytics();
+        updateUnstakeCountdown();
     }
 
     function renderWalletList() {
@@ -337,18 +387,21 @@
             return;
         }
 
-        dom.walletList.innerHTML = networkWallets.map(w => `
-            <div class="wallet-item ${w.id === (activeWallet ? activeWallet.id : null) ? 'active' : ''}" data-id="${w.id}">
-                <span class="wallet-dot"></span>
-                <div class="wallet-info">
-                    <div class="wallet-name">${w.name}</div>
-                    <div class="wallet-balance-sm">${formatBalance(w.balance || 0)} SAY</div>
+        dom.walletList.innerHTML = networkWallets.map(w => {
+            const chain = getChainConfig(w.chain || 'sayman');
+            return `
+                <div class="wallet-item ${w.id === (activeWallet ? activeWallet.id : null) ? 'active' : ''}" data-id="${w.id}">
+                    <span class="wallet-dot" style="background:${chain.color};"></span>
+                    <div class="wallet-info">
+                        <div class="wallet-name">${w.name} <span style="font-size:0.6rem;color:var(--text-muted);">${chain.symbol}</span></div>
+                        <div class="wallet-balance-sm">${formatBalance(w.balance || 0)} ${chain.symbol}</div>
+                    </div>
+                    <button class="wallet-delete" data-id="${w.id}" title="Delete">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
-                <button class="wallet-delete" data-id="${w.id}" title="Delete">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
         dom.walletList.querySelectorAll('.wallet-item').forEach(el => {
             el.addEventListener('click', (e) => {
@@ -410,29 +463,29 @@
             return;
         }
 
+        const chain = getChainConfig(w.chain || 'sayman');
         dom.detailName.textContent = w.name;
         dom.detailStatus.className = 'detail-status active';
-        dom.detailStatus.innerHTML = '<i class="fas fa-circle"></i> Active';
+        dom.detailStatus.innerHTML = `<i class="fas fa-circle" style="color:${chain.color};"></i> ${chain.symbol}`;
         dom.detailAddress.textContent = w.address || '0x...';
         dom.detailBalance.textContent = formatBalance(w.balance || 0);
         dom.detailStaked.textContent = formatBalance(w.stake || 0);
         
-        // Check lock status
+        // Update locked with countdown
         if (w.lockBlock && w.lockedAmount > 0) {
             const lockInfo = getLockRemaining(w.lockBlock);
             if (lockInfo && lockInfo.remaining > 0) {
-                dom.detailLocked.textContent = `${formatBalance(w.lockedAmount)} SAY (${formatLockTime(lockInfo.remainingSeconds)})`;
+                dom.detailLocked.innerHTML = `${formatBalance(w.lockedAmount)} <span class="lock-timer">${formatLockTime(lockInfo.remainingSeconds)}</span>`;
                 dom.detailLocked.style.color = 'var(--warning)';
-            } else {
-                // Lock expired - auto-credit
-                if (w.lockedAmount > 0) {
-                    w.balance = (w.balance || 0) + w.lockedAmount;
-                    w.lockedAmount = 0;
-                    w.lockBlock = null;
-                    saveState();
-                    dom.detailLocked.textContent = '0.00';
-                    dom.detailLocked.style.color = '';
-                }
+            } else if (w.lockedAmount > 0) {
+                // Auto-credit locked tokens
+                w.balance = (w.balance || 0) + w.lockedAmount;
+                w.lockedAmount = 0;
+                w.lockBlock = null;
+                saveState();
+                dom.detailLocked.textContent = '0.00';
+                dom.detailLocked.style.color = '';
+                showToast(`${formatBalance(w.lockedAmount)} unlocked and credited!`, 'success');
             }
         } else {
             dom.detailLocked.textContent = '0.00';
@@ -446,6 +499,58 @@
         renderTransactionHistory();
     }
 
+    // ===== UNSTAKE COUNTDOWN TIMER =====
+    function updateUnstakeCountdown() {
+        if (unstakeCountdownInterval) {
+            clearInterval(unstakeCountdownInterval);
+            unstakeCountdownInterval = null;
+        }
+
+        // Check if any wallet has locked tokens
+        const hasLocked = wallets.some(w => w.lockBlock && w.lockedAmount > 0);
+        if (!hasLocked) return;
+
+        unstakeCountdownInterval = setInterval(() => {
+            let needsUpdate = false;
+            wallets.forEach(w => {
+                if (w.lockBlock && w.lockedAmount > 0) {
+                    const lockInfo = getLockRemaining(w.lockBlock);
+                    if (lockInfo && lockInfo.remaining > 0) {
+                        needsUpdate = true;
+                    } else if (w.lockedAmount > 0) {
+                        // Auto-credit
+                        w.balance = (w.balance || 0) + w.lockedAmount;
+                        w.lockedAmount = 0;
+                        w.lockBlock = null;
+                        needsUpdate = true;
+                        showToast(`${formatBalance(w.lockedAmount)} unlocked and credited!`, 'success');
+                    }
+                }
+            });
+            if (needsUpdate) {
+                saveState();
+                render();
+            }
+        }, 1000);
+    }
+
+    function getLockRemaining(lockBlock) {
+        if (!lockBlock) return null;
+        const remaining = Math.max(0, lockBlock - currentBlock);
+        const remainingSeconds = remaining * blockTime;
+        return { remaining, remainingSeconds };
+    }
+
+    function formatLockTime(seconds) {
+        if (seconds <= 0) return 'Unlocked ✓';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        if (mins > 0) {
+            return `${mins}m ${secs}s`;
+        }
+        return `${secs}s`;
+    }
+
     // ===== FETCH BLOCK INFO =====
     async function fetchBlockInfo() {
         try {
@@ -456,27 +561,9 @@
                 dom.detailBlock.textContent = currentBlock;
                 dom.stakeBlock.textContent = `Block #${currentBlock}`;
                 
-                // Update stake reward time
                 if (activeWallet && activeWallet.stake > 0) {
                     const rewardTime = calculateRewardTime(activeWallet.stake);
                     dom.stakeRewardTime.value = `~${rewardTime} (${blockTime}s per block)`;
-                }
-                
-                // Check lock status for active wallet
-                if (activeWallet && activeWallet.lockBlock && activeWallet.lockedAmount > 0) {
-                    const lockInfo = getLockRemaining(activeWallet.lockBlock);
-                    if (lockInfo && lockInfo.remaining > 0) {
-                        dom.detailLocked.textContent = `${formatBalance(activeWallet.lockedAmount)} SAY (${formatLockTime(lockInfo.remainingSeconds)})`;
-                        dom.detailLocked.style.color = 'var(--warning)';
-                    } else if (activeWallet.lockedAmount > 0) {
-                        // Auto-credit locked tokens
-                        activeWallet.balance = (activeWallet.balance || 0) + activeWallet.lockedAmount;
-                        activeWallet.lockedAmount = 0;
-                        activeWallet.lockBlock = null;
-                        saveState();
-                        render();
-                        showToast(`✅ ${formatBalance(activeWallet.lockedAmount)} SAY unlocked and credited!`, 'success');
-                    }
                 }
             }
         } catch (error) {
@@ -654,12 +741,11 @@
                 }
             }
 
-            // Check if this is an UNSTAKE with lock status
             let lockStatus = '';
             if (tx.type === 'UNSTAKE' && tx.lockBlock) {
                 const lockInfo = getLockRemaining(tx.lockBlock);
                 if (lockInfo && lockInfo.remaining > 0) {
-                    lockStatus = `<span style="color:var(--warning);font-size:0.6rem;">🔒 ${formatLockTime(lockInfo.remainingSeconds)}</span>`;
+                    lockStatus = `<span class="lock-timer" style="font-size:0.6rem;">🔒 ${formatLockTime(lockInfo.remainingSeconds)}</span>`;
                 } else {
                     lockStatus = `<span style="color:var(--success);font-size:0.6rem;">✓ Unlocked</span>`;
                 }
@@ -683,7 +769,7 @@
                     </span>
                     <span class="tx-address-cell">${addressDisplay || '—'}</span>
                     <span class="tx-amount ${isPositive ? 'positive' : 'negative'}">
-                        ${isPositive ? '+' : ''}${formatBalance(displayAmount)} SAY
+                        ${isPositive ? '+' : ''}${formatBalance(displayAmount)} ${getChainSymbol(w.chain || 'sayman')}
                         ${lockStatus ? `<br>${lockStatus}` : ''}
                     </span>
                     <span class="tx-time">${timeDisplay}</span>
@@ -707,19 +793,19 @@
         const content = dom.txDetailContent;
         const isPositive = (tx.amount || 0) >= 0;
         const typeClass = (tx.type || 'transfer').toLowerCase();
+        const symbol = getChainSymbol(activeWallet?.chain || 'sayman');
 
-        // FIX: Gas fee shows directly as "6 SAY"
         let gasFee = 'N/A';
         if (tx.gasPrice && tx.gasLimit) {
             const gasPriceNum = parseFloat(tx.gasPrice);
             const gasLimitNum = parseFloat(tx.gasLimit);
             if (!isNaN(gasPriceNum) && !isNaN(gasLimitNum)) {
                 const fee = (gasPriceNum * gasLimitNum) / 1e18;
-                gasFee = fee.toFixed(2) + ' SAY';
+                gasFee = fee.toFixed(2) + ' ' + symbol;
             }
         }
-        if (gasFee === 'N/A' || gasFee === '0.00 SAY') {
-            gasFee = '6 SAY';
+        if (gasFee === 'N/A' || gasFee === '0.00 ' + symbol) {
+            gasFee = '6 ' + symbol;
         }
 
         let timeDisplay = 'N/A';
@@ -737,7 +823,6 @@
         let txIdDisplay = tx.txId || tx.hash || 'N/A';
         let blockDisplay = tx.blockNumber || tx.block || 'N/A';
 
-        // Lock info for unstake
         let lockInfo = '';
         if (tx.type === 'UNSTAKE' && tx.lockBlock) {
             const lockData = getLockRemaining(tx.lockBlock);
@@ -745,14 +830,14 @@
                 lockInfo = `
                     <div class="form-group">
                         <label><i class="fas fa-clock"></i> Unlock In</label>
-                        <input type="text" value="${formatLockTime(lockData.remainingSeconds)} (${lockData.remaining} blocks)" readonly style="color:var(--warning);" />
+                        <input type="text" value="${formatLockTime(lockData.remainingSeconds)} (${lockData.remaining} blocks)" readonly style="color:var(--warning);font-weight:600;" />
                     </div>
                 `;
             } else {
                 lockInfo = `
                     <div class="form-group">
                         <label><i class="fas fa-check-circle"></i> Status</label>
-                        <input type="text" value="Unlocked ✓" readonly style="color:var(--success);" />
+                        <input type="text" value="Unlocked ✓" readonly style="color:var(--success);font-weight:600;" />
                     </div>
                 `;
             }
@@ -766,7 +851,7 @@
                         ${tx.type || 'Transfer'}
                     </span>
                     <span class="tx-amount ${isPositive ? 'positive' : 'negative'}" style="font-size:1.1rem;">
-                        ${isPositive ? '+' : ''}${formatBalance(tx.amount || 0)} SAY
+                        ${isPositive ? '+' : ''}${formatBalance(tx.amount || 0)} ${symbol}
                     </span>
                 </div>
                 
@@ -791,7 +876,7 @@
                     ${tx.data.amount !== undefined ? `
                     <div class="form-group">
                         <label><i class="fas fa-coins"></i> Amount</label>
-                        <input type="text" value="${formatBalance(tx.data.amount)} SAY" readonly />
+                        <input type="text" value="${formatBalance(tx.data.amount)} ${symbol}" readonly />
                     </div>
                     ` : ''}
                 ` : ''}
@@ -1175,7 +1260,10 @@
             isQrPayScanning = false;
             dom.qrPayResult.innerHTML = `
                 <div class="error-message">
-                    <i class="fas fa-exclamation-circle"></i> Camera access denied.
+                    <i class="fas fa-exclamation-circle"></i> Camera access denied. Please grant camera permission.
+                    <button class="btn-outline-sm" onclick="location.reload()" style="margin-top:8px;">
+                        <i class="fas fa-sync-alt"></i> Retry
+                    </button>
                 </div>
             `;
             console.error('QR Pay Scanner error:', err);
@@ -1183,7 +1271,6 @@
     }
 
     function onQrPayScanSuccess(decodedText) {
-        // Auto-fill address
         if (decodedText && decodedText.length === 40) {
             dom.qrPayAddress.value = decodedText;
             dom.qrPayResult.innerHTML = `
@@ -1212,12 +1299,11 @@
             }
         }
         
-        // Stop scanner after successful scan
         stopQrPayScanner();
     }
 
     function onQrPayScanError(err) {
-        // Ignore
+        // Ignore - fires constantly
     }
 
     function stopQrPayScanner() {
@@ -1231,7 +1317,7 @@
     }
 
     // ===== QR PAY SEND =====
-    dom.qrPaySendBtn.addEventListener('click', async () => {
+    dom.qrPaySendBtn.addEventListener('click', () => {
         const to = dom.qrPayAddress.value.trim();
         const amount = parseFloat(dom.qrPayAmount.value);
 
@@ -1250,12 +1336,10 @@
             return;
         }
 
-        // Close QR pay modal and open send tab with filled data
         closeModal('qrPayModal');
         dom.sendTo.value = to;
         dom.sendAmount.value = amount;
         
-        // Switch to send tab
         document.querySelector('[data-tab="send"]')?.classList.add('active');
         document.getElementById('tab-send')?.classList.add('active');
         
@@ -1434,30 +1518,30 @@
             showToast('Please select a wallet first', 'error');
             return;
         }
-    
+
         try {
             const amount = parseFloat(dom.stakeAmount.value);
-    
+
             if (!amount || amount <= 0) {
                 showToast('Please enter a valid amount', 'error');
                 return;
             }
-    
+
             if (amount < 100) {
                 showToast('Minimum stake is 100 SAY', 'error');
                 return;
             }
-    
+
             showLoading('Preparing stake...');
-    
+
             const wallet = new SaymanWallet(activeWallet.privateKey);
             await wallet.initialize();
-    
+
             const addressRes = await fetch(`${getApiBase()}/address/${wallet.address}`);
             const addressData = await addressRes.json();
             const nonce = addressData.nonce || 0;
-    
-            // Get real gas estimate from blockchain
+
+            // Get real gas estimate
             const gasEstimate = await fetch(`${getApiBase()}/estimate-gas`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1467,23 +1551,23 @@
                 })
             });
             const gas = await gasEstimate.json();
-    
-            // Calculate actual gas fee from blockchain response
+
+            // Calculate dynamic gas fee
             const gasLimit = gas.recommendedGasLimit || 21000;
             const gasPrice = gas.minGasPrice || 1;
             const gasFeeInSAY = (gasLimit * gasPrice) / 1e18;
-    
-            // Check balance including dynamic gas fee
+
+            // Check balance with gas
             const totalNeeded = amount + gasFeeInSAY;
             if (totalNeeded > (activeWallet.balance || 0)) {
                 hideLoading();
                 showToast(`Insufficient balance. Need ${formatBalance(totalNeeded)} SAY (${formatBalance(amount)} + ${formatBalance(gasFeeInSAY)} gas)`, 'error');
                 return;
             }
-    
+
             hideLoading();
             showLoading('Signing stake...');
-    
+
             const txData = {
                 type: 'STAKE',
                 data: { from: wallet.address, amount },
@@ -1492,28 +1576,28 @@
                 gasPrice: gasPrice,
                 nonce: nonce
             };
-    
+
             const signature = await wallet.signTransaction(txData);
-    
+
             const signedTx = {
                 ...txData,
                 signature: signature,
                 publicKey: wallet.publicKey
             };
-    
+
             hideLoading();
             showLoading('Broadcasting...');
-    
+
             const res = await fetch(`${getApiBase()}/broadcast`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(signedTx)
             });
-    
+
             const result = await res.json();
-    
+
             hideLoading();
-    
+
             if (result.success) {
                 const txHash = result.txId || '0x' + generateId().padStart(64, '0');
                 dom.stakeResult.innerHTML = `
@@ -1542,7 +1626,10 @@
                 
                 dom.stakeAmount.value = '';
                 showToast(`Staked ${formatBalance(amount)} SAY (gas: ${formatBalance(gasFeeInSAY)} SAY)`, 'success');
-    
+
+                const rewardTime = calculateRewardTime(activeWallet.stake);
+                dom.stakeRewardTime.value = `~${rewardTime} (${blockTime}s per block)`;
+
                 setTimeout(() => {
                     loadTransactionHistory();
                     fetchBlockInfo();
@@ -1558,7 +1645,7 @@
         }
     });
 
-    // ===== UNSTAKE - WITH LOCK PERIOD =====
+    // ===== UNSTAKE =====
     dom.unstakeBtn.addEventListener('click', async () => {
         if (!activeWallet) {
             showToast('Please select a wallet first', 'error');
@@ -1598,6 +1685,11 @@
             });
             const gas = await gasEstimate.json();
 
+            // Calculate gas fee
+            const gasLimit = gas.recommendedGasLimit || 21000;
+            const gasPrice = gas.minGasPrice || 1;
+            const gasFeeInSAY = (gasLimit * gasPrice) / 1e18;
+
             hideLoading();
             showLoading('Signing unstake...');
 
@@ -1605,8 +1697,8 @@
                 type: 'UNSTAKE',
                 data: { from: wallet.address },
                 timestamp: Date.now(),
-                gasLimit: gas.recommendedGasLimit || 21000,
-                gasPrice: gas.minGasPrice || 1,
+                gasLimit: gasLimit,
+                gasPrice: gasPrice,
                 nonce: nonce
             };
 
@@ -1635,10 +1727,10 @@
                 const txHash = result.txId || '0x' + generateId().padStart(64, '0');
                 const lockBlock = currentBlock + lockBlocks;
                 
-                // Move stake to locked state
                 activeWallet.lockedAmount = (activeWallet.lockedAmount || 0) + unstakeAmount;
                 activeWallet.stake = 0;
                 activeWallet.lockBlock = lockBlock;
+                activeWallet.balance = (activeWallet.balance || 0) - gasFeeInSAY;
                 
                 activeWallet.transactions.push({
                     type: 'UNSTAKE',
@@ -1647,8 +1739,9 @@
                     txId: txHash,
                     blockNumber: currentBlock,
                     lockBlock: lockBlock,
-                    gasPrice: txData.gasPrice,
-                    gasLimit: txData.gasLimit,
+                    gasPrice: gasPrice,
+                    gasLimit: gasLimit,
+                    gasFee: gasFeeInSAY,
                     data: { from: activeWallet.address }
                 });
                 saveState();
@@ -1659,6 +1752,7 @@
                         <i class="fas fa-check-circle"></i>
                         <strong>Unstake Transaction Broadcast!</strong><br>
                         <small>🔒 Tokens locked for ${lockBlocks} blocks (~${lockTimeMinutes} minutes)</small>
+                        <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAY</small>
                     </div>
                 `;
                 
@@ -1765,6 +1859,8 @@
                 balance: w.balance || 0,
                 stake: w.stake || 0,
                 lockedAmount: w.lockedAmount || 0,
+                lockBlock: w.lockBlock || null,
+                chain: w.chain || 'sayman',
                 transactions: w.transactions || [],
                 createdAt: w.createdAt,
                 networkType: w.networkType
@@ -1797,6 +1893,8 @@
             balance: activeWallet.balance || 0,
             stake: activeWallet.stake || 0,
             lockedAmount: activeWallet.lockedAmount || 0,
+            lockBlock: activeWallet.lockBlock || null,
+            chain: activeWallet.chain || 'sayman',
             transactions: activeWallet.transactions || [],
             createdAt: activeWallet.createdAt,
             networkType: activeWallet.networkType
@@ -1833,21 +1931,23 @@
             if (data.wallets && Array.isArray(data.wallets)) {
                 for (const wData of data.wallets) {
                     if (wData.privateKey) {
-                        const w = await createWalletFromPrivateKey(wData.privateKey, wData.name || 'Imported');
+                        const w = await createWalletFromPrivateKey(wData.privateKey, wData.name || 'Imported', wData.chain || 'sayman');
                         if (wData.transactions) w.transactions = wData.transactions;
                         if (wData.balance) w.balance = wData.balance;
                         if (wData.stake) w.stake = wData.stake;
                         if (wData.lockedAmount) w.lockedAmount = wData.lockedAmount;
+                        if (wData.lockBlock) w.lockBlock = wData.lockBlock;
                         wallets.push(w);
                         imported++;
                     }
                 }
             } else if (data.privateKey) {
-                const w = await createWalletFromPrivateKey(data.privateKey, data.name || 'Imported Wallet');
+                const w = await createWalletFromPrivateKey(data.privateKey, data.name || 'Imported Wallet', data.chain || 'sayman');
                 if (data.transactions) w.transactions = data.transactions;
                 if (data.balance) w.balance = data.balance;
                 if (data.stake) w.stake = data.stake;
                 if (data.lockedAmount) w.lockedAmount = data.lockedAmount;
+                if (data.lockBlock) w.lockBlock = data.lockBlock;
                 wallets.push(w);
                 imported++;
             }
@@ -1868,14 +1968,13 @@
         }
     });
 
-    // ===== QR SCAN (for importing) =====
+    // ===== QR SCAN (Import) =====
     dom.importQrBtn.addEventListener('click', () => {
         openModal('scanQrModal');
         setTimeout(startQrScanner, 500);
     });
 
     dom.scanQrNavBtn.addEventListener('click', () => {
-        // Open QR Pay modal instead of scan modal
         openModal('qrPayModal');
         setTimeout(startQrPayScanner, 500);
     });
@@ -1945,7 +2044,6 @@
         closeModal('scanQrModal');
 
         if (decodedText && decodedText.length === 40) {
-            // It's an address - open QR Pay modal
             openModal('qrPayModal');
             dom.qrPayAddress.value = decodedText;
             dom.qrPayResult.innerHTML = `
@@ -2068,11 +2166,13 @@
 
             if (walletData.privateKey) {
                 const name = walletData.name || 'Scanned Wallet';
-                const w = await createWalletFromPrivateKey(walletData.privateKey, name);
+                const chain = walletData.chain || 'sayman';
+                const w = await createWalletFromPrivateKey(walletData.privateKey, name, chain);
                 if (walletData.transactions) w.transactions = walletData.transactions;
                 if (walletData.balance) w.balance = walletData.balance;
                 if (walletData.stake) w.stake = walletData.stake;
                 if (walletData.lockedAmount) w.lockedAmount = walletData.lockedAmount;
+                if (walletData.lockBlock) w.lockBlock = walletData.lockBlock;
                 wallets.push(w);
                 activeWallet = w;
                 saveState();
@@ -2154,6 +2254,7 @@
 
     function showWalletDetails(wallet) {
         const content = dom.detailsContent;
+        const chain = getChainConfig(wallet.chain || 'sayman');
         content.innerHTML = `
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                 <div class="form-group">
@@ -2161,8 +2262,16 @@
                     <input type="text" value="${wallet.name}" readonly />
                 </div>
                 <div class="form-group">
+                    <label><i class="fas fa-link"></i> Chain</label>
+                    <input type="text" value="${chain.name} (${chain.symbol})" readonly style="color:${chain.color};" />
+                </div>
+                <div class="form-group">
                     <label><i class="fas fa-network-wired"></i> Network</label>
                     <input type="text" value="${wallet.networkType.toUpperCase()}" readonly />
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-cube"></i> Current Block</label>
+                    <input type="text" value="${currentBlock || 0}" readonly />
                 </div>
                 <div class="form-group" style="grid-column:1/-1;">
                     <label><i class="fas fa-address-book"></i> Address</label>
@@ -2173,15 +2282,15 @@
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-coins"></i> Balance</label>
-                    <input type="text" value="${formatBalance(wallet.balance || 0)} SAY" readonly />
+                    <input type="text" value="${formatBalance(wallet.balance || 0)} ${chain.symbol}" readonly />
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-lock"></i> Staked</label>
-                    <input type="text" value="${formatBalance(wallet.stake || 0)} SAY" readonly />
+                    <input type="text" value="${formatBalance(wallet.stake || 0)} ${chain.symbol}" readonly />
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-clock"></i> Locked</label>
-                    <input type="text" value="${formatBalance(wallet.lockedAmount || 0)} SAY" readonly />
+                    <input type="text" value="${formatBalance(wallet.lockedAmount || 0)} ${chain.symbol}" readonly />
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-hashtag"></i> Nonce</label>
@@ -2328,17 +2437,20 @@
     dom.mobileMenuBtn.addEventListener('click', () => {
         dom.sidebar.classList.toggle('open');
         dom.mobileOverlay.classList.toggle('active');
+        document.body.style.overflow = dom.sidebar.classList.contains('open') ? 'hidden' : 'auto';
     });
 
     dom.mobileOverlay.addEventListener('click', () => {
         dom.sidebar.classList.remove('open');
         dom.mobileOverlay.classList.remove('active');
+        document.body.style.overflow = 'auto';
     });
 
     document.addEventListener('click', (e) => {
         if (e.target.closest('.wallet-item') && window.innerWidth <= 768) {
             dom.sidebar.classList.remove('open');
             dom.mobileOverlay.classList.remove('active');
+            document.body.style.overflow = 'auto';
         }
     });
 
@@ -2387,7 +2499,12 @@
 
     dom.createWalletBtn.addEventListener('click', async () => {
         const name = dom.newWalletName.value.trim() || 'New Wallet';
-        const w = await generateNewWallet(name);
+        // Show chain selection
+        const chainOptions = Object.entries(chainConfigs).map(([key, val]) => 
+            `${key}: ${val.name} (${val.symbol})`
+        ).join('\n');
+        const chain = prompt(`Select chain (default: sayman):\n${chainOptions}`, 'sayman') || 'sayman';
+        const w = await generateNewWallet(name, chain);
         wallets.push(w);
         activeWallet = w;
         dom.newWalletName.value = '';
@@ -2395,7 +2512,7 @@
         saveState();
         render();
         fetchBlockInfo();
-        showToast('Wallet created!', 'success');
+        showToast(`${chainConfigs[chain].name} wallet created!`, 'success');
     });
 
     dom.importPrivateKeyBtn.addEventListener('click', () => {
@@ -2411,7 +2528,11 @@
 
         try {
             const name = prompt('Name for this wallet?', 'Imported Wallet');
-            const w = await createWalletFromPrivateKey(pk, name || 'Imported Wallet');
+            const chainOptions = Object.entries(chainConfigs).map(([key, val]) => 
+                `${key}: ${val.name} (${val.symbol})`
+            ).join('\n');
+            const chain = prompt(`Select chain (default: sayman):\n${chainOptions}`, 'sayman') || 'sayman';
+            const w = await createWalletFromPrivateKey(pk, name || 'Imported Wallet', chain);
             wallets.push(w);
             activeWallet = w;
             dom.privateKeyInput.value = '';
@@ -2420,7 +2541,7 @@
             saveState();
             render();
             fetchBlockInfo();
-            showToast('Wallet imported!', 'success');
+            showToast(`${chainConfigs[chain].name} wallet imported!`, 'success');
         } catch (err) {
             showToast('Invalid private key', 'error');
         }
@@ -2611,7 +2732,7 @@
 
         setTimeout(async () => {
             if (wallets.length === 0) {
-                const demo = await generateNewWallet('Main Wallet');
+                const demo = await generateNewWallet('Main Wallet', 'sayman');
                 demo.balance = 1250.75;
                 demo.transactions = [
                     { type: 'TRANSFER', amount: 500, time: Date.now() - 172800000, txId: '0x' + generateId().padStart(64, '0'), blockNumber: 12345, data: { from: '0x1234', to: '0x5678' } },
