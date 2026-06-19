@@ -383,6 +383,7 @@
             `;
         }).join('');
 
+        // FIX: Wallet selection - DON'T close sidebar on mobile
         dom.walletList.querySelectorAll('.wallet-item').forEach(el => {
             el.addEventListener('click', (e) => {
                 if (e.target.closest('.wallet-delete')) return;
@@ -393,6 +394,7 @@
                 loadTransactionHistory();
                 fetchBlockInfo();
                 showToast(`Selected: ${activeWallet ? activeWallet.name : ''}`, 'success');
+                // Sidebar stays open on mobile - user closes it manually or taps overlay
             });
         });
 
@@ -1921,6 +1923,42 @@
         showToast('QR downloaded!', 'success');
     });
 
+    dom.shareQrBtn.addEventListener('click', async () => {
+        const canvas = dom.qrContainer.querySelector('canvas');
+        if (!canvas) { showToast('No QR to share', 'error'); return; }
+        try {
+            const blob = await new Promise(resolve => canvas.toBlob(resolve));
+            if (navigator.share) {
+                await navigator.share({
+                    title: 'PUKY Wallet QR',
+                    text: `Send payment to: ${activeWallet.address}`,
+                    files: [new File([blob], 'puky_qr.png', { type: 'image/png' })]
+                });
+            } else {
+                await copyToClipboard(activeWallet.address, 'Address copied!');
+            }
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error('Share failed:', err);
+            }
+        }
+    });
+
+    dom.printQrBtn.addEventListener('click', () => {
+        const canvas = dom.qrContainer.querySelector('canvas');
+        if (!canvas) { showToast('No QR to print', 'error'); return; }
+        const win = window.open('', '_blank');
+        win.document.write(`
+            <html><head><title>QR Code</title>
+            <style>body{display:flex;justify-content:center;align-items:center;height:100vh;margin:0;}</style>
+            </head>
+            <body>
+                <img src="${canvas.toDataURL('image/png')}" style="max-width:300px;" />
+                <script>window.print();window.close();<\/script>
+            </body></html>
+        `);
+    });
+
     dom.editWalletBtn.addEventListener('click', () => {
         if (!activeWallet) {
             showToast('Select a wallet first', 'error');
@@ -2153,6 +2191,16 @@
         showToast('Filters reset', 'success');
     });
 
+    dom.txDateFilter.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            dom.txDateFrom.style.display = 'inline-block';
+            dom.txDateTo.style.display = 'inline-block';
+        } else {
+            dom.txDateFrom.style.display = 'none';
+            dom.txDateTo.style.display = 'none';
+        }
+    });
+
     document.querySelectorAll('.period-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const parent = this.closest('.chart-periods');
@@ -2169,7 +2217,7 @@
 
     dom.walletSearch.addEventListener('input', renderWalletList);
 
-    // ===== FIXED MOBILE MENU =====
+    // ===== FIXED MOBILE MENU - Sidebar stays open =====
     dom.mobileMenuBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         dom.sidebar.classList.toggle('open');
@@ -2181,11 +2229,16 @@
         dom.mobileOverlay.classList.remove('active');
     });
 
+    // Close sidebar ONLY when clicking the overlay or menu button, NOT on wallet selection
     document.addEventListener('click', (e) => {
         if (window.innerWidth <= 768) {
             if (dom.sidebar.classList.contains('open')) {
-                const walletItem = e.target.closest('.wallet-item');
-                if (walletItem) {
+                // Don't close on wallet item click
+                if (e.target.closest('.wallet-item')) {
+                    return;
+                }
+                // Close only if clicking outside sidebar and not on menu button
+                if (!dom.sidebar.contains(e.target) && !dom.mobileMenuBtn.contains(e.target)) {
                     dom.sidebar.classList.remove('open');
                     dom.mobileOverlay.classList.remove('active');
                 }
