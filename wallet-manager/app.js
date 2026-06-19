@@ -1,6 +1,7 @@
 // ============================================================
-//  PUKY Wallet Pro v3.0 - COMPLETE FIXED VERSION
-//  All issues resolved: Camera, Export, Multi-Chain, Block #
+//  PUKY Wallet Pro v3.0 - FIXED
+//  Only Sayman chain works, others are labels for future
+//  Sidebar blur fixed, faucet only for Sayman
 // ============================================================
 
 (function() {
@@ -24,12 +25,11 @@
     let blockTime = 15;
     let stakingAPY = 12.5;
     let UNSTAKE_LOCK_BLOCKS = 100;
-    let lockTimers = {};
     let qrPayScannerInstance = null;
     let isQrPayScanning = false;
     let unstakeCountdownInterval = null;
 
-    // ===== MULTI-CHAIN SUPPORT =====
+    // ===== CHAIN CONFIG (Only Sayman works, others are for display) =====
     const chainConfigs = {
         'sayman': {
             name: 'Sayman',
@@ -38,7 +38,9 @@
             icon: 'fa-wallet',
             color: '#4f6ef7',
             rpc: 'https://sayman.onrender.com/api',
-            explorer: 'https://sayman.onrender.com'
+            explorer: 'https://sayman.onrender.com',
+            active: true,
+            faucet: true
         },
         'ethereum': {
             name: 'Ethereum',
@@ -47,7 +49,9 @@
             icon: 'fa-ethereum',
             color: '#627eea',
             rpc: 'https://mainnet.infura.io/v3/',
-            explorer: 'https://etherscan.io'
+            explorer: 'https://etherscan.io',
+            active: false,
+            faucet: false
         },
         'bitcoin': {
             name: 'Bitcoin',
@@ -56,7 +60,9 @@
             icon: 'fa-btc',
             color: '#f7931a',
             rpc: 'https://blockchain.info',
-            explorer: 'https://blockchain.info'
+            explorer: 'https://blockchain.info',
+            active: false,
+            faucet: false
         },
         'arbitrum': {
             name: 'Arbitrum',
@@ -65,7 +71,9 @@
             icon: 'fa-layer-group',
             color: '#28a0f0',
             rpc: 'https://arb1.arbitrum.io/rpc',
-            explorer: 'https://arbiscan.io'
+            explorer: 'https://arbiscan.io',
+            active: false,
+            faucet: false
         },
         'cardano': {
             name: 'Cardano',
@@ -74,7 +82,9 @@
             icon: 'fa-robot',
             color: '#0033ad',
             rpc: 'https://cardano-mainnet.blockfrost.io',
-            explorer: 'https://cardanoscan.io'
+            explorer: 'https://cardanoscan.io',
+            active: false,
+            faucet: false
         },
         'binance': {
             name: 'Binance Smart Chain',
@@ -83,7 +93,9 @@
             icon: 'fa-bolt',
             color: '#f3ba2f',
             rpc: 'https://bsc-dataseed.binance.org',
-            explorer: 'https://bscscan.com'
+            explorer: 'https://bscscan.com',
+            active: false,
+            faucet: false
         },
         'polygon': {
             name: 'Polygon',
@@ -92,16 +104,9 @@
             icon: 'fa-hexagon',
             color: '#8247e5',
             rpc: 'https://polygon-rpc.com',
-            explorer: 'https://polygonscan.com'
-        },
-        'monad': {
-            name: 'Monad',
-            symbol: 'MONAD',
-            decimals: 18,
-            icon: 'fa-cube',
-            color: '#7c3aed',
-            rpc: 'https://rpc.monad.xyz',
-            explorer: 'https://monadexplorer.xyz'
+            explorer: 'https://polygonscan.com',
+            active: false,
+            faucet: false
         },
         'solana': {
             name: 'Solana',
@@ -110,7 +115,9 @@
             icon: 'fa-sun',
             color: '#9945ff',
             rpc: 'https://api.mainnet-beta.solana.com',
-            explorer: 'https://solscan.io'
+            explorer: 'https://solscan.io',
+            active: false,
+            faucet: false
         }
     };
 
@@ -296,8 +303,8 @@
         return getChainConfig(chain).symbol;
     }
 
-    function getChainName(chain) {
-        return getChainConfig(chain).name;
+    function isChainActive(chain) {
+        return getChainConfig(chain).active || false;
     }
 
     // ===== STORAGE =====
@@ -342,6 +349,11 @@
 
     // ===== WALLET FACTORY =====
     async function createWalletFromPrivateKey(privateKey, name, chain = 'sayman') {
+        // Only Sayman chain works
+        if (chain !== 'sayman') {
+            showToast(`${getChainConfig(chain).name} support coming soon! Using Sayman chain.`, 'warning');
+            chain = 'sayman';
+        }
         const wallet = new SaymanWallet(privateKey);
         await wallet.initialize();
         return {
@@ -362,6 +374,10 @@
     }
 
     async function generateNewWallet(name, chain = 'sayman') {
+        if (chain !== 'sayman') {
+            showToast(`${getChainConfig(chain).name} support coming soon! Using Sayman chain.`, 'warning');
+            chain = 'sayman';
+        }
         const wallet = new SaymanWallet();
         await wallet.initialize();
         return {
@@ -414,11 +430,12 @@
 
         dom.walletList.innerHTML = networkWallets.map(w => {
             const chain = getChainConfig(w.chain || 'sayman');
+            const isActive = isChainActive(w.chain || 'sayman');
             return `
                 <div class="wallet-item ${w.id === (activeWallet ? activeWallet.id : null) ? 'active' : ''}" data-id="${w.id}">
                     <span class="wallet-dot" style="background:${chain.color};"></span>
                     <div class="wallet-info">
-                        <div class="wallet-name">${w.name} <span style="font-size:0.6rem;color:var(--text-muted);">${chain.symbol}</span></div>
+                        <div class="wallet-name">${w.name} <span style="font-size:0.6rem;color:${chain.color};">${chain.symbol}</span></div>
                         <div class="wallet-balance-sm">${formatBalance(w.balance || 0)} ${chain.symbol}</div>
                     </div>
                     <button class="wallet-delete" data-id="${w.id}" title="Delete">
@@ -572,7 +589,7 @@
         return `${secs}s`;
     }
 
-    // ===== FETCH BLOCK INFO - FIXED =====
+    // ===== FETCH BLOCK INFO =====
     async function fetchBlockInfo() {
         try {
             const res = await fetch(`${getApiBase()}/block/latest`);
@@ -610,7 +627,7 @@
         }
     }
 
-    // ===== TRANSACTION HISTORY - FIXED BLOCK NUMBER =====
+    // ===== TRANSACTION HISTORY =====
     async function loadTransactionHistory() {
         if (!activeWallet) return;
 
@@ -653,7 +670,6 @@
                         tx.txId = '0x' + generateId().padStart(64, '0');
                     }
                     
-                    // FIX: Get block number from transaction
                     if (!tx.blockNumber && !tx.block) {
                         tx.blockNumber = currentBlock || 0;
                     }
@@ -753,7 +769,6 @@
                 txIdDisplay = shortAddr(tx.txId || tx.hash);
             }
             
-            // FIX: Show block number
             let blockDisplay = tx.blockNumber || tx.block || 'N/A';
             
             let addressDisplay = '';
@@ -815,7 +830,7 @@
         });
     }
 
-    // ===== TRANSACTION DETAILS - FIXED =====
+    // ===== TRANSACTION DETAILS =====
     function showTransactionDetails(tx) {
         const content = dom.txDetailContent;
         const isPositive = (tx.amount || 0) >= 0;
@@ -970,18 +985,17 @@
         dom.qrAddressDisplay.textContent = address;
     }
 
-    // ===== QR PAY SCANNER - FIXED CAMERA =====
+    // ===== QR PAY SCANNER =====
     async function startQrPayScanner() {
         if (isQrPayScanning) return;
 
         try {
-            // Check if camera permission is granted
             if (navigator.permissions) {
                 const result = await navigator.permissions.query({ name: 'camera' });
                 if (result.state === 'denied') {
                     dom.qrPayResult.innerHTML = `
                         <div class="error-message">
-                            <i class="fas fa-exclamation-circle"></i> Camera permission denied.
+                            <i class="fas fa-exclamation-circle"></i> Camera permission denied. Please enable in settings.
                             <button class="btn-outline-sm" onclick="location.reload()" style="margin-top:8px;">
                                 <i class="fas fa-sync-alt"></i> Retry
                             </button>
@@ -1026,7 +1040,7 @@
             isQrPayScanning = false;
             dom.qrPayResult.innerHTML = `
                 <div class="error-message">
-                    <i class="fas fa-exclamation-circle"></i> ${err.message || 'Camera access denied. Please grant camera permission in settings.'}
+                    <i class="fas fa-exclamation-circle"></i> ${err.message || 'Camera access denied.'}
                     <button class="btn-outline-sm" onclick="location.reload()" style="margin-top:8px;">
                         <i class="fas fa-sync-alt"></i> Retry
                     </button>
@@ -1039,167 +1053,114 @@
         }
     }
 
-    // ===== EXPORT - FIXED FOR MOBILE =====
-    function downloadFile(content, filename, mimeType = 'application/json') {
-        // For mobile, use Blob and create download link
-        try {
-            const blob = new Blob([content], { type: mimeType });
-            const url = window.URL.createObjectURL(blob);
-            
-            // For Android WebView, use direct download
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            
-            // Clean up
-            setTimeout(() => {
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-            }, 100);
-            
-            return true;
-        } catch (e) {
-            console.error('Download failed:', e);
-            return false;
+    function onQrPayScanSuccess(decodedText) {
+        if (decodedText && decodedText.length === 40) {
+            dom.qrPayAddress.value = decodedText;
+            dom.qrPayResult.innerHTML = `
+                <div class="success-message" style="margin-top:8px;">
+                    <i class="fas fa-check-circle"></i> Address detected! Enter amount and send.
+                </div>
+            `;
+            dom.qrPayAmount.focus();
+        } else {
+            try {
+                const data = JSON.parse(decodedText);
+                if (data.address && data.address.length === 40) {
+                    dom.qrPayAddress.value = data.address;
+                    if (data.amount) dom.qrPayAmount.value = data.amount;
+                    dom.qrPayResult.innerHTML = `
+                        <div class="success-message" style="margin-top:8px;">
+                            <i class="fas fa-check-circle"></i> Payment details loaded!
+                        </div>
+                    `;
+                    dom.qrPayAmount.focus();
+                } else {
+                    dom.qrPayResult.innerHTML = `<div class="error-message">Invalid QR code</div>`;
+                }
+            } catch (e) {
+                dom.qrPayResult.innerHTML = `<div class="error-message">Invalid QR code</div>`;
+            }
         }
+        
+        stopQrPayScanner();
     }
 
-    dom.exportAllBtn.addEventListener('click', () => {
-        if (wallets.length === 0) {
-            showToast('No wallets to export', 'error');
+    function onQrPayScanError(err) {
+        // Ignore - fires constantly
+    }
+
+    function stopQrPayScanner() {
+        if (qrPayScannerInstance) {
+            try {
+                qrPayScannerInstance.stop().catch(() => {});
+            } catch (e) {}
+            qrPayScannerInstance = null;
+        }
+        isQrPayScanning = false;
+    }
+
+    // ===== QR PAY SEND =====
+    dom.qrPaySendBtn.addEventListener('click', () => {
+        const to = dom.qrPayAddress.value.trim();
+        const amount = parseFloat(dom.qrPayAmount.value);
+
+        if (!to) {
+            dom.qrPayResult.innerHTML = `<div class="error-message">Please scan a QR code first</div>`;
             return;
         }
 
-        const exportData = {
-            version: '3.0',
-            exportedAt: new Date().toISOString(),
-            network: currentNetwork,
-            wallets: wallets.map(w => ({
-                name: w.name,
-                address: w.address,
-                privateKey: w.privateKey,
-                publicKey: w.publicKey,
-                balance: w.balance || 0,
-                stake: w.stake || 0,
-                lockedAmount: w.lockedAmount || 0,
-                lockBlock: w.lockBlock || null,
-                chain: w.chain || 'sayman',
-                transactions: w.transactions || [],
-                createdAt: w.createdAt,
-                networkType: w.networkType
-            }))
-        };
-
-        const content = JSON.stringify(exportData, null, 2);
-        const filename = `puky_wallets_${Date.now()}.json`;
-        
-        if (downloadFile(content, filename)) {
-            showToast('Wallets exported! Check Downloads folder.', 'success');
-        } else {
-            showToast('Export failed. Try using Chrome browser.', 'error');
+        if (!amount || amount <= 0) {
+            dom.qrPayResult.innerHTML = `<div class="error-message">Please enter a valid amount</div>`;
+            return;
         }
-    });
 
-    dom.exportWalletBtn.addEventListener('click', () => {
         if (!activeWallet) {
-            showToast('Select a wallet first', 'error');
+            dom.qrPayResult.innerHTML = `<div class="error-message">Please select a wallet first</div>`;
             return;
         }
 
-        const exportData = {
-            version: '3.0',
-            exportedAt: new Date().toISOString(),
-            name: activeWallet.name,
-            address: activeWallet.address,
-            privateKey: activeWallet.privateKey,
-            publicKey: activeWallet.publicKey,
-            balance: activeWallet.balance || 0,
-            stake: activeWallet.stake || 0,
-            lockedAmount: activeWallet.lockedAmount || 0,
-            lockBlock: activeWallet.lockBlock || null,
-            chain: activeWallet.chain || 'sayman',
-            transactions: activeWallet.transactions || [],
-            createdAt: activeWallet.createdAt,
-            networkType: activeWallet.networkType
-        };
-
-        const content = JSON.stringify(exportData, null, 2);
-        const filename = `puky_${activeWallet.name}_${Date.now()}.json`;
+        closeModal('qrPayModal');
+        dom.sendTo.value = to;
+        dom.sendAmount.value = amount;
         
-        if (downloadFile(content, filename)) {
-            showToast('Wallet exported! Check Downloads folder.', 'success');
-        } else {
-            showToast('Export failed. Try using Chrome browser.', 'error');
-        }
+        document.querySelector('[data-tab="send"]')?.classList.add('active');
+        document.getElementById('tab-send')?.classList.add('active');
+        
+        showToast(`Ready to send ${formatBalance(amount)} SAYM`, 'success');
     });
 
-    // ===== ADD WALLET - WITH CHAIN SELECTION =====
-    dom.addWalletBtn.addEventListener('click', () => openModal('addWalletModal'));
+    dom.qrPayCancelBtn.addEventListener('click', () => {
+        stopQrPayScanner();
+        closeModal('qrPayModal');
+    });
 
-    dom.createWalletBtn.addEventListener('click', async () => {
-        const name = dom.newWalletName.value.trim() || 'New Wallet';
-        
-        // Show chain selection in a modal-like way
-        const chainList = Object.entries(chainConfigs).map(([key, val]) => 
-            `${key}: ${val.name} (${val.symbol})`
-        ).join('\n');
-        
-        const chain = prompt(`Select blockchain (default: sayman):\n\n${chainList}`, 'sayman') || 'sayman';
-        
-        if (!chainConfigs[chain]) {
-            showToast('Invalid chain selected', 'error');
-            return;
-        }
-        
-        const w = await generateNewWallet(name, chain);
-        wallets.push(w);
-        activeWallet = w;
-        dom.newWalletName.value = '';
-        closeModal('addWalletModal');
-        saveState();
+    // ===== NETWORK SWITCHING =====
+    dom.networkSelect.addEventListener('change', function() {
+        currentNetwork = this.value;
+        dom.detailNetwork.textContent = getNetworkName();
         render();
-        fetchBlockInfo();
-        showToast(`${chainConfigs[chain].name} wallet created!`, 'success');
-    });
-
-    dom.importPrivateKeyBtn.addEventListener('click', () => {
-        dom.privateKeyArea.classList.toggle('hidden');
-    });
-
-    dom.importKeyConfirmBtn.addEventListener('click', async () => {
-        const pk = dom.privateKeyInput.value.trim().replace('0x', '');
-        if (!pk || pk.length !== 64) {
-            showToast('Please enter a valid private key (64 hex chars)', 'error');
-            return;
-        }
-
-        try {
-            const name = prompt('Name for this wallet?', 'Imported Wallet');
-            const chainList = Object.entries(chainConfigs).map(([key, val]) => 
-                `${key}: ${val.name} (${val.symbol})`
-            ).join('\n');
-            const chain = prompt(`Select blockchain (default: sayman):\n\n${chainList}`, 'sayman') || 'sayman';
-            
-            if (!chainConfigs[chain]) {
-                showToast('Invalid chain selected', 'error');
-                return;
-            }
-            
-            const w = await createWalletFromPrivateKey(pk, name || 'Imported Wallet', chain);
-            wallets.push(w);
-            activeWallet = w;
-            dom.privateKeyInput.value = '';
-            dom.privateKeyArea.classList.add('hidden');
-            closeModal('addWalletModal');
-            saveState();
-            render();
+        if (activeWallet) {
+            loadTransactionHistory();
             fetchBlockInfo();
-            showToast(`${chainConfigs[chain].name} wallet imported!`, 'success');
-        } catch (err) {
-            showToast('Invalid private key', 'error');
+        }
+        showToast(`Switched to ${getNetworkName()}`, 'success');
+    });
+
+    // ===== REFRESH =====
+    dom.refreshBtn.addEventListener('click', () => {
+        if (activeWallet) {
+            showLoading('Refreshing data...');
+            Promise.all([
+                loadTransactionHistory(),
+                fetchBlockInfo()
+            ]).then(() => {
+                hideLoading();
+                render();
+                showToast('Data refreshed!', 'success');
+            });
+        } else {
+            render();
+            showToast('Refreshed!', 'success');
         }
     });
 
@@ -1588,9 +1549,15 @@
             return;
         }
 
+        // Only Sayman chain has faucet
+        if (activeWallet.chain !== 'sayman') {
+            dom.faucetResult.innerHTML = `<div class="error-message">Faucet only available for Sayman chain</div>`;
+            return;
+        }
+
         const faucetUrl = getFaucetUrl();
         if (!faucetUrl) {
-            dom.faucetResult.innerHTML = `<div class="error-message">Faucet not available on Mainnet</div>`;
+            dom.faucetResult.innerHTML = `<div class="error-message">Faucet not available on ${getNetworkName()}</div>`;
             return;
         }
 
@@ -1643,6 +1610,380 @@
             dom.faucetResult.innerHTML = `<div class="error-message">${error.message}</div>`;
         }
     });
+
+    // ===== EXPORT =====
+    function downloadFile(content, filename, mimeType = 'application/json') {
+        try {
+            const blob = new Blob([content], { type: mimeType });
+            const url = window.URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+            
+            return true;
+        } catch (e) {
+            console.error('Download failed:', e);
+            return false;
+        }
+    }
+
+    dom.exportAllBtn.addEventListener('click', () => {
+        if (wallets.length === 0) {
+            showToast('No wallets to export', 'error');
+            return;
+        }
+
+        const exportData = {
+            version: '3.0',
+            exportedAt: new Date().toISOString(),
+            network: currentNetwork,
+            wallets: wallets.map(w => ({
+                name: w.name,
+                address: w.address,
+                privateKey: w.privateKey,
+                publicKey: w.publicKey,
+                balance: w.balance || 0,
+                stake: w.stake || 0,
+                lockedAmount: w.lockedAmount || 0,
+                lockBlock: w.lockBlock || null,
+                chain: w.chain || 'sayman',
+                transactions: w.transactions || [],
+                createdAt: w.createdAt,
+                networkType: w.networkType
+            }))
+        };
+
+        const content = JSON.stringify(exportData, null, 2);
+        const filename = `puky_wallets_${Date.now()}.json`;
+        
+        if (downloadFile(content, filename)) {
+            showToast('Wallets exported! Check Downloads folder.', 'success');
+        } else {
+            showToast('Export failed. Try using Chrome browser.', 'error');
+        }
+    });
+
+    dom.exportWalletBtn.addEventListener('click', () => {
+        if (!activeWallet) {
+            showToast('Select a wallet first', 'error');
+            return;
+        }
+
+        const exportData = {
+            version: '3.0',
+            exportedAt: new Date().toISOString(),
+            name: activeWallet.name,
+            address: activeWallet.address,
+            privateKey: activeWallet.privateKey,
+            publicKey: activeWallet.publicKey,
+            balance: activeWallet.balance || 0,
+            stake: activeWallet.stake || 0,
+            lockedAmount: activeWallet.lockedAmount || 0,
+            lockBlock: activeWallet.lockBlock || null,
+            chain: activeWallet.chain || 'sayman',
+            transactions: activeWallet.transactions || [],
+            createdAt: activeWallet.createdAt,
+            networkType: activeWallet.networkType
+        };
+
+        const content = JSON.stringify(exportData, null, 2);
+        const filename = `puky_${activeWallet.name}_${Date.now()}.json`;
+        
+        if (downloadFile(content, filename)) {
+            showToast('Wallet exported! Check Downloads folder.', 'success');
+        } else {
+            showToast('Export failed. Try using Chrome browser.', 'error');
+        }
+    });
+
+    // ===== IMPORT JSON =====
+    dom.importJsonBtn.addEventListener('click', () => openModal('importJsonModal'));
+
+    dom.importJsonConfirmBtn.addEventListener('click', async () => {
+        const file = dom.jsonFileInput.files[0];
+        if (!file) {
+            dom.jsonImportStatus.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Please select a file.</div>';
+            return;
+        }
+
+        dom.jsonImportStatus.innerHTML = '<div style="padding:8px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Importing...</div>';
+
+        try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+
+            let imported = 0;
+
+            if (data.wallets && Array.isArray(data.wallets)) {
+                for (const wData of data.wallets) {
+                    if (wData.privateKey) {
+                        const chain = wData.chain || 'sayman';
+                        const w = await createWalletFromPrivateKey(wData.privateKey, wData.name || 'Imported', chain);
+                        if (wData.transactions) w.transactions = wData.transactions;
+                        if (wData.balance) w.balance = wData.balance;
+                        if (wData.stake) w.stake = wData.stake;
+                        if (wData.lockedAmount) w.lockedAmount = wData.lockedAmount;
+                        if (wData.lockBlock) w.lockBlock = wData.lockBlock;
+                        wallets.push(w);
+                        imported++;
+                    }
+                }
+            } else if (data.privateKey) {
+                const chain = data.chain || 'sayman';
+                const w = await createWalletFromPrivateKey(data.privateKey, data.name || 'Imported Wallet', chain);
+                if (data.transactions) w.transactions = data.transactions;
+                if (data.balance) w.balance = data.balance;
+                if (data.stake) w.stake = data.stake;
+                if (data.lockedAmount) w.lockedAmount = data.lockedAmount;
+                if (data.lockBlock) w.lockBlock = data.lockBlock;
+                wallets.push(w);
+                imported++;
+            }
+
+            if (imported > 0) {
+                activeWallet = wallets[wallets.length - 1];
+                saveState();
+                render();
+                dom.jsonImportStatus.innerHTML = `<div class="success-message"><i class="fas fa-check-circle"></i> Imported ${imported} wallet(s)!</div>`;
+                dom.jsonFileInput.value = '';
+                setTimeout(() => closeModal('importJsonModal'), 1500);
+                showToast(`Imported ${imported} wallet(s)!`, 'success');
+            } else {
+                throw new Error('No valid wallets found in file');
+            }
+        } catch (err) {
+            dom.jsonImportStatus.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
+        }
+    });
+
+    // ===== QR SCAN FUNCTIONS =====
+    dom.importQrBtn.addEventListener('click', () => {
+        openModal('scanQrModal');
+        setTimeout(startQrScanner, 500);
+    });
+
+    dom.scanQrNavBtn.addEventListener('click', () => {
+        openModal('qrPayModal');
+        setTimeout(startQrPayScanner, 500);
+    });
+
+    dom.scanQrSendBtn.addEventListener('click', () => {
+        openModal('qrPayModal');
+        setTimeout(startQrPayScanner, 500);
+    });
+
+    async function startQrScanner() {
+        if (isScanning) return;
+
+        try {
+            if (typeof Html5Qrcode === 'undefined') {
+                dom.scanResult.innerHTML = `
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-circle"></i> QR scanner library not loaded.
+                    </div>
+                `;
+                return;
+            }
+
+            dom.qrScanner.innerHTML = '';
+            html5QrCode = new Html5Qrcode('qrScanner');
+
+            const config = {
+                fps: 15,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0,
+            };
+
+            isScanning = true;
+            dom.stopScanBtn.style.display = 'inline-flex';
+            dom.scanResult.innerHTML = `
+                <div style="padding:8px;color:var(--text-secondary);">
+                    <i class="fas fa-spinner fa-spin"></i> Starting camera...
+                </div>
+            `;
+
+            await html5QrCode.start({
+                facingMode: 'environment'
+            }, config, onQrScanSuccess, onQrScanError);
+
+            dom.scanResult.innerHTML = `
+                <div style="padding:8px;color:var(--success);">
+                    <i class="fas fa-check-circle"></i> Camera active. Scan a QR code.
+                </div>
+            `;
+
+        } catch (err) {
+            isScanning = false;
+            dom.stopScanBtn.style.display = 'none';
+            dom.scanResult.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-circle"></i> ${err.message || 'Camera access denied.'}
+                    <button class="btn-outline-sm" onclick="document.getElementById('qrFileInput').click()" style="margin-top:8px;">
+                        <i class="fas fa-upload"></i> Upload Image
+                    </button>
+                </div>
+            `;
+            console.error('QR Scanner error:', err);
+        }
+    }
+
+    function onQrScanSuccess(decodedText) {
+        stopQrScanner();
+        closeModal('scanQrModal');
+
+        if (decodedText && decodedText.length === 40) {
+            openModal('qrPayModal');
+            dom.qrPayAddress.value = decodedText;
+            dom.qrPayResult.innerHTML = `
+                <div class="success-message" style="margin-top:8px;">
+                    <i class="fas fa-check-circle"></i> Address detected! Enter amount and send.
+                </div>
+            `;
+            dom.qrPayAmount.focus();
+            setTimeout(startQrPayScanner, 500);
+        } else {
+            try {
+                const data = JSON.parse(decodedText);
+                if (data.address && data.address.length === 40) {
+                    openModal('qrPayModal');
+                    dom.qrPayAddress.value = data.address;
+                    if (data.amount) dom.qrPayAmount.value = data.amount;
+                    dom.qrPayResult.innerHTML = `
+                        <div class="success-message" style="margin-top:8px;">
+                            <i class="fas fa-check-circle"></i> Payment details loaded!
+                        </div>
+                    `;
+                    dom.qrPayAmount.focus();
+                    setTimeout(startQrPayScanner, 500);
+                } else if (data.privateKey) {
+                    importWalletFromQrData(decodedText);
+                } else {
+                    showToast('Invalid QR code', 'error');
+                }
+            } catch (e) {
+                const cleaned = decodedText.replace('0x', '').trim();
+                if (cleaned.length === 64) {
+                    importWalletFromQrData(decodedText);
+                } else {
+                    showToast('Invalid QR code', 'error');
+                }
+            }
+        }
+        
+        dom.scanResult.innerHTML = '';
+    }
+
+    function onQrScanError(err) {
+        // Ignore
+    }
+
+    function stopQrScanner() {
+        if (html5QrCode) {
+            try {
+                html5QrCode.stop().catch(() => {});
+            } catch (e) {}
+            html5QrCode = null;
+        }
+        isScanning = false;
+        dom.stopScanBtn.style.display = 'none';
+    }
+
+    dom.stopScanBtn.addEventListener('click', () => {
+        stopQrScanner();
+        dom.scanResult.innerHTML = '<div style="padding:8px;color:var(--text-muted);">Scanner stopped</div>';
+    });
+
+    dom.uploadQrBtn.addEventListener('click', () => dom.qrFileInput.click());
+
+    dom.qrFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            dom.scanResult.innerHTML = '<div style="padding:8px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Processing image...</div>';
+
+            stopQrScanner();
+
+            if (typeof Html5Qrcode !== 'undefined') {
+                const tempScanner = new Html5Qrcode('qrScanner');
+                try {
+                    const result = await tempScanner.scanFile(file, false);
+                    if (result) {
+                        onQrScanSuccess(result);
+                        dom.qrFileInput.value = '';
+                        return;
+                    }
+                } catch (err) {
+                    console.log('File scan error:', err);
+                }
+            }
+
+            dom.scanResult.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-circle"></i> Could not decode QR from image.
+                    <button class="btn-outline-sm" onclick="document.getElementById('qrFileInput').click()" style="margin-top:8px;">
+                        <i class="fas fa-upload"></i> Try Another
+                    </button>
+                </div>
+            `;
+        } catch (err) {
+            dom.scanResult.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
+        }
+        dom.qrFileInput.value = '';
+    });
+
+    async function importWalletFromQrData(data) {
+        try {
+            let walletData;
+            try {
+                walletData = JSON.parse(data);
+            } catch (e) {
+                const pk = data.replace('0x', '').trim();
+                if (pk.length === 64) {
+                    const name = prompt('Name for this wallet?', 'Scanned Wallet');
+                    const chain = prompt('Chain (sayman/ethereum/bitcoin/etc):', 'sayman') || 'sayman';
+                    const w = await createWalletFromPrivateKey(pk, name || 'Scanned Wallet', chain);
+                    wallets.push(w);
+                    activeWallet = w;
+                    saveState();
+                    render();
+                    showToast('Wallet imported from QR scan!', 'success');
+                    return;
+                }
+                throw new Error('Invalid QR data');
+            }
+
+            if (walletData.privateKey) {
+                const name = walletData.name || 'Scanned Wallet';
+                const chain = walletData.chain || 'sayman';
+                const w = await createWalletFromPrivateKey(walletData.privateKey, name, chain);
+                if (walletData.transactions) w.transactions = walletData.transactions;
+                if (walletData.balance) w.balance = walletData.balance;
+                if (walletData.stake) w.stake = walletData.stake;
+                if (walletData.lockedAmount) w.lockedAmount = walletData.lockedAmount;
+                if (walletData.lockBlock) w.lockBlock = walletData.lockBlock;
+                wallets.push(w);
+                activeWallet = w;
+                saveState();
+                render();
+                showToast('Wallet imported from QR scan!', 'success');
+            } else {
+                throw new Error('No private key found in QR data');
+            }
+        } catch (err) {
+            showToast('Failed to import wallet: ' + err.message, 'error');
+            throw err;
+        }
+    }
 
     // ===== SHOW QR (Receive) =====
     dom.showQrBtn.addEventListener('click', () => {
@@ -1802,6 +2143,80 @@
         }
     };
 
+    // ===== ADD WALLET =====
+    dom.addWalletBtn.addEventListener('click', () => openModal('addWalletModal'));
+
+    dom.createWalletBtn.addEventListener('click', async () => {
+        const name = dom.newWalletName.value.trim() || 'New Wallet';
+        
+        const chainList = Object.entries(chainConfigs).map(([key, val]) => 
+            `${key}: ${val.name} (${val.symbol})${val.active ? ' ✓' : ' (coming soon)'}`
+        ).join('\n');
+        
+        const chain = prompt(`Select blockchain (default: sayman):\n\n${chainList}`, 'sayman') || 'sayman';
+        
+        if (!chainConfigs[chain]) {
+            showToast('Invalid chain selected', 'error');
+            return;
+        }
+        
+        if (!isChainActive(chain)) {
+            showToast(`${chainConfigs[chain].name} support coming soon! Creating Sayman wallet.`, 'warning');
+        }
+        
+        const w = await generateNewWallet(name, chain);
+        wallets.push(w);
+        activeWallet = w;
+        dom.newWalletName.value = '';
+        closeModal('addWalletModal');
+        saveState();
+        render();
+        fetchBlockInfo();
+        showToast(`${chainConfigs[chain].name} wallet created!`, 'success');
+    });
+
+    dom.importPrivateKeyBtn.addEventListener('click', () => {
+        dom.privateKeyArea.classList.toggle('hidden');
+    });
+
+    dom.importKeyConfirmBtn.addEventListener('click', async () => {
+        const pk = dom.privateKeyInput.value.trim().replace('0x', '');
+        if (!pk || pk.length !== 64) {
+            showToast('Please enter a valid private key (64 hex chars)', 'error');
+            return;
+        }
+
+        try {
+            const name = prompt('Name for this wallet?', 'Imported Wallet');
+            const chainList = Object.entries(chainConfigs).map(([key, val]) => 
+                `${key}: ${val.name} (${val.symbol})${val.active ? ' ✓' : ' (coming soon)'}`
+            ).join('\n');
+            const chain = prompt(`Select blockchain (default: sayman):\n\n${chainList}`, 'sayman') || 'sayman';
+            
+            if (!chainConfigs[chain]) {
+                showToast('Invalid chain selected', 'error');
+                return;
+            }
+            
+            if (!isChainActive(chain)) {
+                showToast(`${chainConfigs[chain].name} support coming soon! Creating Sayman wallet.`, 'warning');
+            }
+            
+            const w = await createWalletFromPrivateKey(pk, name || 'Imported Wallet', chain);
+            wallets.push(w);
+            activeWallet = w;
+            dom.privateKeyInput.value = '';
+            dom.privateKeyArea.classList.add('hidden');
+            closeModal('addWalletModal');
+            saveState();
+            render();
+            fetchBlockInfo();
+            showToast(`${chainConfigs[chain].name} wallet imported!`, 'success');
+        } catch (err) {
+            showToast('Invalid private key', 'error');
+        }
+    });
+
     // ===== FILTERS =====
     dom.applyFilterBtn.addEventListener('click', () => {
         if (dom.txDateFilter.value === 'custom') {
@@ -1844,30 +2259,27 @@
     // ===== SEARCH =====
     dom.walletSearch.addEventListener('input', renderWalletList);
 
-    // ===== MOBILE MENU - FIXED =====
+    // ===== FIXED MOBILE MENU =====
     dom.mobileMenuBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         dom.sidebar.classList.toggle('open');
         dom.mobileOverlay.classList.toggle('active');
-        document.body.style.overflow = dom.sidebar.classList.contains('open') ? 'hidden' : 'auto';
+        // Don't block body scroll, just overlay
     });
 
     dom.mobileOverlay.addEventListener('click', () => {
         dom.sidebar.classList.remove('open');
         dom.mobileOverlay.classList.remove('active');
-        document.body.style.overflow = 'auto';
     });
 
-    // Close sidebar when clicking outside
+    // Close sidebar when clicking on wallet item
     document.addEventListener('click', (e) => {
         if (window.innerWidth <= 768) {
-            const sidebar = dom.sidebar;
-            const menuBtn = dom.mobileMenuBtn;
-            if (sidebar.classList.contains('open')) {
-                if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
-                    sidebar.classList.remove('open');
+            if (dom.sidebar.classList.contains('open')) {
+                const walletItem = e.target.closest('.wallet-item');
+                if (walletItem) {
+                    dom.sidebar.classList.remove('open');
                     dom.mobileOverlay.classList.remove('active');
-                    document.body.style.overflow = 'auto';
                 }
             }
         }
@@ -1877,13 +2289,11 @@
     function openModal(id) {
         const el = document.getElementById(id);
         if (el) el.classList.add('open');
-        document.body.style.overflow = 'hidden';
     }
 
     function closeModal(id) {
         const el = document.getElementById(id);
         if (el) el.classList.remove('open');
-        document.body.style.overflow = 'auto';
         if (id === 'scanQrModal') stopQrScanner();
         if (id === 'qrPayModal') stopQrPayScanner();
     }
@@ -1895,7 +2305,6 @@
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
                 overlay.classList.remove('open');
-                document.body.style.overflow = 'auto';
                 if (overlay.id === 'scanQrModal') stopQrScanner();
                 if (overlay.id === 'qrPayModal') stopQrPayScanner();
             }
@@ -1928,206 +2337,6 @@
                 updateAnalytics();
             }
         });
-    });
-
-    // ===== TOAST SYSTEM =====
-    function showToast(message, type = 'info') {
-        const existing = document.querySelector('.toast-container');
-        if (existing) existing.remove();
-
-        const container = document.createElement('div');
-        container.className = 'toast-container';
-
-        const toast = document.createElement('div');
-        const colors = {
-            success: 'var(--success)',
-            error: 'var(--error)',
-            warning: 'var(--warning)',
-            info: 'var(--accent)'
-        };
-        const bgColors = {
-            success: 'var(--success-light)',
-            error: 'var(--error-light)',
-            warning: 'var(--warning-light)',
-            info: 'var(--accent-light)'
-        };
-        const icons = {
-            success: 'fa-check-circle',
-            error: 'fa-exclamation-circle',
-            warning: 'fa-exclamation-triangle',
-            info: 'fa-info-circle'
-        };
-
-        toast.className = 'toast';
-        toast.style.cssText = `
-            padding: 8px 14px;
-            background: ${bgColors[type] || bgColors.info};
-            color: ${type === 'success' ? '#065f46' : type === 'error' ? '#991b1b' : 'var(--text-primary)'};
-            border: 1px solid ${colors[type] || colors.info};
-            border-radius: 8px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            box-shadow: var(--shadow-lg);
-            font-family: var(--font);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        `;
-
-        toast.innerHTML = `<i class="fas ${icons[type] || 'fa-info-circle'}"></i> ${message}`;
-        container.appendChild(toast);
-        document.body.appendChild(container);
-
-        setTimeout(() => {
-            container.style.opacity = '0';
-            container.style.transform = 'translateX(400px)';
-            container.style.transition = 'all 0.3s ease';
-            setTimeout(() => container.remove(), 300);
-        }, 4000);
-    }
-
-    window.showToast = showToast;
-
-    // ===== COPY TO CLIPBOARD =====
-    function copyToClipboard(text, message = 'Copied!') {
-        navigator.clipboard.writeText(text).then(() => {
-            showToast(message, 'success');
-        }).catch(() => {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            showToast(message, 'success');
-        });
-    }
-
-    window.copyToClipboard = copyToClipboard;
-
-    // ===== LOADING =====
-    function showLoading(message = 'Loading...') {
-        let overlay = document.getElementById('customLoading');
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'customLoading';
-            overlay.style.cssText = `
-                position: fixed;
-                inset: 0;
-                background: rgba(0,0,0,0.5);
-                backdrop-filter: blur(4px);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 99998;
-            `;
-            document.body.appendChild(overlay);
-        }
-        overlay.innerHTML = `
-            <div style="background:var(--bg-secondary);padding:24px;border-radius:var(--radius-lg);border:1px solid var(--border-color);text-align:center;max-width:280px;">
-                <div class="loader-spinner" style="margin:0 auto 12px;width:36px;height:36px;"></div>
-                <div style="font-weight:500;font-size:0.9rem;">${message}</div>
-            </div>
-        `;
-        overlay.style.display = 'flex';
-    }
-
-    function hideLoading() {
-        const overlay = document.getElementById('customLoading');
-        if (overlay) overlay.style.display = 'none';
-    }
-
-    window.showLoading = showLoading;
-    window.hideLoading = hideLoading;
-
-    // ===== KEYBOARD SHORTCUTS =====
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
-            document.body.style.overflow = 'auto';
-            stopQrScanner();
-            stopQrPayScanner();
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-            e.preventDefault();
-            openModal('addWalletModal');
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-            e.preventDefault();
-            dom.walletSearch.focus();
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
-            e.preventDefault();
-            dom.refreshBtn.click();
-        }
-    });
-
-    // ===== PROGRESS LOADING =====
-    function updateProgress(percent) {
-        dom.progressBar.style.width = percent + '%';
-        dom.progressText.textContent = percent + '%';
-    }
-
-    // ===== REAL-TIME REFRESH =====
-    function startAutoRefresh() {
-        if (refreshInterval) clearInterval(refreshInterval);
-        refreshInterval = setInterval(() => {
-            if (activeWallet) {
-                loadTransactionHistory();
-                fetchBlockInfo();
-            }
-        }, 30000);
-    }
-
-    // ===== QR SCAN FUNCTIONS =====
-    dom.scanQrNavBtn.addEventListener('click', () => {
-        openModal('qrPayModal');
-        setTimeout(startQrPayScanner, 500);
-    });
-
-    dom.scanQrSendBtn.addEventListener('click', () => {
-        openModal('qrPayModal');
-        setTimeout(startQrPayScanner, 500);
-    });
-
-    // ===== QR PAY SEND =====
-    dom.qrPaySendBtn.addEventListener('click', () => {
-        const to = dom.qrPayAddress.value.trim();
-        const amount = parseFloat(dom.qrPayAmount.value);
-
-        if (!to) {
-            dom.qrPayResult.innerHTML = `<div class="error-message">Please scan a QR code first</div>`;
-            return;
-        }
-
-        if (!amount || amount <= 0) {
-            dom.qrPayResult.innerHTML = `<div class="error-message">Please enter a valid amount</div>`;
-            return;
-        }
-
-        if (!activeWallet) {
-            dom.qrPayResult.innerHTML = `<div class="error-message">Please select a wallet first</div>`;
-            return;
-        }
-
-        closeModal('qrPayModal');
-        dom.sendTo.value = to;
-        dom.sendAmount.value = amount;
-        
-        document.querySelector('[data-tab="send"]')?.classList.add('active');
-        document.getElementById('tab-send')?.classList.add('active');
-        
-        showToast(`Ready to send ${formatBalance(amount)} SAYM`, 'success');
-    });
-
-    dom.qrPayCancelBtn.addEventListener('click', () => {
-        stopQrPayScanner();
-        closeModal('qrPayModal');
-    });
-
-    dom.importQrBtn.addEventListener('click', () => {
-        openModal('scanQrModal');
-        setTimeout(startQrScanner, 500);
     });
 
     // ===== CHARTS =====
@@ -2410,240 +2619,153 @@
         `).join('');
     }
 
-    // ===== QR SCANNER FUNCTIONS =====
-    async function startQrScanner() {
-        if (isScanning) return;
+    // ===== TOAST SYSTEM =====
+    function showToast(message, type = 'info') {
+        const existing = document.querySelector('.toast-container');
+        if (existing) existing.remove();
 
-        try {
-            if (typeof Html5Qrcode === 'undefined') {
-                dom.scanResult.innerHTML = `
-                    <div class="error-message">
-                        <i class="fas fa-exclamation-circle"></i> QR scanner library not loaded.
-                    </div>
-                `;
-                return;
-            }
+        const container = document.createElement('div');
+        container.className = 'toast-container';
 
-            dom.qrScanner.innerHTML = '';
-            html5QrCode = new Html5Qrcode('qrScanner');
+        const toast = document.createElement('div');
+        const colors = {
+            success: 'var(--success)',
+            error: 'var(--error)',
+            warning: 'var(--warning)',
+            info: 'var(--accent)'
+        };
+        const bgColors = {
+            success: 'var(--success-light)',
+            error: 'var(--error-light)',
+            warning: 'var(--warning-light)',
+            info: 'var(--accent-light)'
+        };
+        const icons = {
+            success: 'fa-check-circle',
+            error: 'fa-exclamation-circle',
+            warning: 'fa-exclamation-triangle',
+            info: 'fa-info-circle'
+        };
 
-            const config = {
-                fps: 15,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0,
-            };
+        toast.className = 'toast';
+        toast.style.cssText = `
+            padding: 8px 14px;
+            background: ${bgColors[type] || bgColors.info};
+            color: ${type === 'success' ? '#065f46' : type === 'error' ? '#991b1b' : 'var(--text-primary)'};
+            border: 1px solid ${colors[type] || colors.info};
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+            font-family: var(--font);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        `;
 
-            isScanning = true;
-            dom.stopScanBtn.style.display = 'inline-flex';
-            dom.scanResult.innerHTML = `
-                <div style="padding:8px;color:var(--text-secondary);">
-                    <i class="fas fa-spinner fa-spin"></i> Starting camera...
-                </div>
+        toast.innerHTML = `<i class="fas ${icons[type] || 'fa-info-circle'}"></i> ${message}`;
+        container.appendChild(toast);
+        document.body.appendChild(container);
+
+        setTimeout(() => {
+            container.style.opacity = '0';
+            container.style.transform = 'translateX(400px)';
+            container.style.transition = 'all 0.3s ease';
+            setTimeout(() => container.remove(), 300);
+        }, 4000);
+    }
+
+    window.showToast = showToast;
+
+    // ===== COPY TO CLIPBOARD =====
+    function copyToClipboard(text, message = 'Copied!') {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(message, 'success');
+        }).catch(() => {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast(message, 'success');
+        });
+    }
+
+    window.copyToClipboard = copyToClipboard;
+
+    // ===== LOADING =====
+    function showLoading(message = 'Loading...') {
+        let overlay = document.getElementById('customLoading');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'customLoading';
+            overlay.style.cssText = `
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.5);
+                backdrop-filter: blur(4px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 99998;
             `;
-
-            await html5QrCode.start({
-                facingMode: 'environment'
-            }, config, onQrScanSuccess, onQrScanError);
-
-            dom.scanResult.innerHTML = `
-                <div style="padding:8px;color:var(--success);">
-                    <i class="fas fa-check-circle"></i> Camera active. Scan a QR code.
-                </div>
-            `;
-
-        } catch (err) {
-            isScanning = false;
-            dom.stopScanBtn.style.display = 'none';
-            dom.scanResult.innerHTML = `
-                <div class="error-message">
-                    <i class="fas fa-exclamation-circle"></i> ${err.message || 'Camera access denied.'}
-                    <button class="btn-outline-sm" onclick="document.getElementById('qrFileInput').click()" style="margin-top:8px;">
-                        <i class="fas fa-upload"></i> Upload Image
-                    </button>
-                </div>
-            `;
-            console.error('QR Scanner error:', err);
+            document.body.appendChild(overlay);
         }
+        overlay.innerHTML = `
+            <div style="background:var(--bg-secondary);padding:24px;border-radius:var(--radius-lg);border:1px solid var(--border-color);text-align:center;max-width:280px;">
+                <div class="loader-spinner" style="margin:0 auto 12px;width:36px;height:36px;"></div>
+                <div style="font-weight:500;font-size:0.9rem;">${message}</div>
+            </div>
+        `;
+        overlay.style.display = 'flex';
     }
 
-    function onQrScanSuccess(decodedText) {
-        stopQrScanner();
-        closeModal('scanQrModal');
-
-        if (decodedText && decodedText.length === 40) {
-            openModal('qrPayModal');
-            dom.qrPayAddress.value = decodedText;
-            dom.qrPayResult.innerHTML = `
-                <div class="success-message" style="margin-top:8px;">
-                    <i class="fas fa-check-circle"></i> Address detected! Enter amount and send.
-                </div>
-            `;
-            dom.qrPayAmount.focus();
-            setTimeout(startQrPayScanner, 500);
-        } else {
-            try {
-                const data = JSON.parse(decodedText);
-                if (data.address && data.address.length === 40) {
-                    openModal('qrPayModal');
-                    dom.qrPayAddress.value = data.address;
-                    if (data.amount) dom.qrPayAmount.value = data.amount;
-                    dom.qrPayResult.innerHTML = `
-                        <div class="success-message" style="margin-top:8px;">
-                            <i class="fas fa-check-circle"></i> Payment details loaded!
-                        </div>
-                    `;
-                    dom.qrPayAmount.focus();
-                    setTimeout(startQrPayScanner, 500);
-                } else if (data.privateKey) {
-                    importWalletFromQrData(decodedText);
-                } else {
-                    showToast('Invalid QR code', 'error');
-                }
-            } catch (e) {
-                const cleaned = decodedText.replace('0x', '').trim();
-                if (cleaned.length === 64) {
-                    importWalletFromQrData(decodedText);
-                } else {
-                    showToast('Invalid QR code', 'error');
-                }
-            }
-        }
-        
-        dom.scanResult.innerHTML = '';
+    function hideLoading() {
+        const overlay = document.getElementById('customLoading');
+        if (overlay) overlay.style.display = 'none';
     }
 
-    function onQrScanError(err) {
-        // Ignore
-    }
+    window.showLoading = showLoading;
+    window.hideLoading = hideLoading;
 
-    function stopQrScanner() {
-        if (html5QrCode) {
-            try {
-                html5QrCode.stop().catch(() => {});
-            } catch (e) {}
-            html5QrCode = null;
-        }
-        isScanning = false;
-        dom.stopScanBtn.style.display = 'none';
-    }
-
-    dom.stopScanBtn.addEventListener('click', () => {
-        stopQrScanner();
-        dom.scanResult.innerHTML = '<div style="padding:8px;color:var(--text-muted);">Scanner stopped</div>';
-    });
-
-    dom.uploadQrBtn.addEventListener('click', () => dom.qrFileInput.click());
-
-    dom.qrFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        try {
-            dom.scanResult.innerHTML = '<div style="padding:8px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Processing image...</div>';
-
+    // ===== KEYBOARD SHORTCUTS =====
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
             stopQrScanner();
-
-            if (typeof Html5Qrcode !== 'undefined') {
-                const tempScanner = new Html5Qrcode('qrScanner');
-                try {
-                    const result = await tempScanner.scanFile(file, false);
-                    if (result) {
-                        onQrScanSuccess(result);
-                        dom.qrFileInput.value = '';
-                        return;
-                    }
-                } catch (err) {
-                    console.log('File scan error:', err);
-                }
-            }
-
-            dom.scanResult.innerHTML = `
-                <div class="error-message">
-                    <i class="fas fa-exclamation-circle"></i> Could not decode QR from image.
-                    <button class="btn-outline-sm" onclick="document.getElementById('qrFileInput').click()" style="margin-top:8px;">
-                        <i class="fas fa-upload"></i> Try Another
-                    </button>
-                </div>
-            `;
-        } catch (err) {
-            dom.scanResult.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
+            stopQrPayScanner();
         }
-        dom.qrFileInput.value = '';
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+            e.preventDefault();
+            openModal('addWalletModal');
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            dom.walletSearch.focus();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+            e.preventDefault();
+            dom.refreshBtn.click();
+        }
     });
 
-    async function importWalletFromQrData(data) {
-        try {
-            let walletData;
-            try {
-                walletData = JSON.parse(data);
-            } catch (e) {
-                const pk = data.replace('0x', '').trim();
-                if (pk.length === 64) {
-                    const name = prompt('Name for this wallet?', 'Scanned Wallet');
-                    const chain = prompt('Chain (sayman/ethereum/bitcoin/etc):', 'sayman') || 'sayman';
-                    const w = await createWalletFromPrivateKey(pk, name || 'Scanned Wallet', chain);
-                    wallets.push(w);
-                    activeWallet = w;
-                    saveState();
-                    render();
-                    showToast('Wallet imported from QR scan!', 'success');
-                    return;
-                }
-                throw new Error('Invalid QR data');
-            }
-
-            if (walletData.privateKey) {
-                const name = walletData.name || 'Scanned Wallet';
-                const chain = walletData.chain || 'sayman';
-                const w = await createWalletFromPrivateKey(walletData.privateKey, name, chain);
-                if (walletData.transactions) w.transactions = walletData.transactions;
-                if (walletData.balance) w.balance = walletData.balance;
-                if (walletData.stake) w.stake = walletData.stake;
-                if (walletData.lockedAmount) w.lockedAmount = walletData.lockedAmount;
-                if (walletData.lockBlock) w.lockBlock = walletData.lockBlock;
-                wallets.push(w);
-                activeWallet = w;
-                saveState();
-                render();
-                showToast('Wallet imported from QR scan!', 'success');
-            } else {
-                throw new Error('No private key found in QR data');
-            }
-        } catch (err) {
-            showToast('Failed to import wallet: ' + err.message, 'error');
-            throw err;
-        }
+    // ===== PROGRESS LOADING =====
+    function updateProgress(percent) {
+        dom.progressBar.style.width = percent + '%';
+        dom.progressText.textContent = percent + '%';
     }
 
-    // ===== NETWORK SWITCHING =====
-    dom.networkSelect.addEventListener('change', function() {
-        currentNetwork = this.value;
-        dom.detailNetwork.textContent = getNetworkName();
-        render();
-        if (activeWallet) {
-            loadTransactionHistory();
-            fetchBlockInfo();
-        }
-        showToast(`Switched to ${getNetworkName()}`, 'success');
-    });
-
-    // ===== REFRESH =====
-    dom.refreshBtn.addEventListener('click', () => {
-        if (activeWallet) {
-            showLoading('Refreshing data...');
-            Promise.all([
-                loadTransactionHistory(),
-                fetchBlockInfo()
-            ]).then(() => {
-                hideLoading();
-                render();
-                showToast('Data refreshed!', 'success');
-            });
-        } else {
-            render();
-            showToast('Refreshed!', 'success');
-        }
-    });
+    // ===== REAL-TIME REFRESH =====
+    function startAutoRefresh() {
+        if (refreshInterval) clearInterval(refreshInterval);
+        refreshInterval = setInterval(() => {
+            if (activeWallet) {
+                loadTransactionHistory();
+                fetchBlockInfo();
+            }
+        }, 30000);
+    }
 
     // ===== INIT =====
     async function init() {
