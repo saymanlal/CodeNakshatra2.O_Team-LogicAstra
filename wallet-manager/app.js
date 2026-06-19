@@ -1,13 +1,6 @@
-// ============================================================
-//  PUKY Wallet Pro v3.0 - FIXED
-//  Only Sayman chain works, others are labels for future
-//  Sidebar blur fixed, faucet only for Sayman
-// ============================================================
-
 (function() {
     'use strict';
 
-    // ===== STATE =====
     let wallets = [];
     let activeWallet = null;
     let currentNetwork = 'testnet';
@@ -29,7 +22,6 @@
     let isQrPayScanning = false;
     let unstakeCountdownInterval = null;
 
-    // ===== CHAIN CONFIG (Only Sayman works, others are for display) =====
     const chainConfigs = {
         'sayman': {
             name: 'Sayman',
@@ -48,8 +40,6 @@
             decimals: 18,
             icon: 'fa-ethereum',
             color: '#627eea',
-            rpc: 'https://mainnet.infura.io/v3/',
-            explorer: 'https://etherscan.io',
             active: false,
             faucet: false
         },
@@ -59,8 +49,6 @@
             decimals: 8,
             icon: 'fa-btc',
             color: '#f7931a',
-            rpc: 'https://blockchain.info',
-            explorer: 'https://blockchain.info',
             active: false,
             faucet: false
         },
@@ -70,8 +58,6 @@
             decimals: 18,
             icon: 'fa-layer-group',
             color: '#28a0f0',
-            rpc: 'https://arb1.arbitrum.io/rpc',
-            explorer: 'https://arbiscan.io',
             active: false,
             faucet: false
         },
@@ -81,8 +67,6 @@
             decimals: 6,
             icon: 'fa-robot',
             color: '#0033ad',
-            rpc: 'https://cardano-mainnet.blockfrost.io',
-            explorer: 'https://cardanoscan.io',
             active: false,
             faucet: false
         },
@@ -92,8 +76,6 @@
             decimals: 18,
             icon: 'fa-bolt',
             color: '#f3ba2f',
-            rpc: 'https://bsc-dataseed.binance.org',
-            explorer: 'https://bscscan.com',
             active: false,
             faucet: false
         },
@@ -103,8 +85,6 @@
             decimals: 18,
             icon: 'fa-hexagon',
             color: '#8247e5',
-            rpc: 'https://polygon-rpc.com',
-            explorer: 'https://polygonscan.com',
             active: false,
             faucet: false
         },
@@ -114,14 +94,11 @@
             decimals: 9,
             icon: 'fa-sun',
             color: '#9945ff',
-            rpc: 'https://api.mainnet-beta.solana.com',
-            explorer: 'https://solscan.io',
             active: false,
             faucet: false
         }
     };
 
-    // ===== API ENDPOINTS =====
     const networkEndpoints = {
         'testnet': 'https://sayman.onrender.com/api',
         'public-testnet': 'https://sayman.onrender.com/api',
@@ -146,7 +123,6 @@
         'mainnet': null
     };
 
-    // ===== DOM REFS =====
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => document.querySelectorAll(sel);
 
@@ -256,58 +232,24 @@
         qrScanner: $('#qrScanner'),
     };
 
-    // ===== HELPERS =====
-    function getApiBase() {
-        return networkEndpoints[currentNetwork];
-    }
-
-    function getNetworkType() {
-        return networkTypes[currentNetwork];
-    }
-
-    function getNetworkName() {
-        return networkNames[currentNetwork];
-    }
-
-    function getFaucetUrl() {
-        return faucetEndpoints[currentNetwork];
-    }
-
-    function getExplorerUrl() {
-        return 'https://sayman.onrender.com';
-    }
+    function getApiBase() { return networkEndpoints[currentNetwork]; }
+    function getNetworkType() { return networkTypes[currentNetwork]; }
+    function getNetworkName() { return networkNames[currentNetwork]; }
+    function getFaucetUrl() { return faucetEndpoints[currentNetwork]; }
+    function getExplorerUrl() { return 'https://sayman.onrender.com'; }
 
     function shortAddr(addr) {
         if (!addr) return '0x...';
         return addr.slice(0, 6) + '...' + addr.slice(-4);
     }
 
-    function formatBalance(b) {
-        return Number(b).toFixed(2);
-    }
+    function formatBalance(b) { return Number(b).toFixed(2); }
+    function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
-    function generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    }
+    function getChainConfig(chain) { return chainConfigs[chain] || chainConfigs['sayman']; }
+    function getChainSymbol(chain) { return getChainConfig(chain).symbol; }
+    function isChainActive(chain) { return getChainConfig(chain).active || false; }
 
-    function getActiveWallet() {
-        return activeWallet;
-    }
-
-    // ===== CHAIN HELPERS =====
-    function getChainConfig(chain) {
-        return chainConfigs[chain] || chainConfigs['sayman'];
-    }
-
-    function getChainSymbol(chain) {
-        return getChainConfig(chain).symbol;
-    }
-
-    function isChainActive(chain) {
-        return getChainConfig(chain).active || false;
-    }
-
-    // ===== STORAGE =====
     function saveState() {
         try {
             const data = {
@@ -330,7 +272,7 @@
                 network: currentNetwork,
             };
             localStorage.setItem('puky_wallet_state', JSON.stringify(data));
-        } catch (e) { /* ignore */ }
+        } catch (e) {}
     }
 
     function loadState() {
@@ -347,9 +289,7 @@
         } catch (e) { return false; }
     }
 
-    // ===== WALLET FACTORY =====
     async function createWalletFromPrivateKey(privateKey, name, chain = 'sayman') {
-        // Only Sayman chain works
         if (chain !== 'sayman') {
             showToast(`${getChainConfig(chain).name} support coming soon! Using Sayman chain.`, 'warning');
             chain = 'sayman';
@@ -397,7 +337,6 @@
         };
     }
 
-    // ===== RENDER FUNCTIONS =====
     function render() {
         renderWalletList();
         renderStats();
@@ -430,7 +369,6 @@
 
         dom.walletList.innerHTML = networkWallets.map(w => {
             const chain = getChainConfig(w.chain || 'sayman');
-            const isActive = isChainActive(w.chain || 'sayman');
             return `
                 <div class="wallet-item ${w.id === (activeWallet ? activeWallet.id : null) ? 'active' : ''}" data-id="${w.id}">
                     <span class="wallet-dot" style="background:${chain.color};"></span>
@@ -539,7 +477,6 @@
         renderTransactionHistory();
     }
 
-    // ===== UNSTAKE COUNTDOWN TIMER =====
     function updateUnstakeCountdown() {
         if (unstakeCountdownInterval) {
             clearInterval(unstakeCountdownInterval);
@@ -589,7 +526,6 @@
         return `${secs}s`;
     }
 
-    // ===== FETCH BLOCK INFO =====
     async function fetchBlockInfo() {
         try {
             const res = await fetch(`${getApiBase()}/block/latest`);
@@ -627,7 +563,6 @@
         }
     }
 
-    // ===== TRANSACTION HISTORY =====
     async function loadTransactionHistory() {
         if (!activeWallet) return;
 
@@ -830,7 +765,6 @@
         });
     }
 
-    // ===== TRANSACTION DETAILS =====
     function showTransactionDetails(tx) {
         const content = dom.txDetailContent;
         const isPositive = (tx.amount || 0) >= 0;
@@ -970,7 +904,6 @@
         openModal('txDetailModal');
     }
 
-    // ===== QR CODE GENERATION =====
     function generateQR(address) {
         dom.qrContainer.innerHTML = '';
         if (!address) return;
@@ -985,7 +918,6 @@
         dom.qrAddressDisplay.textContent = address;
     }
 
-    // ===== QR PAY SCANNER =====
     async function startQrPayScanner() {
         if (isQrPayScanning) return;
 
@@ -1085,9 +1017,7 @@
         stopQrPayScanner();
     }
 
-    function onQrPayScanError(err) {
-        // Ignore - fires constantly
-    }
+    function onQrPayScanError(err) {}
 
     function stopQrPayScanner() {
         if (qrPayScannerInstance) {
@@ -1099,7 +1029,6 @@
         isQrPayScanning = false;
     }
 
-    // ===== QR PAY SEND =====
     dom.qrPaySendBtn.addEventListener('click', () => {
         const to = dom.qrPayAddress.value.trim();
         const amount = parseFloat(dom.qrPayAmount.value);
@@ -1134,7 +1063,6 @@
         closeModal('qrPayModal');
     });
 
-    // ===== NETWORK SWITCHING =====
     dom.networkSelect.addEventListener('change', function() {
         currentNetwork = this.value;
         dom.detailNetwork.textContent = getNetworkName();
@@ -1146,7 +1074,6 @@
         showToast(`Switched to ${getNetworkName()}`, 'success');
     });
 
-    // ===== REFRESH =====
     dom.refreshBtn.addEventListener('click', () => {
         if (activeWallet) {
             showLoading('Refreshing data...');
@@ -1164,7 +1091,6 @@
         }
     });
 
-    // ===== SEND TRANSACTION =====
     dom.sendBtn.addEventListener('click', async () => {
         if (!activeWallet) {
             showToast('Please select a wallet first', 'error');
@@ -1286,7 +1212,6 @@
         }
     });
 
-    // ===== STAKE =====
     dom.stakeBtn.addEventListener('click', async () => {
         if (!activeWallet) {
             showToast('Please select a wallet first', 'error');
@@ -1413,7 +1338,6 @@
         }
     });
 
-    // ===== UNSTAKE =====
     dom.unstakeBtn.addEventListener('click', async () => {
         if (!activeWallet) {
             showToast('Please select a wallet first', 'error');
@@ -1540,7 +1464,6 @@
         }
     });
 
-    // ===== FAUCET =====
     dom.faucetBtn.addEventListener('click', () => openModal('faucetModal'));
 
     dom.claimFaucetBtn.addEventListener('click', async () => {
@@ -1549,7 +1472,6 @@
             return;
         }
 
-        // Only Sayman chain has faucet
         if (activeWallet.chain !== 'sayman') {
             dom.faucetResult.innerHTML = `<div class="error-message">Faucet only available for Sayman chain</div>`;
             return;
@@ -1611,7 +1533,6 @@
         }
     });
 
-    // ===== EXPORT =====
     function downloadFile(content, filename, mimeType = 'application/json') {
         try {
             const blob = new Blob([content], { type: mimeType });
@@ -1705,7 +1626,6 @@
         }
     });
 
-    // ===== IMPORT JSON =====
     dom.importJsonBtn.addEventListener('click', () => openModal('importJsonModal'));
 
     dom.importJsonConfirmBtn.addEventListener('click', async () => {
@@ -1765,7 +1685,6 @@
         }
     });
 
-    // ===== QR SCAN FUNCTIONS =====
     dom.importQrBtn.addEventListener('click', () => {
         openModal('scanQrModal');
         setTimeout(startQrScanner, 500);
@@ -1882,9 +1801,7 @@
         dom.scanResult.innerHTML = '';
     }
 
-    function onQrScanError(err) {
-        // Ignore
-    }
+    function onQrScanError(err) {}
 
     function stopQrScanner() {
         if (html5QrCode) {
@@ -1985,7 +1902,6 @@
         }
     }
 
-    // ===== SHOW QR (Receive) =====
     dom.showQrBtn.addEventListener('click', () => {
         if (!activeWallet) {
             showToast('Select a wallet first', 'error');
@@ -2005,7 +1921,6 @@
         showToast('QR downloaded!', 'success');
     });
 
-    // ===== EDIT WALLET =====
     dom.editWalletBtn.addEventListener('click', () => {
         if (!activeWallet) {
             showToast('Select a wallet first', 'error');
@@ -2046,7 +1961,6 @@
         showToast('Wallet deleted', 'success');
     });
 
-    // ===== VIEW DETAILS =====
     dom.viewDetailsBtn.addEventListener('click', () => {
         if (!activeWallet) {
             showToast('Select a wallet first', 'error');
@@ -2143,7 +2057,6 @@
         }
     };
 
-    // ===== ADD WALLET =====
     dom.addWalletBtn.addEventListener('click', () => openModal('addWalletModal'));
 
     dom.createWalletBtn.addEventListener('click', async () => {
@@ -2217,7 +2130,6 @@
         }
     });
 
-    // ===== FILTERS =====
     dom.applyFilterBtn.addEventListener('click', () => {
         if (dom.txDateFilter.value === 'custom') {
             dom.txDateFrom.style.display = 'inline-block';
@@ -2241,7 +2153,6 @@
         showToast('Filters reset', 'success');
     });
 
-    // ===== CHART PERIOD CONTROLS =====
     document.querySelectorAll('.period-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const parent = this.closest('.chart-periods');
@@ -2256,7 +2167,6 @@
         });
     });
 
-    // ===== SEARCH =====
     dom.walletSearch.addEventListener('input', renderWalletList);
 
     // ===== FIXED MOBILE MENU =====
@@ -2264,7 +2174,6 @@
         e.stopPropagation();
         dom.sidebar.classList.toggle('open');
         dom.mobileOverlay.classList.toggle('active');
-        // Don't block body scroll, just overlay
     });
 
     dom.mobileOverlay.addEventListener('click', () => {
@@ -2272,7 +2181,6 @@
         dom.mobileOverlay.classList.remove('active');
     });
 
-    // Close sidebar when clicking on wallet item
     document.addEventListener('click', (e) => {
         if (window.innerWidth <= 768) {
             if (dom.sidebar.classList.contains('open')) {
@@ -2285,7 +2193,6 @@
         }
     });
 
-    // ===== MODAL CONTROLS =====
     function openModal(id) {
         const el = document.getElementById(id);
         if (el) el.classList.add('open');
@@ -2322,7 +2229,6 @@
         });
     });
 
-    // ===== TAB SWITCHING =====
     document.querySelectorAll('.tab-btn').forEach(tab => {
         tab.addEventListener('click', function() {
             document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
@@ -2339,13 +2245,10 @@
         });
     });
 
-    // ===== CHARTS =====
     function updateCharts() {
         if (!activeWallet) {
-            if (spendingChart) { spendingChart.destroy();
-                spendingChart = null; }
-            if (monthlyChart) { monthlyChart.destroy();
-                monthlyChart = null; }
+            if (spendingChart) { spendingChart.destroy(); spendingChart = null; }
+            if (monthlyChart) { monthlyChart.destroy(); monthlyChart = null; }
             return;
         }
         renderSpendingChart();
@@ -2447,7 +2350,6 @@
         });
     }
 
-    // ===== ANALYTICS =====
     function updateAnalytics() {
         if (!activeWallet) {
             dom.annualSummary.innerHTML = '<p class="text-muted"><i class="fas fa-info-circle"></i> Select a wallet to view analytics</p>';
@@ -2619,7 +2521,6 @@
         `).join('');
     }
 
-    // ===== TOAST SYSTEM =====
     function showToast(message, type = 'info') {
         const existing = document.querySelector('.toast-container');
         if (existing) existing.remove();
@@ -2677,7 +2578,6 @@
 
     window.showToast = showToast;
 
-    // ===== COPY TO CLIPBOARD =====
     function copyToClipboard(text, message = 'Copied!') {
         navigator.clipboard.writeText(text).then(() => {
             showToast(message, 'success');
@@ -2694,7 +2594,6 @@
 
     window.copyToClipboard = copyToClipboard;
 
-    // ===== LOADING =====
     function showLoading(message = 'Loading...') {
         let overlay = document.getElementById('customLoading');
         if (!overlay) {
@@ -2729,7 +2628,6 @@
     window.showLoading = showLoading;
     window.hideLoading = hideLoading;
 
-    // ===== KEYBOARD SHORTCUTS =====
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
@@ -2750,13 +2648,11 @@
         }
     });
 
-    // ===== PROGRESS LOADING =====
     function updateProgress(percent) {
         dom.progressBar.style.width = percent + '%';
         dom.progressText.textContent = percent + '%';
     }
 
-    // ===== REAL-TIME REFRESH =====
     function startAutoRefresh() {
         if (refreshInterval) clearInterval(refreshInterval);
         refreshInterval = setInterval(() => {
@@ -2767,7 +2663,6 @@
         }, 30000);
     }
 
-    // ===== INIT =====
     async function init() {
         let progress = 0;
         const interval = setInterval(() => {
@@ -2821,7 +2716,6 @@
             console.log(`📊 ${wallets.length} wallets loaded on ${getNetworkName()}`);
         }, 600);
 
-        // Auto-start QR scanner when modal opens
         const scanModal = document.getElementById('scanQrModal');
         const observer = new MutationObserver(() => {
             if (scanModal.classList.contains('open')) {
@@ -2832,7 +2726,6 @@
         });
         observer.observe(scanModal, { attributes: true, attributeFilter: ['class'] });
 
-        // Auto-start QR Pay scanner when modal opens
         const qrPayModal = document.getElementById('qrPayModal');
         const qrPayObserver = new MutationObserver(() => {
             if (qrPayModal.classList.contains('open')) {

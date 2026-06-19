@@ -3,16 +3,27 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Background -->
     <path
         android:fillColor="#4f6ef7"
         android:pathData="M0,0h108v108h-108z"/>
+    <!-- Outer circle -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,20 C35,20 20,35 20,54 C20,73 35,88 54,88 C73,88 88,73 88,54 C88,35 73,20 54,20 Z M54,78 C40.8,78 30,67.2 30,54 C30,40.8 40.8,30 54,30 C67.2,30 78,40.8 78,54 C78,67.2 67.2,78 54,78 Z"/>
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,42 C50,42 46,46 46,50 L46,58 C46,62 50,66 54,66 C58,66 62,62 62,58 L62,50 C62,46 58,42 54,42 Z M58,50 C58,52.2 56.2,54 54,54 C51.8,54 50,52.2 50,50 C50,47.8 51.8,46 54,46 C56.2,46 58,47.8 58,50 Z"/>
+        android:pathData="M54,18 C34.1,18 18,34.1 18,54 C18,73.9 34.1,90 54,90 C73.9,90 90,73.9 90,54 C90,34.1 73.9,18 54,18 Z M54,82 C38.5,82 26,69.5 26,54 C26,38.5 38.5,26 54,26 C69.5,26 82,38.5 82,54 C82,69.5 69.5,82 54,82 Z"/>
+    <!-- Inner circle -->
     <path
         android:fillColor="#4f6ef7"
-        android:pathData="M54,48 L52,52 L56,52 Z"/>
+        android:pathData="M54,32 C41.9,32 32,41.9 32,54 C32,66.1 41.9,76 54,76 C66.1,76 76,66.1 76,54 C76,41.9 66.1,32 54,32 Z"/>
+    <!-- Shield icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,38 L44,44 L44,54 C44,62.3 48.9,69.7 54,72 C59.1,69.7 64,62.3 64,54 L64,44 L54,38 Z M58,54 C58,60.5 54.9,66.1 54,67.6 C53.1,66.1 50,60.5 50,54 L50,48 L54,45 L58,48 L58,54 Z"/>
+    <!-- Lock icon inside shield -->
+    <path
+        android:fillColor="#4f6ef7"
+        android:pathData="M54,50 C52.5,50 51.5,51 51.5,52.5 L51.5,56.5 C51.5,58 52.5,59 54,59 C55.5,59 56.5,58 56.5,56.5 L56.5,52.5 C56.5,51 55.5,50 54,50 Z"/>
+    <path
+        android:fillColor="#4f6ef7"
+        android:pathData="M56.5,52.5 L56.5,51.5 C56.5,50.1 55.4,49 54,49 C52.6,49 51.5,50.1 51.5,51.5 L51.5,52.5 L50.5,52.5 L50.5,51.5 C50.5,49.6 51.9,48.2 53.8,48.1 L54,48.1 C55.9,48.1 57.5,49.6 57.5,51.5 L57.5,52.5 L56.5,52.5 Z"/>
 </vector>
