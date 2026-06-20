@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -13,9 +14,11 @@
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js">
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
 
     <!-- PREMIUM LOADING SCREEN -->
@@ -23,15 +26,18 @@
         <div class="loader-wrapper">
             <div class="loader-icon">
                 <svg viewBox="0 0 100 100" width="60" height="60">
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(79,110,247,0.2)" stroke-width="4"/>
-                    <path d="M50 5 A45 45 0 0 1 95 50" fill="none" stroke="#4f6ef7" stroke-width="4" stroke-linecap="round">
-                        <animate attributeName="stroke-dasharray" from="0 283" to="283 283" dur="1.5s" repeatCount="indefinite"/>
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(79,110,247,0.2)" stroke-width="4" />
+                    <path d="M50 5 A45 45 0 0 1 95 50" fill="none" stroke="#4f6ef7" stroke-width="4"
+                        stroke-linecap="round">
+                        <animate attributeName="stroke-dasharray" from="0 283" to="283 283" dur="1.5s"
+                            repeatCount="indefinite" />
                     </path>
                     <circle cx="50" cy="50" r="15" fill="#4f6ef7" opacity="0.1">
-                        <animate attributeName="r" from="10" to="20" dur="1s" repeatCount="indefinite"/>
-                        <animate attributeName="opacity" from="0.3" to="0" dur="1s" repeatCount="indefinite"/>
+                        <animate attributeName="r" from="10" to="20" dur="1s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" from="0.3" to="0" dur="1s" repeatCount="indefinite" />
                     </circle>
-                    <text x="50" y="56" text-anchor="middle" font-size="20" font-weight="700" fill="#4f6ef7" font-family="Inter">P</text>
+                    <text x="50" y="56" text-anchor="middle" font-size="20" font-weight="700" fill="#4f6ef7"
+                        font-family="Inter">P</text>
                 </svg>
             </div>
             <p class="loader-title">PUKY Wallet</p>
@@ -58,9 +64,10 @@
                 <div class="nav-brand-wrapper">
                     <div class="brand-icon">
                         <svg viewBox="0 0 40 40" width="32" height="32">
-                            <circle cx="20" cy="20" r="18" fill="#4f6ef7" opacity="0.15"/>
-                            <circle cx="20" cy="20" r="12" fill="none" stroke="#4f6ef7" stroke-width="2"/>
-                            <text x="20" y="24" text-anchor="middle" font-size="14" font-weight="700" fill="#4f6ef7" font-family="Inter">P</text>
+                            <circle cx="20" cy="20" r="18" fill="#4f6ef7" opacity="0.15" />
+                            <circle cx="20" cy="20" r="12" fill="none" stroke="#4f6ef7" stroke-width="2" />
+                            <text x="20" y="24" text-anchor="middle" font-size="14" font-weight="700" fill="#4f6ef7"
+                                font-family="Inter">P</text>
                         </svg>
                     </div>
                     <span class="nav-brand">PUKY</span>
@@ -205,12 +212,14 @@
                                 <span class="detail-status" id="detailStatus">
                                     <i class="fas fa-circle"></i> Inactive
                                 </span>
-                                <button class="btn-outline-sm" id="editWalletBtn" style="padding:2px 8px;font-size:0.6rem;">
+                                <button class="btn-outline-sm" id="editWalletBtn"
+                                    style="padding:2px 8px;font-size:0.6rem;">
                                     <i class="fas fa-edit"></i>
                                 </button>
                             </div>
                             <div class="detail-address-wrapper">
-                                <span class="address-mono" id="detailAddress">0x0000000000000000000000000000000000000000</span>
+                                <span class="address-mono"
+                                    id="detailAddress">0x0000000000000000000000000000000000000000</span>
                                 <button class="copy-btn" onclick="copyAddress()" title="Copy Address">
                                     <i class="fas fa-copy"></i>
                                 </button>
@@ -300,7 +309,8 @@
                                 </button>
                             </div>
                             <div class="tx-summary">
-                                <span><i class="fas fa-coins"></i> Total: <strong id="txTotalAmount">0.00</strong> SAY</span>
+                                <span><i class="fas fa-coins"></i> Total: <strong id="txTotalAmount">0.00</strong>
+                                    SAY</span>
                                 <span><i class="fas fa-list"></i> Count: <strong id="txTotalCount">0</strong></span>
                             </div>
                         </div>
@@ -320,7 +330,8 @@
                                     <label><i class="fas fa-user"></i> Recipient Address</label>
                                     <div style="display:flex;gap:8px;">
                                         <input type="text" id="sendTo" placeholder="0x..." style="flex:1;" />
-                                        <button class="btn-outline-sm" id="scanQrSendBtn" title="Scan QR to fill address">
+                                        <button class="btn-outline-sm" id="scanQrSendBtn"
+                                            title="Scan QR to fill address">
                                             <i class="fas fa-qrcode"></i>
                                         </button>
                                     </div>
@@ -359,21 +370,25 @@
                                 <div class="form-group">
                                     <label><i class="fas fa-coins"></i> Amount to Stake (SAY)</label>
                                     <input type="number" id="stakeAmount" placeholder="Enter amount" step="0.01" />
-                                    <small class="helper-text"><i class="fas fa-info-circle"></i> Minimum: 100 SAY</small>
+                                    <small class="helper-text"><i class="fas fa-info-circle"></i> Minimum: 100
+                                        SAY</small>
                                 </div>
                                 <div class="form-group">
                                     <label><i class="fas fa-clock"></i> Est. Reward Time</label>
-                                    <input type="text" id="stakeRewardTime" value="~2-3 blocks (~30-45 sec)" readonly style="background:var(--bg-input);" />
+                                    <input type="text" id="stakeRewardTime" value="~2-3 blocks (~30-45 sec)" readonly
+                                        style="background:var(--bg-input);" />
                                 </div>
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label><i class="fas fa-percentage"></i> Est. APY</label>
-                                    <input type="text" id="stakeApy" value="12.5% Annual" readonly style="background:var(--bg-input);" />
+                                    <input type="text" id="stakeApy" value="12.5% Annual" readonly
+                                        style="background:var(--bg-input);" />
                                 </div>
                                 <div class="form-group">
                                     <label><i class="fas fa-cube"></i> Current Block</label>
-                                    <input type="text" id="stakeBlock" value="Loading..." readonly style="background:var(--bg-input);" />
+                                    <input type="text" id="stakeBlock" value="Loading..." readonly
+                                        style="background:var(--bg-input);" />
                                 </div>
                             </div>
                             <div class="stake-actions">
@@ -385,9 +400,10 @@
                                 </button>
                             </div>
                             <div id="stakeResult"></div>
-                            <div id="stakeInfo" style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+                            <div id="stakeInfo"
+                                style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
                                 <p style="font-size:0.8rem;color:var(--text-muted);">
-                                    <i class="fas fa-info-circle"></i> 
+                                    <i class="fas fa-info-circle"></i>
                                     <strong>Staking Rewards:</strong> Earn ~12.5% APY. Rewards auto-credit every block.
                                     Unstaking locks tokens for ~100 blocks (~25 min) with live countdown.
                                 </p>
@@ -437,11 +453,12 @@
             <div class="modal-body" style="text-align:center;">
                 <div id="qrPayScanner" style="width:100%; max-width:280px; margin:0 auto;"></div>
                 <p class="helper-text"><i class="fas fa-camera"></i> Scan recipient's QR code</p>
-                
+
                 <div class="qr-pay-form" style="margin-top:16px;text-align:left;">
                     <div class="form-group">
                         <label><i class="fas fa-user"></i> Recipient Address</label>
-                        <input type="text" id="qrPayAddress" placeholder="Address will auto-fill" readonly style="background:var(--bg-input);" />
+                        <input type="text" id="qrPayAddress" placeholder="Address will auto-fill" readonly
+                            style="background:var(--bg-input);" />
                     </div>
                     <div class="form-group">
                         <label><i class="fas fa-coins"></i> Amount (SAY)</label>
@@ -601,7 +618,8 @@
                 </button>
             </div>
             <div class="modal-body">
-                <p class="helper-text"><i class="fas fa-info-circle"></i> Upload a JSON file exported from PUKY Wallet.</p>
+                <p class="helper-text"><i class="fas fa-info-circle"></i> Upload a JSON file exported from PUKY Wallet.
+                </p>
                 <div class="file-upload-wrapper">
                     <input type="file" id="jsonFileInput" accept=".json" />
                     <label for="jsonFileInput" class="file-upload-label">
@@ -661,4 +679,5 @@
     <script src="crypto-client.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>

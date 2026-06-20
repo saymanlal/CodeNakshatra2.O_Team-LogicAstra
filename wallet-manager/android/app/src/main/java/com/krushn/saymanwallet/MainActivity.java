@@ -1,4 +1,4 @@
-package com.krushn.saymanwallet;
+package com.krushn.pukywallet;
 
 import com.getcapacitor.BridgeActivity;
 
