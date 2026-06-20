@@ -29,8 +29,8 @@
             decimals: 18,
             icon: 'fa-wallet',
             color: '#4f6ef7',
-            rpc: 'https://sayman.onrender.com/api',
-            explorer: 'https://sayman.onrender.com',
+            rpc: 'https://web-production-dd46d.up.railway.app/api',
+            explorer: 'https://web-production-dd46d.up.railway.app',
             active: true,
             faucet: true
         },
@@ -100,9 +100,9 @@
     };
 
     const networkEndpoints = {
-        'testnet': 'https://sayman.onrender.com/api',
-        'public-testnet': 'https://sayman.onrender.com/api',
-        'mainnet': 'https://sayman.onrender.com/api'
+        'testnet': 'https://web-production-dd46d.up.railway.app/api',
+        'public-testnet': 'https://web-production-dd46d.up.railway.app/api',
+        'mainnet': 'https://web-production-dd46d.up.railway.app/api'
     };
 
     const networkNames = {
@@ -118,8 +118,8 @@
     };
 
     const faucetEndpoints = {
-        'testnet': 'https://sayman-faucet.onrender.com/faucet',
-        'public-testnet': 'https://sayman-faucet.onrender.com/faucet',
+        'testnet': 'https://web-production-dd46d.up.railway.app/faucet',
+        'public-testnet': 'https://web-production-dd46d.up.railway.app/faucet',
         'mainnet': null
     };
 
@@ -236,7 +236,7 @@
     function getNetworkType() { return networkTypes[currentNetwork]; }
     function getNetworkName() { return networkNames[currentNetwork]; }
     function getFaucetUrl() { return faucetEndpoints[currentNetwork]; }
-    function getExplorerUrl() { return 'https://sayman.onrender.com'; }
+    function getExplorerUrl() { return 'https://web-production-dd46d.up.railway.app'; }
 
     function shortAddr(addr) {
         if (!addr) return '0x...';
@@ -383,7 +383,6 @@
             `;
         }).join('');
 
-        // FIX: Wallet selection - DON'T close sidebar on mobile
         dom.walletList.querySelectorAll('.wallet-item').forEach(el => {
             el.addEventListener('click', (e) => {
                 if (e.target.closest('.wallet-delete')) return;
@@ -394,7 +393,6 @@
                 loadTransactionHistory();
                 fetchBlockInfo();
                 showToast(`Selected: ${activeWallet ? activeWallet.name : ''}`, 'success');
-                // Sidebar stays open on mobile - user closes it manually or taps overlay
             });
         });
 
@@ -2217,7 +2215,6 @@
 
     dom.walletSearch.addEventListener('input', renderWalletList);
 
-    // ===== FIXED MOBILE MENU - Sidebar stays open =====
     dom.mobileMenuBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         dom.sidebar.classList.toggle('open');
@@ -2229,15 +2226,12 @@
         dom.mobileOverlay.classList.remove('active');
     });
 
-    // Close sidebar ONLY when clicking the overlay or menu button, NOT on wallet selection
     document.addEventListener('click', (e) => {
         if (window.innerWidth <= 768) {
             if (dom.sidebar.classList.contains('open')) {
-                // Don't close on wallet item click
                 if (e.target.closest('.wallet-item')) {
                     return;
                 }
-                // Close only if clicking outside sidebar and not on menu button
                 if (!dom.sidebar.contains(e.target) && !dom.mobileMenuBtn.contains(e.target)) {
                     dom.sidebar.classList.remove('open');
                     dom.mobileOverlay.classList.remove('active');
