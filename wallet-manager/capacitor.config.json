@@ -1,5 +1,25 @@
 {
-  "appId": "com.krushn.saymanwallet",
-  "appName": "Sayman Wallet",
-  "webDir": "www"
+  "appId": "com.krushn.pukywallet",
+  "appName": "PUKY Wallet",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "backgroundColor": "#4f6ef7",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP"
+    },
+    "Permissions": {
+      "android": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    }
+  }
 }

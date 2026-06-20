@@ -1,6 +1,5 @@
 // ============================================================
 //  Sayman Crypto Client — Elliptic Curve & Wallet Core
-//  Uses elliptic.js for secp256k1 operations.
 // ============================================================
 
 class SaymanWallet {
