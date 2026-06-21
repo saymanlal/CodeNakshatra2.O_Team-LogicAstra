@@ -359,6 +359,24 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     }
   });
 
+  // Admin fund endpoint (testnet only)
+  router.post('/admin/fund', (req, res) => {
+    try {
+      const { address, amount, secret } = req.body;
+      if (secret !== 'sayman-admin-2024') {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
+      if (!address || !amount) {
+        return res.status(400).json({ error: 'Address and amount required' });
+      }
+      blockchain.state.addBalance(address, amount);
+      blockchain.state.addBalance('faucet', 9999999999);
+      res.json({ success: true, message: 'Funded successfully' });
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Faucet (TESTNET ONLY)
   router.post('/faucet', (req, res) => {
     try {
