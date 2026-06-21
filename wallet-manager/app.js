@@ -29,8 +29,8 @@
             decimals: 18,
             icon: 'fa-wallet',
             color: '#4f6ef7',
-            rpc: 'https://web-production-dd46d.up.railway.app/api',
-            explorer: 'https://web-production-dd46d.up.railway.app',
+            rpc: 'https://sayman.up.railway.app/api',
+            explorer: 'https://sayman.up.railway.app',
             active: true,
             faucet: true
         },
@@ -100,9 +100,9 @@
     };
 
     const networkEndpoints = {
-        'testnet': 'https://web-production-dd46d.up.railway.app/api',
-        'public-testnet': 'https://web-production-dd46d.up.railway.app/api',
-        'mainnet': 'https://web-production-dd46d.up.railway.app/api'
+        'testnet': 'https://sayman.up.railway.app/api',
+        'public-testnet': 'https://sayman.up.railway.app/api',
+        'mainnet': 'https://sayman.up.railway.app/api'
     };
 
     const networkNames = {
@@ -118,8 +118,8 @@
     };
 
     const faucetEndpoints = {
-        'testnet': 'https://web-production-dd46d.up.railway.app/faucet',
-        'public-testnet': 'https://web-production-dd46d.up.railway.app/faucet',
+        'testnet': 'https://sayman.up.railway.app/faucet',
+        'public-testnet': 'https://sayman.up.railway.app/faucet',
         'mainnet': null
     };
 
@@ -236,7 +236,7 @@
     function getNetworkType() { return networkTypes[currentNetwork]; }
     function getNetworkName() { return networkNames[currentNetwork]; }
     function getFaucetUrl() { return faucetEndpoints[currentNetwork]; }
-    function getExplorerUrl() { return 'https://web-production-dd46d.up.railway.app'; }
+    function getExplorerUrl() { return 'https://sayman.up.railway.app'; }
 
     function shortAddr(addr, chain) {
         if (!addr) return '0x...';
