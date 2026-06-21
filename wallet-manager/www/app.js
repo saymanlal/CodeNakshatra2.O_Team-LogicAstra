@@ -240,8 +240,6 @@
 
     function shortAddr(addr, chain) {
         if (!addr) return '0x...';
-        const config = getChainConfig(chain || 'sayman');
-        // Different chains have different address formats
         if (chain === 'bitcoin') {
             return addr.slice(0, 6) + '...' + addr.slice(-6);
         } else if (chain === 'solana') {
@@ -250,32 +248,21 @@
         return addr.slice(0, 6) + '...' + addr.slice(-4);
     }
 
-    function formatBalance(b) { 
+    function formatBalance(b) {
         if (b === undefined || b === null || isNaN(b)) return '0.00';
-        return Number(b).toFixed(2); 
+        return Number(b).toFixed(2);
     }
-    
+
     function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
     function getChainConfig(chain) { return chainConfigs[chain] || chainConfigs['sayman']; }
     function getChainSymbol(chain) { return getChainConfig(chain).symbol; }
     function isChainActive(chain) { return getChainConfig(chain).active || false; }
-    
-    // Get proper address format for each chain
+
     function getAddressForChain(address, chain) {
         if (!address) return '0x...';
-        const config = getChainConfig(chain || 'sayman');
-        const symbol = config.symbol;
-        
-        // Bitcoin addresses start with 1, 3, or bc1
-        if (chain === 'bitcoin') {
-            return address;
-        }
-        // Solana addresses are base58
-        if (chain === 'solana') {
-            return address;
-        }
-        // EVM chains use 0x prefix
+        if (chain === 'bitcoin') return address;
+        if (chain === 'solana') return address;
         if (!address.startsWith('0x') && !address.startsWith('0X')) {
             return '0x' + address;
         }
@@ -385,7 +372,7 @@
             dom.walletList.innerHTML = `
                 <div class="empty-state" style="padding:16px 8px;">
                     <i class="fas fa-wallet" style="font-size:20px;opacity:0.3;display:block;margin-bottom:6px;"></i>
-                    <p style="color:var(--text-muted);font-size:0.8rem;">No wallets found</p>
+                    <p style="color:var(--text-muted);font-size:0.8rem;">No wallets yet — tap "New" to create one</p>
                 </div>
             `;
             return;
@@ -393,7 +380,6 @@
 
         dom.walletList.innerHTML = networkWallets.map(w => {
             const chain = getChainConfig(w.chain || 'sayman');
-            const displayAddress = getAddressForChain(w.address, w.chain);
             return `
                 <div class="wallet-item ${w.id === (activeWallet ? activeWallet.id : null) ? 'active' : ''}" data-id="${w.id}">
                     <span class="wallet-dot" style="background:${chain.color};"></span>
@@ -470,14 +456,14 @@
 
         const chain = getChainConfig(w.chain || 'sayman');
         const displayAddress = getAddressForChain(w.address, w.chain);
-        
+
         dom.detailName.textContent = `${w.name} (${chain.symbol})`;
         dom.detailStatus.className = 'detail-status active';
         dom.detailStatus.innerHTML = `<i class="fas fa-circle" style="color:${chain.color};"></i> ${chain.name}`;
         dom.detailAddress.textContent = displayAddress;
         dom.detailBalance.textContent = formatBalance(w.balance || 0);
         dom.detailStaked.textContent = formatBalance(w.stake || 0);
-        
+
         if (w.lockBlock && w.lockedAmount > 0) {
             const lockInfo = getLockRemaining(w.lockBlock);
             if (lockInfo && lockInfo.remaining > 0) {
@@ -490,13 +476,13 @@
                 saveState();
                 dom.detailLocked.textContent = '0.00';
                 dom.detailLocked.style.color = '';
-                showToast(`${formatBalance(w.lockedAmount)} unlocked and credited!`, 'success');
+                showToast(`Unlocked and credited!`, 'success');
             }
         } else {
             dom.detailLocked.textContent = '0.00';
             dom.detailLocked.style.color = '';
         }
-        
+
         dom.detailNonce.textContent = w.nonce || 0;
         dom.detailBlock.textContent = currentBlock || '0';
         dom.detailNetwork.textContent = getNetworkName();
@@ -525,7 +511,7 @@
                         w.lockedAmount = 0;
                         w.lockBlock = null;
                         needsUpdate = true;
-                        showToast(`${formatBalance(w.lockedAmount)} unlocked and credited!`, 'success');
+                        showToast(`Unlocked and credited!`, 'success');
                     }
                 }
             });
@@ -561,7 +547,7 @@
                 currentBlock = data.blockNumber || data.height || 0;
                 dom.detailBlock.textContent = currentBlock;
                 dom.stakeBlock.textContent = `Block #${currentBlock}`;
-                
+
                 if (activeWallet && activeWallet.stake > 0) {
                     const rewardTime = calculateRewardTime(activeWallet.stake);
                     dom.stakeRewardTime.value = `~${rewardTime} (${blockTime}s per block)`;
@@ -578,7 +564,7 @@
         const minReward = 0.01;
         const blocksNeeded = minReward / (stakeAmount * (stakingAPY / 100) / blocksPerYear);
         const secondsNeeded = blocksNeeded * blockTime;
-        
+
         if (secondsNeeded < 60) {
             return `${Math.round(secondsNeeded)} seconds`;
         } else if (secondsNeeded < 3600) {
@@ -601,13 +587,13 @@
             if (data.transactions) {
                 activeWallet.transactions = data.transactions.map(tx => {
                     let amount = 0;
-                    
+
                     if (tx.data && tx.data.amount !== undefined) {
                         amount = parseFloat(tx.data.amount) || 0;
                     } else if (tx.amount !== undefined) {
                         amount = parseFloat(tx.amount) || 0;
                     }
-                    
+
                     if (tx.type === 'TRANSFER' && tx.data) {
                         if (tx.data.to === activeWallet.address) {
                             amount = Math.abs(amount);
@@ -615,35 +601,34 @@
                             amount = -Math.abs(amount);
                         }
                     }
-                    
+
                     if (tx.type === 'STAKE') {
                         amount = -Math.abs(amount);
                     }
-                    
+
                     if (tx.type === 'REWARD' || tx.type === 'FAUCET') {
                         amount = Math.abs(amount);
                     }
-                    
+
                     if (tx.type === 'UNSTAKE') {
                         amount = Math.abs(amount);
                     }
-                    
+
                     if (!tx.txId && !tx.hash) {
                         tx.txId = '0x' + generateId().padStart(64, '0');
                     }
-                    
+
                     if (!tx.blockNumber && !tx.block) {
                         tx.blockNumber = currentBlock || 0;
                     }
-                    
+
                     if (!tx.time) {
                         tx.time = Date.now();
                     }
-                    
+
                     return { ...tx, amount: amount };
                 });
-                
-                // Update balance from server
+
                 if (data.balance !== undefined) {
                     activeWallet.balance = data.balance;
                 }
@@ -721,7 +706,7 @@
             const isPositive = (tx.amount || 0) >= 0;
             const displayAmount = (tx.amount || 0);
             const symbol = chain.symbol;
-            
+
             let timeDisplay = 'N/A';
             if (tx.time) {
                 try {
@@ -733,14 +718,9 @@
                     timeDisplay = 'N/A';
                 }
             }
-            
-            let txIdDisplay = 'N/A';
-            if (tx.txId || tx.hash) {
-                txIdDisplay = shortAddr(tx.txId || tx.hash, w.chain);
-            }
-            
+
             let blockDisplay = tx.blockNumber || tx.block || 'N/A';
-            
+
             let addressDisplay = '';
             if (tx.data) {
                 if (tx.data.to && tx.data.to !== w.address) {
@@ -867,13 +847,13 @@
                         ${isPositive ? '+' : ''}${formatBalance(tx.amount || 0)} ${symbol}
                     </span>
                 </div>
-                
+
                 <div class="form-group">
                     <label><i class="fas fa-hashtag"></i> Transaction ID</label>
                     <input type="text" value="${txIdDisplay}" readonly style="font-family:monospace;font-size:0.7rem;" />
                     <a href="${explorerUrl}/tx/${tx.txId || tx.hash}" target="_blank" style="font-size:0.65rem;color:var(--accent);">View on Explorer →</a>
                 </div>
-                
+
                 ${tx.data ? `
                     ${tx.data.from ? `
                     <div class="form-group">
@@ -894,7 +874,7 @@
                     </div>
                     ` : ''}
                 ` : ''}
-                
+
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                     <div class="form-group">
                         <label><i class="fas fa-clock"></i> Timestamp</label>
@@ -906,7 +886,7 @@
                         <a href="${explorerUrl}/block/${blockDisplay}" target="_blank" style="font-size:0.65rem;color:var(--accent);">View Block →</a>
                     </div>
                 </div>
-                
+
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
                     <div class="form-group">
                         <label><i class="fas fa-gas-pump"></i> Gas Price</label>
@@ -921,16 +901,16 @@
                         <input type="text" value="${gasFee}" readonly style="font-weight:600;color:var(--accent);" />
                     </div>
                 </div>
-                
+
                 ${lockInfo}
-                
+
                 ${tx.nonce !== undefined ? `
                 <div class="form-group">
                     <label><i class="fas fa-hashtag"></i> Nonce</label>
                     <input type="text" value="${tx.nonce}" readonly />
                 </div>
                 ` : ''}
-                
+
                 <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border-color);flex-wrap:wrap;">
                     <button class="btn-outline-sm" onclick="closeModal('txDetailModal')"><i class="fas fa-times"></i> Close</button>
                 </div>
@@ -956,6 +936,19 @@
 
     async function startQrPayScanner() {
         if (isQrPayScanning) return;
+        isQrPayScanning = true; // set immediately, synchronously — closes the race window that caused double camera feeds
+
+        // Defensively tear down any leftover instance before starting a fresh one
+        if (qrPayScannerInstance) {
+            try {
+                await qrPayScannerInstance.stop();
+                await qrPayScannerInstance.clear();
+            } catch (e) {}
+            qrPayScannerInstance = null;
+        }
+        if (dom.qrPayScanner) {
+            dom.qrPayScanner.innerHTML = '';
+        }
 
         try {
             if (navigator.permissions) {
@@ -978,7 +971,6 @@
                 return;
             }
 
-            dom.qrPayScanner.innerHTML = '';
             qrPayScannerInstance = new Html5Qrcode('qrPayScanner');
 
             const config = {
@@ -987,7 +979,6 @@
                 aspectRatio: 1.0,
             };
 
-            isQrPayScanning = true;
             dom.qrPayResult.innerHTML = `
                 <div style="padding:8px;color:var(--text-secondary);">
                     <i class="fas fa-spinner fa-spin"></i> Requesting camera access...
@@ -1049,7 +1040,7 @@
                 dom.qrPayResult.innerHTML = `<div class="error-message">Invalid QR code</div>`;
             }
         }
-        
+
         stopQrPayScanner();
     }
 
@@ -1087,10 +1078,10 @@
         closeModal('qrPayModal');
         dom.sendTo.value = to;
         dom.sendAmount.value = amount;
-        
+
         document.querySelector('[data-tab="send"]')?.classList.add('active');
         document.getElementById('tab-send')?.classList.add('active');
-        
+
         showToast(`Ready to send ${formatBalance(amount)} ${getChainSymbol(activeWallet.chain)}`, 'success');
     });
 
@@ -1208,7 +1199,6 @@
 
             if (result.success) {
                 const txHash = result.txId || '0x' + generateId().padStart(64, '0');
-                const symbol = getChainSymbol(activeWallet.chain);
                 dom.sendResult.innerHTML = `
                     <div class="success-message">
                         <i class="fas fa-check-circle"></i>
@@ -1238,7 +1228,7 @@
                     loadTransactionHistory();
                     fetchBlockInfo();
                     render();
-                }, 2000);
+                }, 800);
             } else {
                 showToast(result.error || 'Transaction failed', 'error');
             }
@@ -1341,7 +1331,7 @@
                         <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAYM</small>
                     </div>
                 `;
-                
+
                 activeWallet.balance = (activeWallet.balance || 0) - amount - gasFeeInSAY;
                 activeWallet.stake = (activeWallet.stake || 0) + amount;
                 activeWallet.transactions.push({
@@ -1356,7 +1346,7 @@
                     data: { from: activeWallet.address, amount }
                 });
                 saveState();
-                
+
                 dom.stakeAmount.value = '';
                 showToast(`Staked ${formatBalance(amount)} SAYM (gas: ${formatBalance(gasFeeInSAY)} SAYM)`, 'success');
 
@@ -1364,7 +1354,7 @@
                     loadTransactionHistory();
                     fetchBlockInfo();
                     render();
-                }, 2000);
+                }, 800);
             } else {
                 showToast(result.error || 'Staking failed', 'error');
             }
@@ -1454,12 +1444,12 @@
             if (result.success) {
                 const txHash = result.txId || '0x' + generateId().padStart(64, '0');
                 const lockBlock = currentBlock + lockBlocks;
-                
+
                 activeWallet.lockedAmount = (activeWallet.lockedAmount || 0) + unstakeAmount;
                 activeWallet.stake = 0;
                 activeWallet.lockBlock = lockBlock;
                 activeWallet.balance = (activeWallet.balance || 0) - gasFeeInSAY;
-                
+
                 activeWallet.transactions.push({
                     type: 'UNSTAKE',
                     amount: unstakeAmount,
@@ -1474,7 +1464,7 @@
                 });
                 saveState();
                 render();
-                
+
                 dom.stakeResult.innerHTML = `
                     <div class="success-message">
                         <i class="fas fa-check-circle"></i>
@@ -1483,14 +1473,14 @@
                         <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAYM</small>
                     </div>
                 `;
-                
+
                 showToast(`Unstaked ${formatBalance(unstakeAmount)} SAYM (locked ${lockTimeMinutes} min)`, 'success');
 
                 setTimeout(() => {
                     loadTransactionHistory();
                     fetchBlockInfo();
                     render();
-                }, 2000);
+                }, 800);
             } else {
                 showToast(result.error || 'Unstaking failed', 'error');
             }
@@ -1509,7 +1499,6 @@
             return;
         }
 
-        // Check if faucet is available for this chain
         const chainConfig = getChainConfig(activeWallet.chain || 'sayman');
         if (!chainConfig.faucet) {
             dom.faucetResult.innerHTML = `<div class="error-message">Faucet not available for ${chainConfig.name} (${chainConfig.symbol})</div>`;
@@ -1538,7 +1527,7 @@
                 const faucetAmount = data.amount || 100;
                 const txHash = data.txId || '0x' + generateId().padStart(64, '0');
                 const symbol = chainConfig.symbol;
-                
+
                 activeWallet.balance = (activeWallet.balance || 0) + faucetAmount;
                 activeWallet.transactions.push({
                     type: 'FAUCET',
@@ -1551,7 +1540,7 @@
                 saveState();
                 render();
                 loadTransactionHistory();
-                
+
                 dom.faucetResult.innerHTML = `
                     <div class="success-message">
                         <i class="fas fa-check-circle"></i>
@@ -1565,7 +1554,7 @@
                     loadTransactionHistory();
                     fetchBlockInfo();
                     render();
-                }, 2000);
+                }, 800);
             } else {
                 const errorMsg = data.error || 'Faucet request failed';
                 dom.faucetResult.innerHTML = `<div class="error-message">${errorMsg}</div>`;
@@ -1581,19 +1570,19 @@
         try {
             const blob = new Blob([content], { type: mimeType });
             const url = window.URL.createObjectURL(blob);
-            
+
             const link = document.createElement('a');
             link.href = url;
             link.download = filename;
             link.style.display = 'none';
             document.body.appendChild(link);
             link.click();
-            
+
             setTimeout(() => {
                 document.body.removeChild(link);
                 window.URL.revokeObjectURL(url);
             }, 100);
-            
+
             return true;
         } catch (e) {
             console.error('Download failed:', e);
@@ -1629,7 +1618,7 @@
 
         const content = JSON.stringify(exportData, null, 2);
         const filename = `puky_wallets_${Date.now()}.json`;
-        
+
         if (downloadFile(content, filename)) {
             showToast('Wallets exported! Check Downloads folder.', 'success');
         } else {
@@ -1662,7 +1651,7 @@
 
         const content = JSON.stringify(exportData, null, 2);
         const filename = `puky_${activeWallet.name}_${Date.now()}.json`;
-        
+
         if (downloadFile(content, filename)) {
             showToast('Wallet exported! Check Downloads folder.', 'success');
         } else {
@@ -1736,19 +1725,16 @@
 
     dom.scanQrNavBtn.addEventListener('click', () => {
         openModal('qrPayModal');
-        setTimeout(startQrPayScanner, 500);
     });
 
     dom.scanQrSendBtn.addEventListener('click', () => {
         openModal('qrPayModal');
-        setTimeout(startQrPayScanner, 500);
     });
 
     async function startQrScanner() {
         if (isScanning) return;
 
         try {
-            // Clear any existing scanner first
             if (html5QrCode) {
                 try {
                     await html5QrCode.stop();
@@ -1757,7 +1743,6 @@
                 html5QrCode = null;
             }
 
-            // Clear scanner container
             const scannerElement = dom.qrScanner;
             if (scannerElement) {
                 scannerElement.innerHTML = '';
@@ -1828,7 +1813,6 @@
                 </div>
             `;
             dom.qrPayAmount.focus();
-            setTimeout(startQrPayScanner, 500);
         } else {
             try {
                 const data = JSON.parse(decodedText);
@@ -1842,7 +1826,6 @@
                         </div>
                     `;
                     dom.qrPayAmount.focus();
-                    setTimeout(startQrPayScanner, 500);
                 } else if (data.privateKey) {
                     importWalletFromQrData(decodedText);
                 } else {
@@ -1857,7 +1840,7 @@
                 }
             }
         }
-        
+
         dom.scanResult.innerHTML = '';
     }
 
@@ -1873,7 +1856,6 @@
         }
         isScanning = false;
         dom.stopScanBtn.style.display = 'none';
-        // Clear the scanner element
         if (dom.qrScanner) {
             dom.qrScanner.innerHTML = '';
         }
@@ -2052,7 +2034,7 @@
     dom.deleteWalletBtn.addEventListener('click', () => {
         if (!activeWallet) return;
         if (!confirm(`Delete "${activeWallet.name}" permanently?`)) return;
-        
+
         const id = activeWallet.id;
         wallets = wallets.filter(w => w.id !== id);
         activeWallet = wallets.length ? wallets[0] : null;
@@ -2163,18 +2145,18 @@
 
     dom.createWalletBtn.addEventListener('click', async () => {
         const name = dom.newWalletName.value.trim() || 'New Wallet';
-        
-        const chainList = Object.entries(chainConfigs).map(([key, val]) => 
+
+        const chainList = Object.entries(chainConfigs).map(([key, val]) =>
             `${key}: ${val.name} (${val.symbol})${val.active ? ' ✓' : ' (coming soon)'}`
         ).join('\n');
-        
+
         const chain = prompt(`Select blockchain (default: sayman):\n\n${chainList}`, 'sayman') || 'sayman';
-        
+
         if (!chainConfigs[chain]) {
             showToast('Invalid chain selected', 'error');
             return;
         }
-        
+
         const w = await generateNewWallet(name, chain);
         wallets.push(w);
         activeWallet = w;
@@ -2199,16 +2181,16 @@
 
         try {
             const name = prompt('Name for this wallet?', 'Imported Wallet');
-            const chainList = Object.entries(chainConfigs).map(([key, val]) => 
+            const chainList = Object.entries(chainConfigs).map(([key, val]) =>
                 `${key}: ${val.name} (${val.symbol})${val.active ? ' ✓' : ' (coming soon)'}`
             ).join('\n');
             const chain = prompt(`Select blockchain (default: sayman):\n\n${chainList}`, 'sayman') || 'sayman';
-            
+
             if (!chainConfigs[chain]) {
                 showToast('Invalid chain selected', 'error');
                 return;
             }
-            
+
             const w = await createWalletFromPrivateKey(pk, name || 'Imported Wallet', chain);
             wallets.push(w);
             activeWallet = w;
@@ -2273,7 +2255,6 @@
 
     dom.walletSearch.addEventListener('input', renderWalletList);
 
-    // FIX: Navbar - Sidebar stays open on selection
     dom.mobileMenuBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         dom.sidebar.classList.toggle('open');
@@ -2281,7 +2262,6 @@
     });
 
     dom.mobileOverlay.addEventListener('click', (e) => {
-        // Only close if clicking the overlay itself, not its children
         if (e.target === dom.mobileOverlay) {
             dom.sidebar.classList.remove('open');
             dom.mobileOverlay.classList.remove('active');
@@ -2291,15 +2271,12 @@
     document.addEventListener('click', (e) => {
         if (window.innerWidth <= 768) {
             if (dom.sidebar.classList.contains('open')) {
-                // If clicking inside sidebar, keep it open
                 if (dom.sidebar.contains(e.target)) {
                     return;
                 }
-                // If clicking menu button, toggle handled above
                 if (dom.mobileMenuBtn.contains(e.target)) {
                     return;
                 }
-                // Close only when clicking outside
                 dom.sidebar.classList.remove('open');
                 dom.mobileOverlay.classList.remove('active');
             }
@@ -2773,8 +2750,18 @@
                 loadTransactionHistory();
                 fetchBlockInfo();
             }
-        }, 30000);
+        }, 6000);
     }
+
+    // Re-sync immediately when the app/tab regains focus — mobile OSes
+    // pause JS timers in the background, so without this the balance
+    // can sit stale for minutes after you switch back.
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && activeWallet) {
+            loadTransactionHistory();
+            fetchBlockInfo();
+        }
+    });
 
     async function init() {
         let progress = 0;
@@ -2789,23 +2776,13 @@
             }
         }, 200);
 
-        const hasState = loadState();
+        loadState();
         dom.networkSelect.value = currentNetwork;
 
         setTimeout(async () => {
-            if (wallets.length === 0) {
-                const demo = await generateNewWallet('Main Wallet', 'sayman');
-                demo.balance = 1250.75;
-                demo.transactions = [
-                    { type: 'TRANSFER', amount: 500, time: Date.now() - 172800000, txId: '0x' + generateId().padStart(64, '0'), blockNumber: 12345, data: { from: '0x1234', to: '0x5678' } },
-                    { type: 'TRANSFER', amount: -120, time: Date.now() - 129600000, txId: '0x' + generateId().padStart(64, '0'), blockNumber: 12346, data: { from: '0x5678', to: '0x1234' } },
-                    { type: 'STAKE', amount: -300, time: Date.now() - 86400000, txId: '0x' + generateId().padStart(64, '0'), blockNumber: 12347, data: { from: '0x1234', amount: 300 } },
-                    { type: 'REWARD', amount: 45.75, time: Date.now() - 43200000, txId: '0x' + generateId().padStart(64, '0'), blockNumber: 12348, data: { from: 'system', to: '0x1234' } },
-                ];
-                wallets.push(demo);
-                activeWallet = demo;
-                saveState();
-            }
+            // NOTE: No demo wallet is auto-created anymore.
+            // If wallets.length === 0, the UI simply shows the
+            // empty state and the user creates/imports a real wallet.
 
             if (!activeWallet && wallets.length > 0) {
                 activeWallet = wallets[0];
