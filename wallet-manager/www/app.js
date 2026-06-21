@@ -2268,20 +2268,9 @@
         }
     });
 
-    document.addEventListener('click', (e) => {
-        if (window.innerWidth <= 768) {
-            if (dom.sidebar.classList.contains('open')) {
-                if (dom.sidebar.contains(e.target)) {
-                    return;
-                }
-                if (dom.mobileMenuBtn.contains(e.target)) {
-                    return;
-                }
-                dom.sidebar.classList.remove('open');
-                dom.mobileOverlay.classList.remove('active');
-            }
-        }
-    });
+    // Removed — mobileOverlay click handler already closes the sidebar cleanly.
+// The old document-level click listener was firing before wallet-item
+// click handlers and swallowing the tap on mobile.
 
     function openModal(id) {
         const el = document.getElementById(id);
