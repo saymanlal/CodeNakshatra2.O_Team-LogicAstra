@@ -630,7 +630,8 @@
                 });
 
                 if (data.balance !== undefined) {
-                    activeWallet.balance = data.balance;
+                    const b = Number(data.balance);
+                    activeWallet.balance = isFinite(b) && b < 1e15 ? b : (data.transactions || []).reduce((s,t) => s + (t.amount || 0), 0);
                 }
                 if (data.stake !== undefined) {
                     activeWallet.stake = data.stake;
