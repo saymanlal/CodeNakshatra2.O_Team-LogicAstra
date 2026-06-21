@@ -1821,3 +1821,63 @@ body {
 .btn-outline-sm:active {
     transform: scale(0.97);
 }
+
+/* ===== FIX: Navbar Click-Through ===== */
+.sidebar {
+    pointer-events: auto;
+    z-index: 60;
+}
+
+.sidebar .wallet-item {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    position: relative;
+    z-index: 61;
+}
+
+.sidebar .wallet-item * {
+    pointer-events: none !important;
+}
+
+.sidebar .wallet-item .wallet-delete {
+    pointer-events: auto !important;
+}
+
+.sidebar .wallet-item .wallet-delete * {
+    pointer-events: none !important;
+}
+
+.mobile-overlay {
+    pointer-events: none;
+}
+
+.mobile-overlay.active {
+    pointer-events: auto;
+}
+
+.mobile-overlay.active ~ .sidebar {
+    pointer-events: auto;
+}
+
+.mobile-menu-btn {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 1002;
+}
+
+.sidebar.open {
+    pointer-events: auto !important;
+}
+
+/* Fix for modal dimming */
+.modal-overlay {
+    pointer-events: none;
+}
+
+.modal-overlay.open {
+    pointer-events: auto;
+}
+
+.modal-overlay.open .modal {
+    pointer-events: auto;
+}
