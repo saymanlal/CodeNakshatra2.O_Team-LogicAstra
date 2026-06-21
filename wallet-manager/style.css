@@ -1829,7 +1829,6 @@ body {
 
 .sidebar.open {
     transform: translateX(0);
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
 }
 
 #qrPayScanner {
