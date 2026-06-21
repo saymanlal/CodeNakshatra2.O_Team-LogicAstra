@@ -118,8 +118,8 @@
     };
 
     const faucetEndpoints = {
-        'testnet': 'https://sayman.up.railway.app/faucet',
-        'public-testnet': 'https://sayman.up.railway.app/faucet',
+        'testnet': 'https://sayman-faucet.onrender.com/faucet',
+        'public-testnet': 'https://sayman-faucet.onrender.com/faucet',
         'mainnet': null
     };
 

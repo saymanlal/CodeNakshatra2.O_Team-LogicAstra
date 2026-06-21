@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.FAUCET_PORT || 10000;
-const API_BASE = process.env.API_BASE || 'https://sayman.onrender.com/api';
+const API_BASE = process.env.API_BASE || 'https://sayman.up.railway.app/api';
 const FAUCET_AMOUNT = parseInt(process.env.FAUCET_AMOUNT) || 100;
 
 class FaucetWallet {
