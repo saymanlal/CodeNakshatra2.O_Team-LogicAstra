@@ -541,10 +541,10 @@
 
     async function fetchBlockInfo() {
         try {
-            const res = await fetch(`${getApiBase()}/block/latest`);
+            const res = await fetch(`${getApiBase()}/blocks?limit=1`);
             if (res.ok) {
                 const data = await res.json();
-                currentBlock = data.blockNumber || data.height || 0;
+                currentBlock = (data.blocks && data.blocks[0] && data.blocks[0].index) || data.blockNumber || data.height || 0;
                 dom.detailBlock.textContent = currentBlock;
                 dom.stakeBlock.textContent = `Block #${currentBlock}`;
 
@@ -630,7 +630,8 @@
                 });
 
                 if (data.balance !== undefined) {
-                    activeWallet.balance = data.balance;
+                    const b = Number(data.balance);
+                    activeWallet.balance = isFinite(b) && b < 1e15 ? b : (data.transactions || []).reduce((s,t) => s + (t.amount || 0), 0);
                 }
                 if (data.stake !== undefined) {
                     activeWallet.stake = data.stake;
