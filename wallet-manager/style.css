@@ -212,7 +212,7 @@ body {
 
 .mobile-overlay.active {
     display: block;
-    pointer-events: auto;
+    pointer-events: none;
 }
 
 .navbar {
@@ -565,9 +565,9 @@ body {
     }
 
     .mobile-overlay.active {
-        display: block;
-        pointer-events: auto;
-    }
+    display: block;
+    pointer-events: none;
+}
 }
 
 .btn-primary-sm {

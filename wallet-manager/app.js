@@ -2261,11 +2261,9 @@
         dom.mobileOverlay.classList.toggle('active');
     });
 
-    dom.mobileOverlay.addEventListener('click', (e) => {
-        if (e.target === dom.mobileOverlay) {
-            dom.sidebar.classList.remove('open');
-            dom.mobileOverlay.classList.remove('active');
-        }
+    dom.mobileOverlay.addEventListener('click', () => {
+        dom.sidebar.classList.remove('open');
+        dom.mobileOverlay.classList.remove('active');
     });
 
     // Removed — mobileOverlay click handler already closes the sidebar cleanly.
