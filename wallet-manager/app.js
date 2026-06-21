@@ -541,10 +541,10 @@
 
     async function fetchBlockInfo() {
         try {
-            const res = await fetch(`${getApiBase()}/block/latest`);
+            const res = await fetch(`${getApiBase()}/blocks?limit=1`);
             if (res.ok) {
                 const data = await res.json();
-                currentBlock = data.blockNumber || data.height || 0;
+                currentBlock = (data.blocks && data.blocks[0] && data.blocks[0].index) || data.blockNumber || data.height || 0;
                 dom.detailBlock.textContent = currentBlock;
                 dom.stakeBlock.textContent = `Block #${currentBlock}`;
 
