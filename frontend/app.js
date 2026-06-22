@@ -1,1106 +1,507 @@
-let apiBase = window.location.origin + '/api';
-let networkConfig = null;
-let currentWallet = null;
-let currentPage = 1;
-let blocksPerPage = 20;
+// ── SAYMAN Blockchain — app.js ────────────────────────────────────────────────
+// Pages: Dashboard · Explorer (search + jump-to-page) · Validators (with block history) · Contracts · Network
 
-function formatBlockTimestamp(timestamp, fallback = 'Pending...') {
-  if (timestamp === null || timestamp === undefined || timestamp === '') {
-    return fallback;
-  }
+const API   = '/api';
+const POLL  = 5000;
+const PG_SZ = 20;
 
-  const numericTimestamp = Number(timestamp);
-  if (!Number.isFinite(numericTimestamp)) {
-    return fallback;
-  }
+// ── State ─────────────────────────────────────────────────────────────────────
+let explorerPage   = 1;
+let explorerTotal  = 0;
+let networkConfig  = null;
 
-  const date = new Date(numericTimestamp);
-  return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString();
-}
-
-// Initialize on page load
+// ── Boot ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  // tag nav buttons with their page name so polling can read active page
+  document.querySelectorAll('.nav-btn[data-page]').forEach(btn => {
+    // already tagged via data-page attribute in HTML
+  });
+
   await loadNetworkConfig();
-  await updateHeaderInfo();
-  loadWallet();
-  updateStats();
-  updateBlockFeed();
-  
-  // Auto-refresh every 3 seconds
-  setInterval(updateStats, 3000);
-  setInterval(updateHeaderInfo, 5000);
-  setInterval(updateBlockFeed, 5000);
+  updateHeaderInfo();
+  showPage('dashboard');
+
+  setInterval(poll, POLL);
+  setInterval(updateHeaderInfo, POLL);
 });
 
-// Load network configuration
-async function loadNetworkConfig() {
-  try {
-    const res = await fetch(`${apiBase}/network`);
-    networkConfig = await res.json();
-    console.log('Network config loaded:', networkConfig);
-  } catch (error) {
-    console.error('Error loading network config:', error);
+function poll() {
+  const active = document.querySelector('.nav-btn.active');
+  if (!active) return;
+  switch (active.dataset.page) {
+    case 'dashboard':  loadDashboard();                    break;
+    case 'explorer':   loadExplorer(explorerPage);         break;
+    case 'validators': /* validators don't auto-poll */    break;
+    case 'contracts':  loadContracts();                    break;
+    case 'network':    loadNetwork();                      break;
   }
 }
 
-// Update header information
+// ── Config & Header ───────────────────────────────────────────────────────────
+async function loadNetworkConfig() {
+  try { networkConfig = await apiFetch('/network'); } catch {}
+}
+
 async function updateHeaderInfo() {
   try {
-    const res = await fetch(`${apiBase}/network/stats`);
-    const data = await res.json();
-    
-    document.getElementById('header-network').textContent = data.network || 'Unknown';
-    document.getElementById('header-chain').textContent = data.chainId || 'Unknown';
-    document.getElementById('header-node').textContent = data.nodeId ? data.nodeId.substring(0, 16) + '...' : 'Unknown';
-    document.getElementById('header-mode').textContent = data.mode ? data.mode.toUpperCase() : 'Unknown';
-  } catch (error) {
-    console.error('Error updating header:', error);
-    document.getElementById('header-network').textContent = 'Connection Error';
-    document.getElementById('header-chain').textContent = 'Check Console (F12)';
-    document.getElementById('header-node').textContent = 'Press F12';
-    document.getElementById('header-mode').textContent = 'Error';
+    const d = await apiFetch('/network/stats');
+    setEl('header-network', d.network  || '—');
+    setEl('header-chain',   d.chainId  || '—');
+    setEl('header-node',    (d.nodeId  || '').slice(0, 16) + '…');
+    setEl('header-mode',    (d.mode    || '—').toUpperCase());
+  } catch {
+    setEl('header-network', 'Connection error');
   }
 }
 
-// Navigation - FIXED: Properly handle active state
+// ── Navigation ────────────────────────────────────────────────────────────────
 function showPage(pageId) {
-  // Update nav buttons - FIXED: Use currentTarget to get the button that was clicked
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.classList.remove('active');
-  });
-  
-  // Find and activate the correct button
-  const clickedButton = event ? event.currentTarget : null;
-  if (clickedButton) {
-    clickedButton.classList.add('active');
-  } else {
-    // Fallback: find button by matching onclick
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-      if (btn.onclick && btn.onclick.toString().includes(pageId)) {
-        btn.classList.add('active');
-      }
-    });
-  }
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
-  // Update pages
-  document.querySelectorAll('.page').forEach(page => {
-    page.classList.remove('active');
-  });
-  document.getElementById(pageId).classList.add('active');
+  const page = document.getElementById(pageId);
+  if (page) page.classList.add('active');
 
-  // Load page-specific data
-  if (pageId === 'explorer') {
-    loadExplorerBlocks();
-  } else if (pageId === 'validators') {
-    loadValidators();
-  } else if (pageId === 'contracts') {
-    loadContracts();
-  } else if (pageId === 'network') {
-    loadNetworkStats();
-  } else if (pageId === 'dashboard') {
-    updateBlockFeed();
+  const btn = document.querySelector(`.nav-btn[data-page="${pageId}"]`);
+  if (btn) btn.classList.add('active');
+
+  switch (pageId) {
+    case 'dashboard':  loadDashboard();        break;
+    case 'explorer':   loadExplorer(1);        break;
+    case 'validators': loadValidators();       break;
+    case 'contracts':  loadContracts();        break;
+    case 'network':    loadNetwork();          break;
   }
 }
 
-// Update dashboard stats - FIXED: Get actual validator count from validators endpoint
-async function updateStats() {
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+async function loadDashboard() {
   try {
-    const res = await fetch(`${apiBase}/stats`);
-    const stats = await res.json();
+    const [stats, blocksData, valData] = await Promise.all([
+      apiFetch('/stats'),
+      apiFetch('/blocks?page=1&limit=10'),
+      apiFetch('/validators'),
+    ]);
 
-    document.getElementById('stat-blocks').textContent = stats.blocks || 0;
-    document.getElementById('stat-mempool').textContent = stats.mempool || 0;
-    document.getElementById('stat-contracts').textContent = stats.contracts || 0;
+    setEl('stat-blocks',    stats.blocks     ?? 0);
+    setEl('stat-validators', valData.validators?.length ?? 0);
+    setEl('stat-stake',     sayn(valData.totalStake ?? 0, false));
+    setEl('stat-mempool',   stats.mempool    ?? 0);
+    setEl('stat-contracts', stats.contracts  ?? 0);
+    setEl('stat-reward',    sayn(stats.blockReward ?? 0, false));
+    setEl('stat-blocktime', Math.round((stats.blockTime ?? 5000) / 1000));
+    setEl('stat-apr',       valData.estimatedAPR ?? 0);
 
-    // FIXED: Get validator data for APR and actual validator count
-    const validatorsRes = await fetch(`${apiBase}/validators`);
-    const validatorsData = await validatorsRes.json();
-    
-    // Use actual validator count from validators endpoint
-    const actualValidatorCount = validatorsData.validators ? validatorsData.validators.length : 0;
-    document.getElementById('stat-validators').textContent = actualValidatorCount;
-    document.getElementById('stat-stake').textContent = validatorsData.totalStake || 0;
-    document.getElementById('stat-apr').textContent = validatorsData.estimatedAPR || 0;
-
-    if (currentWallet) {
-      const balanceRes = await fetch(`${apiBase}/balance/${currentWallet.address}`);
-      const balanceData = await balanceRes.json();
-      if (document.getElementById('wallet-balance')) {
-        document.getElementById('wallet-balance').textContent = balanceData.balance + ' SAYM';
-      }
-      if (document.getElementById('wallet-staked')) {
-        document.getElementById('wallet-staked').textContent = balanceData.stake + ' SAYM';
-      }
+    const blocks = (blocksData.blocks || []).sort((a, b) => b.index - a.index);
+    const feed   = document.getElementById('block-feed');
+    if (feed) {
+      feed.innerHTML = blocks.map(b => `
+        <div class="block-item">
+          <div class="block-index">#${b.index}</div>
+          <div class="block-hash">${(b.hash || '').slice(0, 52)}…</div>
+          <div class="block-time">${fmtTime(b.timestamp)}</div>
+        </div>
+      `).join('') || '<div style="padding:calc(var(--grid)*2);color:var(--mono-400);font-size:12px;">No blocks yet</div>';
     }
-
-  } catch (error) {
-    console.error('Error updating stats:', error);
-  }
+  } catch (e) { console.error('Dashboard:', e); }
 }
 
-// Update live block feed - FIXED: Show blocks in descending order (newest first)
-async function updateBlockFeed() {
+// ── Explorer ──────────────────────────────────────────────────────────────────
+async function loadExplorer(page = 1) {
+  explorerPage = page;
+
+  // clear search UI when paginating normally
+  const searchInput = document.getElementById('explorer-search');
+
   try {
-    const res = await fetch(`${apiBase}/blocks?limit=10`);
-    const data = await res.json();
-    
-    const feed = document.getElementById('block-feed');
-    if (!feed) return;
-    
-    // Clear and rebuild
-    feed.innerHTML = '';
-    
-    // FIXED: Blocks are already sorted newest first from API, just display them
-    data.blocks.forEach(block => {
-      const item = document.createElement('div');
-      item.className = 'block-item';
-      
-      item.innerHTML = `
-        <div class="block-index">#${block.index}</div>
-        <div class="block-hash">${block.hash || 'Generating...'}</div>
-        <div class="block-time">${formatBlockTimestamp(block.timestamp, 'Pending...')}</div>
-      `;
-      
-      feed.appendChild(item);
-    });
-  } catch (error) {
-    console.error('Error updating block feed:', error);
-  }
+    const data = await apiFetch(`/blocks?page=${page}&limit=${PG_SZ}`);
+    explorerTotal = data.total || 0;
+    const totalPages = data.totalPages || Math.max(1, Math.ceil(explorerTotal / PG_SZ));
+    const blocks = (data.blocks || []).sort((a, b) => b.index - a.index);
+
+    renderExplorerRows(blocks);
+    renderPagination(page, totalPages, explorerTotal);
+  } catch (e) { console.error('Explorer:', e); }
 }
 
-// Load explorer blocks with pagination - FIXED: Proper pagination controls
-async function loadExplorerBlocks(page = 1) {
+// Search: by block number or hash prefix
+async function searchExplorer() {
+  const q = (document.getElementById('explorer-search')?.value || '').trim();
+  if (!q) { loadExplorer(1); return; }
+
+  clearPagination();
+  const tbody = document.getElementById('explorer-blocks');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;">Searching…</td></tr>`;
+
   try {
-    currentPage = page;
-    const res = await fetch(`${apiBase}/blocks?page=${page}&limit=20`);
-    const data = await res.json();
-    
-    const tbody = document.getElementById('explorer-blocks');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    data.blocks.forEach(block => {
-      const row = document.createElement('tr');
-      const timeStr = formatBlockTimestamp(block.timestamp, 'Pending...');
-      
-      // Calculate total gas used
-      let gasUsed = 0;
-      if (block.transactions && Array.isArray(block.transactions)) {
-        block.transactions.forEach(tx => {
-          if (tx.gasUsed) gasUsed += tx.gasUsed;
-        });
-      }
-      
-      row.innerHTML = `
-        <td>#${block.index}</td>
-        <td class="mono">${block.hash ? block.hash.substring(0, 16) + '...' : 'N/A'}</td>
-        <td class="mono">${block.validator ? block.validator.substring(0, 16) + '...' : 'N/A'}</td>
-        <td>${block.transactions ? block.transactions.length : 0}</td>
-        <td>${gasUsed}</td>
-        <td>${timeStr}</td>
-      `;
-      
-      // Add hover tooltip with full details
-      row.title = `Block #${block.index}
-Hash: ${block.hash || 'N/A'}
-Previous: ${block.previousHash || 'N/A'}
-Validator: ${block.validator || 'N/A'}
-Timestamp: ${timeStr}
-Transactions: ${block.transactions ? block.transactions.length : 0}
-Gas Used: ${gasUsed}
-Chain ID: ${block.chainId || 'N/A'}`;
-      
-      row.style.cursor = 'pointer';
-      
-      // Click to view full details
-      row.onclick = () => viewBlockDetails(block);
-      
-      tbody.appendChild(row);
-    });
-    
-    // FIXED: Render pagination controls
-    renderPagination(data.total, page);
-    
-  } catch (error) {
-    console.error('Error loading explorer blocks:', error);
+    // Try numeric block index first
+    if (/^\d+$/.test(q)) {
+      const block = await apiFetch(`/block/${q}`);
+      renderExplorerRows(block ? [block] : []);
+      setEl('explorer-page-info', block ? '1 result' : 'Block not found');
+      return;
+    }
+    // Otherwise search by hash
+    const block = await apiFetch(`/block/hash/${q}`);
+    renderExplorerRows(block ? [block] : []);
+    setEl('explorer-page-info', block ? '1 result' : 'No block found for that hash');
+  } catch {
+    // Fallback: filter client-side from current page
+    try {
+      const data = await apiFetch(`/blocks?page=1&limit=100`);
+      const matches = (data.blocks || []).filter(b =>
+        String(b.index) === q ||
+        (b.hash || '').startsWith(q) ||
+        (b.validator || '').startsWith(q)
+      ).sort((a, b) => b.index - a.index);
+      renderExplorerRows(matches);
+      setEl('explorer-page-info', `${matches.length} result${matches.length !== 1 ? 's' : ''}`);
+    } catch (e2) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*2);color:#c00;font-size:12px;">Search error</td></tr>`;
+    }
   }
 }
 
-// FIXED: Proper pagination rendering
-function renderPagination(totalBlocks, currentPage) {
-  const paginationDiv = document.getElementById('pagination-controls');
-  if (!paginationDiv) return;
-  
-  const totalPages = Math.ceil(totalBlocks / 20);
-  
-  if (totalPages <= 1) {
-    paginationDiv.innerHTML = '';
+function clearSearch() {
+  const el = document.getElementById('explorer-search');
+  if (el) el.value = '';
+  loadExplorer(1);
+}
+
+// Jump to page
+function jumpToPage() {
+  const el  = document.getElementById('explorer-jump');
+  const val = parseInt(el?.value || '0', 10);
+  const totalPages = Math.max(1, Math.ceil(explorerTotal / PG_SZ));
+  if (val >= 1 && val <= totalPages) {
+    loadExplorer(val);
+    if (el) el.value = '';
+  }
+}
+
+function renderExplorerRows(blocks) {
+  const tbody = document.getElementById('explorer-blocks');
+  if (!tbody) return;
+
+  if (!blocks.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*3);text-align:center;color:var(--mono-400);font-size:12px;">No blocks found</td></tr>`;
     return;
   }
-  
-  const prevDisabled = currentPage === 1;
-  const nextDisabled = currentPage === totalPages;
-  
-  paginationDiv.innerHTML = `
-    <button 
-      onclick="loadExplorerBlocks(${currentPage - 1})" 
-      ${prevDisabled ? 'disabled' : ''}
-      style="padding: 8px 16px; border: var(--border); background: ${prevDisabled ? 'var(--mono-900)' : 'var(--mono-1000)'}; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; color: ${prevDisabled ? 'var(--mono-600)' : 'var(--mono-100)'};"
-    >← Previous</button>
-    <span style="padding: 8px 16px; color: var(--mono-400);">Page ${currentPage} of ${totalPages}</span>
-    <button 
-      onclick="loadExplorerBlocks(${currentPage + 1})" 
-      ${nextDisabled ? 'disabled' : ''}
-      style="padding: 8px 16px; border: var(--border); background: ${nextDisabled ? 'var(--mono-900)' : 'var(--mono-1000)'}; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; color: ${nextDisabled ? 'var(--mono-600)' : 'var(--mono-100)'};"
-    >Next →</button>
+
+  tbody.innerHTML = blocks.map(b => {
+    const gas = b.gasUsed ?? (b.transactions || []).reduce((s, tx) => s + (tx.gasUsed || 0), 0);
+    return `
+      <tr style="cursor:pointer" onclick="showBlockDetail(${JSON.stringify(JSON.stringify(b))})"
+          title="Click for full details">
+        <td>#${b.index}</td>
+        <td class="mono">${(b.hash || '').slice(0, 20)}…</td>
+        <td class="mono link" onclick="event.stopPropagation();showValidatorDetail('${b.validator || ''}')"
+            title="View validator blocks">${(b.validator || '—').slice(0, 16)}…</td>
+        <td>${b.transactions?.length ?? 0}</td>
+        <td>${gas.toLocaleString()}</td>
+        <td>${fmtTime(b.timestamp)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderPagination(page, totalPages, total) {
+  const ctrl = document.getElementById('pagination-controls');
+  if (!ctrl) return;
+
+  if (totalPages <= 1) {
+    ctrl.innerHTML = `<span style="font-size:12px;color:var(--mono-400)">${total} block${total !== 1 ? 's' : ''}</span>`;
+    return;
+  }
+
+  ctrl.innerHTML = `
+    <button onclick="loadExplorer(1)" ${page <= 1 ? 'disabled' : ''}>«</button>
+    <button onclick="loadExplorer(${page - 1})" ${page <= 1 ? 'disabled' : ''}>← Prev</button>
+    <span id="explorer-page-info">Page ${page} of ${totalPages} · ${total} blocks</span>
+    <button onclick="loadExplorer(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>Next →</button>
+    <button onclick="loadExplorer(${totalPages})" ${page >= totalPages ? 'disabled' : ''}>»</button>
+    <span style="display:flex;align-items:center;gap:4px;margin-left:calc(var(--grid)*2)">
+      <input id="explorer-jump" type="number" min="1" max="${totalPages}"
+             placeholder="Page #"
+             style="width:72px;padding:5px 8px;border:var(--border);font-size:12px;"
+             onkeydown="if(event.key==='Enter')jumpToPage()">
+      <button onclick="jumpToPage()">Go</button>
+    </span>
   `;
 }
 
-// View block details (modal/expanded view)
-function viewBlockDetails(block) {
-  const timeStr = formatBlockTimestamp(block.timestamp, 'Pending...');
-  
-  let gasUsed = 0;
-  if (block.transactions && Array.isArray(block.transactions)) {
-    block.transactions.forEach(tx => {
-      if (tx.gasUsed) gasUsed += tx.gasUsed;
-    });
-  }
-  
-  // Create modal overlay
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: calc(var(--grid) * 4);
-  `;
-  
-  modal.innerHTML = `
-    <div style="
-      background: var(--mono-1000);
-      border: var(--border);
-      max-width: 800px;
-      width: 100%;
-      max-height: 80vh;
-      overflow-y: auto;
-    ">
-      <div style="
-        border-bottom: var(--border);
-        padding: calc(var(--grid) * 3);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      ">
-        <h2 style="margin: 0;">Block #${block.index}</h2>
-        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="
-          background: none;
-          border: var(--border);
-          padding: calc(var(--grid) * 1) calc(var(--grid) * 2);
-          cursor: pointer;
-          font-size: 12px;
-        ">CLOSE</button>
+function clearPagination() {
+  const ctrl = document.getElementById('pagination-controls');
+  if (ctrl) ctrl.innerHTML = '';
+}
+
+// Block detail modal
+function showBlockDetail(jsonStr) {
+  const b   = JSON.parse(jsonStr);
+  const gas = b.gasUsed ?? (b.transactions || []).reduce((s, tx) => s + (tx.gasUsed || 0), 0);
+
+  const modal = makeModal(`Block #${b.index}`, `
+    <table style="width:100%;font-size:12px;border-collapse:collapse">
+      ${detailRow('Hash',          `<span class="mono" style="word-break:break-all">${b.hash || '—'}</span>`)}
+      ${detailRow('Previous Hash', `<span class="mono" style="word-break:break-all">${b.previousHash || '—'}</span>`)}
+      ${detailRow('Validator',     `<span class="mono">${b.validator || '—'}</span>`)}
+      ${detailRow('Timestamp',     fmtTime(b.timestamp))}
+      ${detailRow('Chain ID',      b.chainId || '—')}
+      ${detailRow('Gas Used',      gas.toLocaleString())}
+      ${detailRow('State Root',    `<span class="mono" style="word-break:break-all">${b.stateRoot || '—'}</span>`)}
+    </table>
+    <div style="margin-top:calc(var(--grid)*3);border-top:var(--border);padding-top:calc(var(--grid)*2)">
+      <div style="font-size:12px;font-weight:500;margin-bottom:calc(var(--grid)*1)">
+        Transactions (${b.transactions?.length ?? 0})
       </div>
-      
-      <div style="padding: calc(var(--grid) * 3);">
-        <table style="width: 100%; font-size: 12px;">
-          <tr>
-            <td style="padding: calc(var(--grid) * 1); color: var(--mono-400);">Hash</td>
-            <td style="padding: calc(var(--grid) * 1); font-family: monospace; word-break: break-all;">${block.hash || 'N/A'}</td>
-          </tr>
-          <tr>
-            <td style="padding: calc(var(--grid) * 1); color: var(--mono-400);">Previous Hash</td>
-            <td style="padding: calc(var(--grid) * 1); font-family: monospace; word-break: break-all;">${block.previousHash || 'N/A'}</td>
-          </tr>
-          <tr>
-            <td style="padding: calc(var(--grid) * 1); color: var(--mono-400);">Validator</td>
-            <td style="padding: calc(var(--grid) * 1); font-family: monospace;">${block.validator || 'N/A'}</td>
-          </tr>
-          <tr>
-            <td style="padding: calc(var(--grid) * 1); color: var(--mono-400);">Timestamp</td>
-            <td style="padding: calc(var(--grid) * 1);">${timeStr}</td>
-          </tr>
-          <tr>
-            <td style="padding: calc(var(--grid) * 1); color: var(--mono-400);">Chain ID</td>
-            <td style="padding: calc(var(--grid) * 1);">${block.chainId || 'N/A'}</td>
-          </tr>
-          <tr>
-            <td style="padding: calc(var(--grid) * 1); color: var(--mono-400);">Gas Used</td>
-            <td style="padding: calc(var(--grid) * 1);">${gasUsed}</td>
-          </tr>
-        </table>
-        
-        <div style="margin-top: calc(var(--grid) * 3); border-top: var(--border); padding-top: calc(var(--grid) * 2);">
-          <h3 style="font-size: 14px; margin-bottom: calc(var(--grid) * 2);">Transactions (${block.transactions ? block.transactions.length : 0})</h3>
-          ${block.transactions && block.transactions.length > 0 ? 
-            block.transactions.map(tx => `
-              <div style="
-                border: var(--border);
-                padding: calc(var(--grid) * 2);
-                margin-bottom: calc(var(--grid) * 1);
-                font-size: 11px;
-              ">
-                <div><strong>Type:</strong> ${tx.type}</div>
-                <div><strong>ID:</strong> <span style="font-family: monospace;">${tx.id}</span></div>
-                ${tx.data.from ? `<div><strong>From:</strong> <span style="font-family: monospace;">${tx.data.from}</span></div>` : ''}
-                ${tx.data.to ? `<div><strong>To:</strong> <span style="font-family: monospace;">${tx.data.to}</span></div>` : ''}
-                ${tx.data.amount ? `<div><strong>Amount:</strong> ${tx.data.amount} SAYM</div>` : ''}
-                ${tx.gasUsed ? `<div><strong>Gas Used:</strong> ${tx.gasUsed}</div>` : ''}
-              </div>
-            `).join('') 
-            : '<p style="color: var(--mono-400); font-size: 12px;">No transactions</p>'
-          }
-        </div>
-      </div>
+      ${(b.transactions?.length
+        ? b.transactions.map(tx => `
+            <div style="border:var(--border);padding:calc(var(--grid)*2);margin-bottom:4px;font-size:11px">
+              <div><strong>Type:</strong> ${tx.type}</div>
+              <div><strong>ID:</strong> <span class="mono">${tx.id}</span></div>
+              ${tx.data?.from   ? `<div><strong>From:</strong> <span class="mono">${tx.data.from}</span></div>`   : ''}
+              ${tx.data?.to     ? `<div><strong>To:</strong> <span class="mono">${tx.data.to}</span></div>`     : ''}
+              ${tx.data?.amount ? `<div><strong>Amount:</strong> ${sayn(tx.data.amount)}</div>`                 : ''}
+              ${tx.gasUsed      ? `<div><strong>Gas:</strong> ${tx.gasUsed}</div>`                              : ''}
+            </div>
+          `).join('')
+        : '<p style="color:var(--mono-400);font-size:12px">No transactions in this block</p>'
+      )}
     </div>
-  `;
-  
-  modal.onclick = (e) => {
-    if (e.target === modal) {
-      modal.remove();
-    }
-  };
-  
+  `);
   document.body.appendChild(modal);
 }
 
-// Load validators - FIXED: Show all validators properly
+// ── Validators ────────────────────────────────────────────────────────────────
 async function loadValidators() {
+  const tbody = document.getElementById('validator-list');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="padding:calc(var(--grid)*2);color:var(--mono-400);font-size:12px;">Loading…</td></tr>`;
+
   try {
-    const res = await fetch(`${apiBase}/validators`);
-    const data = await res.json();
-    
-    const tbody = document.getElementById('validator-list');
+    const data = await apiFetch('/validators');
+    const validators = data.validators || [];
+
     if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    console.log('Validators data:', data);
-    
-    if (!data.validators || data.validators.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--mono-400);">No validators found</td></tr>';
+
+    if (!validators.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:calc(var(--grid)*3);text-align:center;color:var(--mono-400)">No validators found</td></tr>`;
       return;
     }
-    
-    // FIXED: Show all validators
-    data.validators.forEach(validator => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td class="mono">${validator.address ? validator.address.substring(0, 20) + '...' : 'Unknown'}</td>
-        <td>${validator.stake || 0} SAYM</td>
-        <td>${validator.percentage || 0}%</td>
-        <td>${validator.missedBlocks || 0}</td>
-      `;
-      
-      // Add hover tooltip
-      row.title = `Validator: ${validator.address || 'Unknown'}
-Stake: ${validator.stake || 0} SAYM
-Share: ${validator.percentage || 0}%
-Missed Blocks: ${validator.missedBlocks || 0}
-Status: ${validator.isActive ? 'Active' : 'Inactive'}`;
-      
-      tbody.appendChild(row);
-    });
-  } catch (error) {
-    console.error('Error loading validators:', error);
-    const tbody = document.getElementById('validator-list');
-    if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #ef4444;">Error loading validators</td></tr>';
-    }
+
+    tbody.innerHTML = validators.map(v => `
+      <tr style="cursor:pointer" onclick="showValidatorDetail('${v.address || ''}')"
+          title="Click to see blocks validated by this address">
+        <td class="mono">${(v.address || '').slice(0, 20)}…</td>
+        <td>${sayn(v.stake ?? 0)}</td>
+        <td>${v.percentage ?? 0}%</td>
+        <td>${v.missedBlocks ?? 0}</td>
+        <td>
+          <span style="font-size:11px;padding:2px 8px;border:1px solid ${v.isActive ? '#2a7a2a' : 'var(--mono-800)'};color:${v.isActive ? '#2a7a2a' : 'var(--mono-400)'}">
+            ${v.isActive ? 'Active' : 'Inactive'}
+          </span>
+        </td>
+      </tr>
+    `).join('');
+
+    // summary row
+    setEl('val-total-stake', sayn(data.totalStake ?? 0));
+    setEl('val-apr',         (data.estimatedAPR ?? 0) + '%');
+    setEl('val-count',       validators.length);
+
+  } catch (e) {
+    console.error('Validators:', e);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="padding:calc(var(--grid)*2);color:#c00;font-size:12px;">Failed to load validators</td></tr>`;
   }
 }
 
-// Load contracts
+// Show blocks validated by a specific address
+async function showValidatorDetail(address) {
+  if (!address) return;
+
+  const modal = makeModal(
+    `Validator: ${address.slice(0, 20)}…`,
+    `<div id="vd-loading" style="color:var(--mono-400);font-size:12px;padding:calc(var(--grid)*2)">Loading blocks…</div>`
+  );
+  document.body.appendChild(modal);
+
+  try {
+    // Fetch all blocks and filter — replace with a dedicated endpoint if you add one later
+    const data   = await apiFetch(`/blocks?page=1&limit=200`);
+    const blocks = (data.blocks || [])
+      .filter(b => (b.validator || '').toLowerCase() === address.toLowerCase())
+      .sort((a, b) => b.index - a.index);
+
+    const container = modal.querySelector('#vd-loading');
+    if (!container) return;
+
+    if (!blocks.length) {
+      container.textContent = 'No blocks validated by this address (in last 200 blocks).';
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="font-size:12px;color:var(--mono-400);margin-bottom:calc(var(--grid)*2)">
+        ${blocks.length} block${blocks.length !== 1 ? 's' : ''} validated (last 200 checked)
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="border-bottom:var(--border)">
+          <tr>
+            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:11px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em">Block</th>
+            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:11px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em">Hash</th>
+            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:11px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em">Txs</th>
+            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:11px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em">Gas</th>
+            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:11px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${blocks.map(b => `
+            <tr style="border-bottom:1px solid var(--mono-900)">
+              <td style="padding:calc(var(--grid)*1)">#${b.index}</td>
+              <td style="padding:calc(var(--grid)*1);font-family:'SF Mono',monospace;font-size:11px">${(b.hash||'').slice(0,20)}…</td>
+              <td style="padding:calc(var(--grid)*1)">${b.transactions?.length ?? 0}</td>
+              <td style="padding:calc(var(--grid)*1)">${(b.gasUsed ?? 0).toLocaleString()}</td>
+              <td style="padding:calc(var(--grid)*1)">${fmtTime(b.timestamp)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (e) {
+    const c = modal.querySelector('#vd-loading');
+    if (c) c.textContent = 'Error loading validator blocks.';
+  }
+}
+
+// ── Contracts ─────────────────────────────────────────────────────────────────
 async function loadContracts() {
   try {
-    const res = await fetch(`${apiBase}/contracts`);
-    const data = await res.json();
-    
-    const tbody = document.getElementById('contract-list');
+    const data      = await apiFetch('/contracts');
+    const contracts = data.contracts || [];
+    const tbody     = document.getElementById('contract-list');
     if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    if (!data.contracts || data.contracts.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--mono-400);">No contracts deployed yet</td></tr>';
+
+    if (!contracts.length) {
+      tbody.innerHTML = `<tr><td colspan="3" style="padding:calc(var(--grid)*3);text-align:center;color:var(--mono-400)">No contracts deployed yet</td></tr>`;
       return;
     }
-    
-    data.contracts.forEach(contract => {
-      const row = document.createElement('tr');
-      const codeSize = contract.code ? contract.code.length : 0;
-      
-      row.innerHTML = `
-        <td class="mono">${contract.address ? contract.address.substring(0, 20) + '...' : 'Unknown'}</td>
-        <td class="mono">${contract.creator ? contract.creator.substring(0, 20) + '...' : 'Unknown'}</td>
-        <td>${codeSize} bytes</td>
-      `;
-      
-      // Add hover tooltip
-      row.title = `Contract: ${contract.address || 'Unknown'}
-Creator: ${contract.creator || 'Unknown'}
-Code Size: ${codeSize} bytes
-Created: ${contract.createdAt ? new Date(contract.createdAt).toLocaleString() : 'Unknown'}`;
-      
-      row.style.cursor = 'pointer';
-      
-      tbody.appendChild(row);
-    });
-  } catch (error) {
-    console.error('Error loading contracts:', error);
-  }
+
+    tbody.innerHTML = contracts.map(c => `
+      <tr>
+        <td class="mono">${(c.address || '').slice(0, 20)}…</td>
+        <td class="mono">${(c.creator || '').slice(0, 20)}…</td>
+        <td>${(c.code?.length ?? 0).toLocaleString()} bytes</td>
+      </tr>
+    `).join('');
+  } catch (e) { console.error('Contracts:', e); }
 }
 
-// Load network stats
-async function loadNetworkStats() {
+// ── Network ───────────────────────────────────────────────────────────────────
+async function loadNetwork() {
   try {
-    const res = await fetch(`${apiBase}/network/stats`);
-    const data = await res.json();
-    
-    // Update stat cards
-    document.getElementById('net-peers').textContent = data.peers || 0;
-    document.getElementById('net-height').textContent = data.blockHeight || 0;
-    document.getElementById('net-blocktime').textContent = data.averageBlockTime || 0;
-    document.getElementById('net-mempool').textContent = data.mempool || 0;
-    
-    // Update network info table
-    document.getElementById('net-node-id').textContent = data.nodeId ? data.nodeId.substring(0, 32) + '...' : 'Unknown';
-    document.getElementById('net-mode').textContent = data.mode ? data.mode.toUpperCase() : 'Unknown';
-    document.getElementById('net-network').textContent = data.network || 'Unknown';
-    document.getElementById('net-chain').textContent = data.chainId || 'Unknown';
-    document.getElementById('net-uptime').textContent = formatUptime(data.uptime || 0);
-    
-    // Update peer list
-    const peerListDiv = document.getElementById('peer-list');
-    peerListDiv.innerHTML = '';
-    
-    if (!data.peerList || data.peerList.length === 0) {
-      peerListDiv.innerHTML = '<p style="color: var(--mono-400); padding: 1rem;">No peers connected</p>';
-      return;
-    }
-    
-    data.peerList.forEach(peer => {
-      const peerDiv = document.createElement('div');
-      peerDiv.style.cssText = `
-        padding: 1rem;
-        border: var(--border);
-        margin-bottom: 0.5rem;
-        font-size: 12px;
-        font-family: 'SF Mono', monospace;
-      `;
-      
-      const lastSeenAgo = Math.floor((Date.now() - peer.lastSeen) / 1000);
-      
-      peerDiv.innerHTML = `
-        <div><strong>Node ID:</strong> ${peer.nodeId ? peer.nodeId.substring(0, 16) + '...' : 'Unknown'}</div>
-        <div><strong>Chain Height:</strong> ${peer.chainHeight || 'Unknown'}</div>
-        <div><strong>Last Seen:</strong> ${lastSeenAgo}s ago</div>
-      `;
-      
-      peerListDiv.appendChild(peerDiv);
-    });
-    
-  } catch (error) {
-    console.error('Error loading network stats:', error);
-    document.getElementById('net-peers').textContent = '0';
-    document.getElementById('net-height').textContent = '0';
-    document.getElementById('net-blocktime').textContent = '0';
-    document.getElementById('net-mempool').textContent = '0';
-    document.getElementById('net-node-id').textContent = 'Loading...';
-    document.getElementById('net-mode').textContent = 'Loading...';
-    document.getElementById('net-network').textContent = 'Loading...';
-    document.getElementById('net-chain').textContent = 'Loading...';
-    document.getElementById('net-uptime').textContent = 'Loading...';
-  }
+    const d = await apiFetch('/network/stats');
+
+    setEl('net-peers',     d.peers       ?? 0);
+    setEl('net-height',    d.blockHeight ?? 0);
+    setEl('net-blocktime', Math.round(d.averageBlockTime || 5000));
+    setEl('net-mempool',   d.mempool     ?? 0);
+    setEl('net-node-id',   (d.nodeId  || '').slice(0, 32) + '…');
+    setEl('net-mode',      (d.mode    || '—').toUpperCase());
+    setEl('net-network',   d.network  || '—');
+    setEl('net-chain',     d.chainId  || '—');
+    setEl('net-uptime',    fmtUptime(d.uptime || 0));
+
+    const peerDiv = document.getElementById('peer-list');
+    if (!peerDiv) return;
+
+    const peers = d.peerList || [];
+    peerDiv.innerHTML = peers.length
+      ? peers.map(p => `
+          <div class="peer-row">
+            <div><strong>Node ID:</strong> ${(p.nodeId || '—').slice(0, 20)}…</div>
+            <div><strong>Height:</strong> ${p.chainHeight ?? '—'}</div>
+            <div><strong>Last seen:</strong> ${fmtTimeAgo(p.lastSeen)}</div>
+          </div>
+        `).join('')
+      : '<p style="color:var(--mono-400);padding:calc(var(--grid)*2);font-size:12px;">No peers connected</p>';
+
+  } catch (e) { console.error('Network:', e); }
 }
 
-// Format uptime
-function formatUptime(seconds) {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  
+// ── Modal helper ──────────────────────────────────────────────────────────────
+function makeModal(title, bodyHtml) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:calc(var(--grid)*4)`;
+  overlay.innerHTML = `
+    <div style="background:var(--mono-1000);border:var(--border);max-width:820px;width:100%;max-height:82vh;display:flex;flex-direction:column">
+      <div style="border-bottom:var(--border);padding:calc(var(--grid)*2) calc(var(--grid)*3);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+        <span style="font-size:14px;font-weight:500">${title}</span>
+        <button onclick="this.closest('[style*=inset]').remove()"
+                style="background:none;border:var(--border);padding:4px 10px;cursor:pointer;font-size:11px;letter-spacing:.06em">CLOSE</button>
+      </div>
+      <div style="padding:calc(var(--grid)*3);overflow-y:auto;flex:1">${bodyHtml}</div>
+    </div>
+  `;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  return overlay;
+}
+
+function detailRow(label, value) {
+  return `<tr style="border-bottom:1px solid var(--mono-900)">
+    <td style="padding:calc(var(--grid)*1.5);color:var(--mono-400);white-space:nowrap;width:120px">${label}</td>
+    <td style="padding:calc(var(--grid)*1.5)">${value}</td>
+  </tr>`;
+}
+
+// ── API helper ────────────────────────────────────────────────────────────────
+async function apiFetch(path) {
+  const res = await fetch(API + path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+function setEl(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = (value === null || value === undefined) ? '—' : value;
+}
+
+function fmtTime(ts) {
+  if (ts === null || ts === undefined || ts === '') return '—';
+  const n = Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  try { return new Date(n).toLocaleString(); } catch { return '—'; }
+}
+
+function fmtTimeAgo(ts) {
+  if (!ts) return '—';
+  const d = Date.now() - Number(ts);
+  if (d < 60000)    return Math.round(d / 1000)   + 's ago';
+  if (d < 3600000)  return Math.round(d / 60000)  + 'm ago';
+  return Math.round(d / 3600000) + 'h ago';
+}
+
+function fmtUptime(s) {
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
+        m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
   const parts = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0) parts.push(`${minutes}m`);
-  parts.push(`${secs}s`);
-  
+  if (d) parts.push(`${d}d`);
+  if (h) parts.push(`${h}h`);
+  if (m) parts.push(`${m}m`);
+  parts.push(`${sec}s`);
   return parts.join(' ');
 }
 
-// Wallet functions
-function loadWallet() {
-  const saved = localStorage.getItem('sayman_wallet');
-  if (saved) {
-    currentWallet = JSON.parse(saved);
-    displayWallet();
-  }
+// sayn(baseUnits, withUnit=true) → "1.2345 SAYN" or "1.2345"
+function sayn(baseUnits, withUnit = true) {
+  if (baseUnits === null || baseUnits === undefined) return '—';
+  const v = Number(baseUnits) / 10000;
+  return Number.isFinite(v) ? v.toFixed(4) + (withUnit ? ' SAYN' : '') : '—';
 }
 
-function displayWallet() {
-  if (currentWallet) {
-    const walletInfo = document.getElementById('wallet-info');
-    if (walletInfo) {
-      walletInfo.classList.remove('hidden');
-      document.getElementById('wallet-address').value = currentWallet.address;
-      document.getElementById('wallet-key').value = currentWallet.privateKey;
-    }
-  }
-}
-
-async function createWallet() {
-  try {
-    showLoading('Creating wallet...');
-    
-    const wallet = new SaymanWallet();
-    await wallet.initialize();
-    
-    currentWallet = wallet.export();
-    saveWallet(currentWallet);
-    displayWallet();
-    
-    hideLoading();
-    showResult('wallet', '✅ Wallet created CLIENT-SIDE! Your private key never left your browser. Save it securely!', 'success');
-  } catch (error) {
-    hideLoading();
-    showResult('wallet', 'Error creating wallet: ' + error.message, 'error');
-  }
-}
-
-async function importWallet() {
-  const privateKey = prompt('Enter your private key:');
-  if (privateKey) {
-    try {
-      showLoading('Importing wallet...');
-      
-      const wallet = new SaymanWallet(privateKey);
-      await wallet.initialize();
-      
-      currentWallet = wallet.export();
-      saveWallet(currentWallet);
-      displayWallet();
-      
-      hideLoading();
-      showResult('wallet', '✅ Wallet imported successfully!', 'success');
-    } catch (error) {
-      hideLoading();
-      showResult('wallet', 'Invalid private key', 'error');
-    }
-  }
-}
-
-function saveWallet(wallet) {
-  localStorage.setItem('sayman_wallet', JSON.stringify(wallet));
-}
-
-function toggleKey() {
-  const keyInput = document.getElementById('wallet-key');
-  const btn = event.target;
-  if (keyInput.type === 'password') {
-    keyInput.type = 'text';
-    btn.textContent = 'Hide';
-  } else {
-    keyInput.type = 'password';
-    btn.textContent = 'Show';
-  }
-}
-
-function copyAddress() {
-  const addr = document.getElementById('wallet-address');
-  addr.select();
-  document.execCommand('copy');
-  showNotification('Address copied!');
-}
-
-function copyKey() {
-  const key = document.getElementById('wallet-key');
-  const originalType = key.type;
-  key.type = 'text';
-  key.select();
-  document.execCommand('copy');
-  key.type = originalType;
-  showNotification('Private key copied!');
-}
-
-// Gas estimation helper
-async function estimateGas(type, data) {
-  try {
-    const res = await fetch(`${apiBase}/estimate-gas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, data })
-    });
-    return await res.json();
-  } catch (error) {
-    console.error('Gas estimation error:', error);
-    return { estimatedGas: 50000, recommendedGasLimit: 60000, minGasPrice: 1 };
-  }
-}
-
-// Send transaction - CLIENT-SIDE SIGNING
-async function sendTransaction() {
-  const to = document.getElementById('send-to').value;
-  const amount = parseFloat(document.getElementById('send-amount').value);
-  const privateKey = document.getElementById('send-key').value;
-
-  if (!to || !amount || !privateKey) {
-    showResult('send', 'Please fill all fields', 'error');
-    return;
-  }
-
-  try {
-    showLoading('Estimating gas...');
-    
-    const wallet = new SaymanWallet(privateKey);
-    await wallet.initialize();
-    
-    // Get nonce
-    const addressData = await fetch(`${apiBase}/address/${wallet.address}`);
-    const { nonce } = await addressData.json();
-    
-    // Estimate gas
-    const gasEstimate = await estimateGas('TRANSFER', { from: wallet.address, to, amount });
-    
-    hideLoading();
-    showLoading('Signing transaction...');
-    
-    const txData = {
-      type: 'TRANSFER',
-      data: { from: wallet.address, to, amount },
-      timestamp: Date.now(),
-      gasLimit: gasEstimate.recommendedGasLimit,
-      gasPrice: gasEstimate.minGasPrice,
-      nonce: nonce
-    };
-    
-    const signature = await wallet.signTransaction(txData);
-    
-    const signedTx = {
-      ...txData,
-      signature: signature,
-      publicKey: wallet.publicKey
-    };
-    
-    hideLoading();
-    showLoading('Broadcasting...');
-    
-    const res = await fetch(`${apiBase}/broadcast`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(signedTx)
-    });
-
-    const data = await res.json();
-    hideLoading();
-
-    if (data.success) {
-      showResult('send', `✅ Transaction broadcast! Gas: ${data.gasLimit} @ ${data.gasPrice} (Max cost: ${data.maxGasCost})`, 'success');
-      document.getElementById('send-to').value = '';
-      document.getElementById('send-amount').value = '';
-      document.getElementById('send-key').value = '';
-      updateStats();
-    } else {
-      showResult('send', data.error || 'Transaction failed', 'error');
-    }
-  } catch (error) {
-    hideLoading();
-    showResult('send', error.message, 'error');
-  }
-}
-
-// Stake - CLIENT-SIDE SIGNING
-async function stakeTokens() {
-  const amount = parseFloat(document.getElementById('stake-amount').value);
-  const privateKey = document.getElementById('stake-key').value;
-
-  if (!amount || !privateKey) {
-    showResult('stake', 'Please fill all fields', 'error');
-    return;
-  }
-
-  if (networkConfig && amount < networkConfig.minStake) {
-    showResult('stake', `Minimum stake is ${networkConfig.minStake} SAYM`, 'error');
-    return;
-  }
-
-  try {
-    showLoading('Estimating gas...');
-    
-    const wallet = new SaymanWallet(privateKey);
-    await wallet.initialize();
-    
-    const addressData = await fetch(`${apiBase}/address/${wallet.address}`);
-    const { nonce } = await addressData.json();
-    
-    const gasEstimate = await estimateGas('STAKE', { from: wallet.address, amount });
-    
-    hideLoading();
-    showLoading('Signing stake transaction...');
-    
-    const txData = {
-      type: 'STAKE',
-      data: { from: wallet.address, amount },
-      timestamp: Date.now(),
-      gasLimit: gasEstimate.recommendedGasLimit,
-      gasPrice: gasEstimate.minGasPrice,
-      nonce: nonce
-    };
-    
-    const signature = await wallet.signTransaction(txData);
-    
-    const signedTx = {
-      ...txData,
-      signature: signature,
-      publicKey: wallet.publicKey
-    };
-    
-    hideLoading();
-    showLoading('Broadcasting...');
-    
-    const res = await fetch(`${apiBase}/broadcast`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(signedTx)
-    });
-
-    const data = await res.json();
-    hideLoading();
-
-    if (data.success) {
-      showResult('stake', `✅ Stake broadcast! Gas: ${data.gasLimit} (Max cost: ${data.maxGasCost})`, 'success');
-      document.getElementById('stake-amount').value = '';
-      document.getElementById('stake-key').value = '';
-      updateStats();
-    } else {
-      showResult('stake', data.error || 'Staking failed', 'error');
-    }
-  } catch (error) {
-    hideLoading();
-    showResult('stake', error.message, 'error');
-  }
-}
-
-// Unstake tokens
-async function unstakeTokens() {
-  const privateKey = document.getElementById('unstake-key').value;
-
-  if (!privateKey) {
-    showResult('stake', 'Please enter private key', 'error');
-    return;
-  }
-
-  try {
-    showLoading('Signing unstake transaction...');
-    
-    const wallet = new SaymanWallet(privateKey);
-    await wallet.initialize();
-    
-    const addressData = await fetch(`${apiBase}/address/${wallet.address}`);
-    const { nonce } = await addressData.json();
-    
-    const gasEstimate = await estimateGas('UNSTAKE', { from: wallet.address });
-    
-    const txData = {
-      type: 'UNSTAKE',
-      data: { from: wallet.address },
-      timestamp: Date.now(),
-      gasLimit: gasEstimate.recommendedGasLimit,
-      gasPrice: gasEstimate.minGasPrice,
-      nonce: nonce
-    };
-    
-    const signature = await wallet.signTransaction(txData);
-    
-    const signedTx = {
-      ...txData,
-      signature: signature,
-      publicKey: wallet.publicKey
-    };
-    
-    hideLoading();
-    showLoading('Broadcasting...');
-    
-    const res = await fetch(`${apiBase}/broadcast`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(signedTx)
-    });
-
-    const data = await res.json();
-    hideLoading();
-
-    if (data.success) {
-      showResult('stake', `✅ Unstake initiated! Funds available at block ${data.unlockBlock}`, 'success');
-      document.getElementById('unstake-key').value = '';
-      updateStats();
-    } else {
-      showResult('stake', data.error || 'Unstaking failed', 'error');
-    }
-  } catch (error) {
-    hideLoading();
-    showResult('stake', error.message, 'error');
-  }
-}
-
-// Deploy contract - CLIENT-SIDE SIGNING
-async function deployContract() {
-  const code = document.getElementById('contract-code').value;
-  const privateKey = document.getElementById('deploy-key').value;
-
-  if (!code || !privateKey) {
-    showResult('contract', 'Please fill all fields', 'error');
-    return;
-  }
-
-  try {
-    showLoading('Signing contract deployment...');
-    
-    const wallet = new SaymanWallet(privateKey);
-    await wallet.initialize();
-    
-    const addressData = await fetch(`${apiBase}/address/${wallet.address}`);
-    const { nonce } = await addressData.json();
-    
-    const gasEstimate = await estimateGas('CONTRACT_DEPLOY', { from: wallet.address, code });
-    
-    const txData = {
-      type: 'CONTRACT_DEPLOY',
-      data: { from: wallet.address, code },
-      timestamp: Date.now(),
-      gasLimit: gasEstimate.recommendedGasLimit,
-      gasPrice: gasEstimate.minGasPrice,
-      nonce: nonce
-    };
-    
-    const signature = await wallet.signTransaction(txData);
-    
-    const signedTx = {
-      ...txData,
-      signature: signature,
-      publicKey: wallet.publicKey
-    };
-    
-    hideLoading();
-    showLoading('Broadcasting...');
-    
-    const res = await fetch(`${apiBase}/broadcast`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(signedTx)
-    });
-
-    const data = await res.json();
-    hideLoading();
-
-    if (data.success) {
-      showResult('contract', '✅ Contract deployment signed and broadcast!', 'success');
-      document.getElementById('contract-code').value = '';
-      document.getElementById('deploy-key').value = '';
-      setTimeout(loadContracts, 6000);
-    } else {
-      showResult('contract', data.error || 'Deploy failed', 'error');
-    }
-  } catch (error) {
-    hideLoading();
-    showResult('contract', error.message, 'error');
-  }
-}
-
-// Call contract - CLIENT-SIDE SIGNING
-async function callContract() {
-  const contractAddress = document.getElementById('call-address').value;
-  const method = document.getElementById('call-method').value;
-  const argsText = document.getElementById('call-args').value;
-  const privateKey = document.getElementById('call-key').value;
-
-  if (!contractAddress || !method || !privateKey) {
-    showResult('contract', 'Please fill required fields', 'error');
-    return;
-  }
-
-  try {
-    showLoading('Signing contract call...');
-    
-    const wallet = new SaymanWallet(privateKey);
-    await wallet.initialize();
-    
-    const addressData = await fetch(`${apiBase}/address/${wallet.address}`);
-    const { nonce } = await addressData.json();
-    
-    const args = argsText ? JSON.parse(argsText) : {};
-    
-    const gasEstimate = await estimateGas('CONTRACT_CALL', { from: wallet.address, contractAddress, method, args });
-    
-    const txData = {
-      type: 'CONTRACT_CALL',
-      data: { from: wallet.address, contractAddress, method, args },
-      timestamp: Date.now(),
-      gasLimit: gasEstimate.recommendedGasLimit,
-      gasPrice: gasEstimate.minGasPrice,
-      nonce: nonce
-    };
-    
-    const signature = await wallet.signTransaction(txData);
-    
-    const signedTx = {
-      ...txData,
-      signature: signature,
-      publicKey: wallet.publicKey
-    };
-    
-    hideLoading();
-    showLoading('Broadcasting...');
-    
-    const res = await fetch(`${apiBase}/broadcast`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(signedTx)
-    });
-
-    const data = await res.json();
-    hideLoading();
-
-    if (data.success) {
-      showResult('contract', '✅ Contract call signed and broadcast!', 'success');
-      document.getElementById('call-address').value = '';
-      document.getElementById('call-method').value = '';
-      document.getElementById('call-args').value = '';
-      document.getElementById('call-key').value = '';
-      setTimeout(() => loadContracts(), 6000);
-    } else {
-      showResult('contract', data.error || 'Call failed', 'error');
-    }
-  } catch (error) {
-    hideLoading();
-    showResult('contract', error.message, 'error');
-  }
-}
-
-// Faucet
-async function claimFaucet() {
-  const address = document.getElementById('faucet-address').value.trim();
-
-  if (!address) {
-    showResult('faucet', 'Please enter a wallet address', 'error');
-    return;
-  }
-
-  try {
-    showLoading('Requesting faucet...');
-
-    const res = await fetch(`${apiBase}/faucet`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address })
-    });
-
-    const data = await res.json();
-    hideLoading();
-
-    if (data.success) {
-      showResult('faucet', `✅ ${data.amount} SAYM credited (pending in mempool)`, 'success');
-      document.getElementById('faucet-address').value = '';
-      updateStats();
-    } else {
-      showResult('faucet', data.error || 'Faucet request failed', 'error');
-    }
-  } catch (error) {
-    hideLoading();
-    showResult('faucet', error.message, 'error');
-  }
-}
-
-// Utility functions
-function showResult(page, message, type) {
-  const resultDiv = document.getElementById(`${page}-result`);
-  if (resultDiv) {
-    resultDiv.textContent = message;
-    resultDiv.className = `result ${type}`;
-    setTimeout(() => {
-      resultDiv.textContent = '';
-      resultDiv.className = 'result';
-    }, 5000);
-  }
-}
-
-function showLoading(message) {
-  const overlay = document.createElement('div');
-  overlay.id = 'loading-overlay';
-  overlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-    color: white;
-    font-size: 1.5rem;
-    font-weight: 600;
-  `;
-  overlay.textContent = message;
-  document.body.appendChild(overlay);
-}
-
-function hideLoading() {
-  const overlay = document.getElementById('loading-overlay');
-  if (overlay) {
-    overlay.remove();
-  }
-}
-
-function showNotification(message) {
-  const notification = document.createElement('div');
-  notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #10b981;
-    color: white;
-    padding: 1rem 2rem;
-    border-radius: 12px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-    z-index: 10000;
-    animation: slideIn 0.3s ease;
-  `;
-  notification.textContent = message;
-  document.body.appendChild(notification);
-  
-  setTimeout(() => {
-    notification.remove();
-  }, 3000);
-}
-
-// Auto-refresh network stats when on network page
-setInterval(() => {
-  const networkPage = document.getElementById('network');
-  if (networkPage && networkPage.classList.contains('active')) {
-    loadNetworkStats();
-  }
-}, 3000);
-
-// Auto-refresh explorer when on explorer page
-setInterval(() => {
-  const explorerPage = document.getElementById('explorer');
-  if (explorerPage && explorerPage.classList.contains('active')) {
-    loadExplorerBlocks(currentPage);
-  }
-}, 3000);
-
-// Initialize explorer when page loads
-if (document.getElementById('explorer')) {
-  loadExplorerBlocks(1);
+function showNotification(msg) {
+  const n = document.createElement('div');
+  n.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--mono-100);color:var(--mono-1000);padding:8px 16px;font-size:12px;letter-spacing:.05em;z-index:10000;';
+  n.textContent = msg;
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 2500);
 }
