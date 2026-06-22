@@ -3,14 +3,14 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import crypto from 'crypto';                // ✅ top-level ESM import — no await/require mix
+import crypto from 'crypto';
 import Blockchain from './core/blockchain.js';
 import { P2PServer } from './p2p/server.js';
 import { setupRoutes } from './api/routes.js';
 import { loadConfig } from './config/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
@@ -22,9 +22,6 @@ let p2pServer;
 let miningInterval;
 let server;
 
-// ── Persistent Node ID ───────────────────────────────────────────────────────
-// Keeps the same nodeId across restarts.
-// Stored in dbPath/node-id.txt (survives Render restarts if disk is mounted).
 function loadOrCreateNodeId(dbPath) {
   const idFile = path.join(dbPath, 'node-id.txt');
   try {
@@ -34,8 +31,7 @@ function loadOrCreateNodeId(dbPath) {
     }
   } catch {}
 
-  // ✅ crypto is already imported at the top — no await, no require
-  const id = crypto.randomBytes(16).toString('hex'); // 32 hex chars
+  const id = crypto.randomBytes(16).toString('hex');
   try {
     fs.mkdirSync(dbPath, { recursive: true });
     fs.writeFileSync(idFile, id);
@@ -45,21 +41,19 @@ function loadOrCreateNodeId(dbPath) {
 
 async function startServer() {
   try {
-    // ── Parse CLI args ────────────────────────────────────────────────────────
     const args = process.argv.slice(2);
-    let networkFlag = 'testnet';
-    let modeFlag    = 'validator';
+    let networkFlag = 'public-testnet';
+    let modeFlag = 'validator';
 
     for (let i = 0; i < args.length; i++) {
       if (args[i] === '--network' && args[i + 1]) networkFlag = args[i + 1];
-      if (args[i] === '--mode'    && args[i + 1]) modeFlag    = args[i + 1];
+      if (args[i] === '--mode' && args[i + 1]) modeFlag = args[i + 1];
     }
 
     const config = loadConfig(networkFlag);
-    const mode   = modeFlag;
+    const mode = modeFlag;
     const dbPath = process.env.DB_PATH || '/tmp/sayman-data';
 
-    // ── Startup banner ────────────────────────────────────────────────────────
     console.log('\n╔════════════════════════════════════════╗');
     console.log('║   SAYMAN BLOCKCHAIN - PHASE 7          ║');
     console.log('║   Public Network + Real P2P            ║');
@@ -69,61 +63,53 @@ async function startServer() {
     console.log(`📛 Network Name: ${config.networkName}`);
     console.log(`🔗 Chain ID: ${config.chainId}`);
     console.log(`🌐 API Port: ${config.apiPort}`);
-    console.log(`📡 P2P Port: ${config.p2pPort || 'HTTP Server Attached'}`);
     console.log(`⏱️  Block Time: ${config.blockTime}ms`);
     console.log(`💰 Block Reward: ${(config.blockReward / (config.decimals || 10000)).toFixed(4)} SAYN`);
-    console.log(`🎯 Min Stake: ${(config.minStake / (config.decimals || 10000)).toFixed(4)} SAYN`);
-    console.log(`⏳ Unstake Delay: ${config.unstakeDelay} blocks`);
-    console.log(`🚰 Faucet: ${config.faucetEnabled ? 'ENABLED ✅' : 'DISABLED ❌'}`);
     console.log(`👥 Max Peers: ${config.maxPeers}`);
-    console.log(`🔗 Bootstrap Peers: ${config.bootstrapPeers?.length > 0 ? config.bootstrapPeers.join(', ') : 'None (standalone mode)'}`);
-    console.log(`📁 Database path: ${dbPath}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}\n`);
+    console.log(`🔗 Bootstrap Peers: ${config.bootstrapPeers?.length > 0 ? config.bootstrapPeers.join(', ') : 'None'}`);
+    console.log(`📁 Database path: ${dbPath}\n`);
 
-    // ── Node ID ───────────────────────────────────────────────────────────────
     const nodeId = loadOrCreateNodeId(dbPath);
     console.log(`📡 Node ID: ${nodeId}`);
 
-    // ── Blockchain ────────────────────────────────────────────────────────────
     blockchain = new Blockchain(config, dbPath);
     await blockchain.initialize();
 
-    // ── P2P ───────────────────────────────────────────────────────────────────
     p2pServer = new P2PServer(blockchain, config.p2pPort);
 
-    // ── Routes ────────────────────────────────────────────────────────────────
+    // ── Set bootstrap peers for auto-discovery ────────────────────
+    if (config.bootstrapPeers?.length > 0) {
+      p2pServer.setBootstrapPeers(config.bootstrapPeers);
+    }
+
     setupRoutes(app, blockchain, p2pServer, config);
 
-    // ── Health check (Render keep-alive) ──────────────────────────────────────
     app.get('/health', (_req, res) => {
       res.status(200).json({
-        status:    'ok',
+        status: 'ok',
         timestamp: Date.now(),
-        network:   blockchain.networkName,
-        blocks:    blockchain.chain.length,
-        peers:     p2pServer ? p2pServer.peers.size : 0,
+        network: blockchain.networkName,
+        blocks: blockchain.chain.length,
+        peers: p2pServer ? p2pServer.peers.size : 0,
       });
     });
 
-    // ── HTTP server ───────────────────────────────────────────────────────────
     const PORT = config.apiPort;
 
     server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`\n🚀 API server running on port ${PORT}`);
       console.log(`🔗 Mode: ${mode.toUpperCase()}`);
 
-      // ── Attach P2P to the HTTP server (WebSocket at /p2p) ─────────────────
       if (mode === 'validator' || mode === 'full') {
         try {
           p2pServer.listen(server);
         } catch (err) {
           console.error('❌ P2P server failed to start:', err.message);
-          console.log('⚠️  Continuing in API-only mode');
+          console.log('⚠️ Continuing in API-only mode');
         }
       }
 
-      // ── Connect to bootstrap peers ─────────────────────────────────────────
-      // Small delay so our server is ready before opening outbound connections
+      // ── Connect to bootstrap peers ──────────────────────────────
       if (config.bootstrapPeers?.length > 0) {
         console.log(`\n🔗 Connecting to ${config.bootstrapPeers.length} bootstrap peer(s)...`);
         setTimeout(() => {
@@ -131,15 +117,14 @@ async function startServer() {
         }, 2000);
       }
 
-      // ── Start mining ───────────────────────────────────────────────────────
       if (mode === 'validator') {
-        console.log('\n⛏️  Starting block production...');
+        console.log('\n⛏️ Starting block production...');
         startMining();
       }
     });
 
     process.on('SIGTERM', gracefulShutdown);
-    process.on('SIGINT',  gracefulShutdown);
+    process.on('SIGINT', gracefulShutdown);
 
   } catch (err) {
     console.error('❌ Fatal error during startup:', err);
@@ -166,7 +151,7 @@ function gracefulShutdown() {
   console.log('\n🛑 Shutting down gracefully...');
 
   if (miningInterval) clearInterval(miningInterval);
-  if (p2pServer)      p2pServer.close();
+  if (p2pServer) p2pServer.close();
 
   const finish = () => {
     if (server) {

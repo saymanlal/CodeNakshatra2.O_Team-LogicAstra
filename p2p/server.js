@@ -6,15 +6,20 @@ export class P2PServer {
   constructor(blockchain, port = null) {
     this.blockchain = blockchain;
     this.port = port;
-    this.peers = new Map();      // peerId (local) → peer object
+    this.peers = new Map();
     this.wss = null;
     this.nodeId = crypto.randomBytes(16).toString('hex');
     this.isSyncing = false;
 
-    // Track outbound URLs to avoid duplicate connections and enable reconnect
     this.outboundUrls = new Set();
     this.reconnectTimers = new Map();
-    this.RECONNECT_DELAY = 15_000; // 15s
+    this.RECONNECT_DELAY = 15_000;
+
+    // ── AUTO DISCOVERY ──────────────────────────────────────────────
+    this.bootstrapUrls = [];
+    this.discoveredPeers = new Set();
+    this.discoveryInterval = null;
+    this.pendingPeerRequests = new Map();
   }
 
   // ─── Server startup ─────────────────────────────────────────────────────────
@@ -28,7 +33,7 @@ export class P2PServer {
         this.wss = new WebSocketServer({ port: this.port });
         console.log(`✅ P2P server on port ${this.port}`);
       } else {
-        console.log('⚠️  P2P disabled — API-only mode');
+        console.log('⚠️ P2P disabled — API-only mode');
         return;
       }
 
@@ -43,30 +48,99 @@ export class P2PServer {
       });
 
       console.log(`📡 Node ID: ${this.nodeId}`);
+
+      // ── Start auto-discovery ──────────────────────────────────────
+      this._startDiscovery();
+
     } catch (err) {
       console.error('❌ P2P startup failed:', err.message);
       console.log('📡 API-only mode');
     }
   }
 
-  // ─── Bootstrap: connect to known peers on startup ───────────────────────────
+  // ─── AUTO DISCOVERY ──────────────────────────────────────────────────────────
 
-  connectToBootstrapPeers(urls = []) {
-    if (!urls.length) return;
-    console.log(`\n🔗 Connecting to ${urls.length} bootstrap peer(s)...`);
-    urls.forEach(url => this.connectToPeer(url));
+  _startDiscovery() {
+    // Every 30 seconds, try to discover new peers
+    this.discoveryInterval = setInterval(() => {
+      this._discoverPeers();
+    }, 30_000);
+
+    // Initial discovery after 5 seconds
+    setTimeout(() => this._discoverPeers(), 5000);
   }
 
-  // ─── Outbound connection (we initiate) ──────────────────────────────────────
+  async _discoverPeers() {
+    try {
+      // 1. Ask all connected peers for their known peers
+      this._broadcast({ type: 'get_peers' });
+
+      // 2. If we have bootstrap peers, connect to them
+      for (const url of this.bootstrapUrls) {
+        if (!this.outboundUrls.has(url) && !this._isConnected(url)) {
+          this.connectToPeer(url);
+        }
+      }
+
+      // 3. Try to discover via DNS (if you have DNS seeds later)
+      // await this._discoverViaDNS();
+
+    } catch (err) {
+      // silently ignore
+    }
+  }
+
+  // ─── Set bootstrap peers ─────────────────────────────────────────────────────
+
+  setBootstrapPeers(urls = []) {
+    if (!Array.isArray(urls)) return;
+    this.bootstrapUrls = urls.filter(u => u && u.trim());
+    console.log(`🔗 Set ${this.bootstrapUrls.length} bootstrap peer(s)`);
+    if (this.bootstrapUrls.length) {
+      this.bootstrapUrls.forEach(u => console.log(`  → ${u}`));
+    }
+  }
+
+  // ─── Bootstrap: connect to known peers ──────────────────────────────────────
+
+  connectToBootstrapPeers(urls = []) {
+    if (urls.length) {
+      this.bootstrapUrls = [...new Set([...this.bootstrapUrls, ...urls])];
+    }
+    if (!this.bootstrapUrls.length) {
+      console.log('⚠️ No bootstrap peers configured');
+      return;
+    }
+
+    console.log(`\n🔗 Connecting to ${this.bootstrapUrls.length} bootstrap peer(s)...`);
+    this.bootstrapUrls.forEach(url => {
+      if (!this.outboundUrls.has(url) && !this._isConnected(url)) {
+        this.connectToPeer(url);
+      }
+    });
+  }
+
+  // ─── Outbound connection ─────────────────────────────────────────────────────
 
   connectToPeer(url) {
-    if (this.outboundUrls.has(url)) return; // already connecting / connected
+    if (!url || typeof url !== 'string') return;
+    url = url.trim();
+    if (!url) return;
+
+    if (this.outboundUrls.has(url)) return;
     this.outboundUrls.add(url);
 
+    if (!url.startsWith('wss://') && !url.startsWith('ws://')) {
+      console.warn(`⚠️ Invalid peer URL: ${url}`);
+      this.outboundUrls.delete(url);
+      return;
+    }
+
     const attempt = () => {
-      // Skip if we're already connected to this URL
       for (const peer of this.peers.values()) {
-        if (peer.url === url && peer.ws.readyState === WebSocket.OPEN) return;
+        if (peer.url === url && peer.ws.readyState === WebSocket.OPEN) {
+          return;
+        }
       }
 
       console.log(`🔗 Connecting to peer: ${url}`);
@@ -79,18 +153,28 @@ export class P2PServer {
         return;
       }
 
+      const timeout = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          ws.close();
+          console.log(`⏱️ Connection timeout: ${url}`);
+          this._scheduleReconnect(url);
+        }
+      }, 10000);
+
       ws.on('open', () => {
+        clearTimeout(timeout);
         console.log(`✅ Connected to peer: ${url}`);
         this._handleOutboundConnection(ws, url);
       });
 
       ws.on('error', (err) => {
+        clearTimeout(timeout);
         console.error(`❌ Peer ${url} error:`, err.message);
       });
 
       ws.on('close', () => {
+        clearTimeout(timeout);
         console.log(`🔌 Outbound peer closed: ${url}`);
-        // Remove from peers map so reconnect can re-register
         for (const [id, peer] of this.peers.entries()) {
           if (peer.url === url) {
             this.peers.delete(id);
@@ -112,10 +196,9 @@ export class P2PServer {
       this.connectToPeer(url);
     }, this.RECONNECT_DELAY);
     this.reconnectTimers.set(url, timer);
-    console.log(`🔄 Will retry ${url} in ${this.RECONNECT_DELAY / 1000}s`);
   }
 
-  // ─── Inbound connection handler (they connected to us) ──────────────────────
+  // ─── Inbound connection ──────────────────────────────────────────────────────
 
   _handleInboundConnection(ws) {
     const peerId = crypto.randomBytes(8).toString('hex');
@@ -134,8 +217,6 @@ export class P2PServer {
     this._sendHandshake(ws);
     this._requestBlocks(ws);
   }
-
-  // ─── Outbound connection handler (we connected to them) ─────────────────────
 
   _handleOutboundConnection(ws, url) {
     const peerId = crypto.randomBytes(8).toString('hex');
@@ -171,7 +252,6 @@ export class P2PServer {
       const peer = this.peers.get(peerId);
       console.log(`👋 Peer ${peerId} disconnected`);
       this.peers.delete(peerId);
-      // If inbound, nothing to reconnect. Outbound reconnect is on the ws close handler above.
     });
 
     ws.on('error', (err) => {
@@ -187,7 +267,6 @@ export class P2PServer {
     if (peer) peer.lastSeen = Date.now();
 
     switch (msg.type) {
-
       case 'handshake':
         await this._handleHandshake(msg, peerId);
         break;
@@ -208,9 +287,65 @@ export class P2PServer {
         await this._handleBlocks(msg, peerId);
         break;
 
+      case 'get_peers':
+        this._handleGetPeers(msg, peerId);
+        break;
+
+      case 'peers':
+        this._handlePeers(msg, peerId);
+        break;
+
       default:
-        // silently ignore unknown messages
+        break;
     }
+  }
+
+  // ─── Peer discovery messages ────────────────────────────────────────────────
+
+  _handleGetPeers(msg, peerId) {
+    const peer = this.peers.get(peerId);
+    if (!peer) return;
+
+    // Send back our known peer list (excluding the requester)
+    const peerList = Array.from(this.peers.values())
+      .filter(p => p.id !== peerId && p.url)
+      .map(p => p.url)
+      .slice(0, 20);
+
+    if (peerList.length) {
+      this._send(peer.ws, {
+        type: 'peers',
+        peers: peerList,
+      });
+    }
+  }
+
+  _handlePeers(msg, peerId) {
+    const peers = msg.peers || [];
+    if (!Array.isArray(peers)) return;
+
+    // Connect to any new peers we don't know about
+    let newPeers = 0;
+    for (const url of peers) {
+      if (!this.outboundUrls.has(url) && !this._isConnected(url)) {
+        console.log(`🔍 Discovered new peer: ${url}`);
+        this.discoveredPeers.add(url);
+        this.connectToPeer(url);
+        newPeers++;
+      }
+    }
+    if (newPeers) {
+      console.log(`✨ Discovered ${newPeers} new peer(s)`);
+    }
+  }
+
+  _isConnected(url) {
+    for (const peer of this.peers.values()) {
+      if (peer.url === url && peer.ws.readyState === WebSocket.OPEN) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // ─── Handshake ──────────────────────────────────────────────────────────────
@@ -219,21 +354,21 @@ export class P2PServer {
     const peer = this.peers.get(peerId);
     if (!peer) return;
 
-    peer.nodeId      = msg.nodeId;
+    peer.nodeId = msg.nodeId;
     peer.chainHeight = msg.chainHeight || 0;
-    peer.chainId     = msg.chainId;
+    peer.chainId = msg.chainId;
 
-    console.log(`🤝 Handshake: node=${msg.nodeId?.slice(0, 8)} height=${msg.chainHeight} chainId=${msg.chainId}`);
+    console.log(`🤝 Handshake: node=${msg.nodeId?.slice(0, 8)} height=${msg.chainHeight}`);
 
-    // Chain ID mismatch — reject peer
+    // Chain ID mismatch — reject
     if (msg.chainId && this.blockchain.chainId && msg.chainId !== this.blockchain.chainId) {
-      console.warn(`⚠️  Chain ID mismatch (${msg.chainId} ≠ ${this.blockchain.chainId}). Closing.`);
+      console.warn(`⚠️ Chain ID mismatch. Closing.`);
       peer.ws.close();
       this.peers.delete(peerId);
       return;
     }
 
-    // If they have a longer chain, request their blocks
+    // If peer is ahead, sync
     if (msg.chainHeight > this.blockchain.chain.length) {
       console.log(`📥 Peer is ahead (${msg.chainHeight} > ${this.blockchain.chain.length}). Syncing...`);
       this._requestBlocks(peer.ws);
@@ -242,11 +377,11 @@ export class P2PServer {
 
   _sendHandshake(ws) {
     this._send(ws, {
-      type:        'handshake',
-      nodeId:      this.nodeId,
+      type: 'handshake',
+      nodeId: this.nodeId,
       chainHeight: this.blockchain.chain.length,
-      chainId:     this.blockchain.chainId,
-      timestamp:   Date.now(),
+      chainId: this.blockchain.chainId,
+      timestamp: Date.now(),
     });
   }
 
@@ -259,32 +394,33 @@ export class P2PServer {
 
       const ourHeight = this.blockchain.chain.length;
 
-      // Block we already have
-      if (blockData.index < ourHeight) return;
+      if (blockData.index < ourHeight) {
+        const localBlock = this.blockchain.chain[blockData.index];
+        if (localBlock && localBlock.hash !== blockData.hash) {
+          console.warn(`⚠️ Fork at block ${blockData.index}. Requesting full sync...`);
+          const peer = this.peers.get(peerId);
+          if (peer) this._requestBlocks(peer.ws);
+        }
+        return;
+      }
 
-      // Next sequential block — try to append
       if (blockData.index === ourHeight) {
         const block = await Block.fromJSON(blockData);
         const added = await this.blockchain.addBlock(block);
         if (added) {
           const peer = this.peers.get(peerId);
           if (peer) {
-            peer.chainHeight = Math.max(
-              peer.chainHeight || 0,
-              block.index + 1
-            );
+            peer.chainHeight = Math.max(peer.chainHeight || 0, block.index + 1);
           }
           console.log(`📦 Accepted block #${block.index} from peer ${peerId}`);
-          // Re-broadcast to other peers (flood)
           this._broadcastExcept({ type: 'new_block', block: blockData }, peerId);
         }
         return;
       }
 
-      // They're ahead — trigger full sync
       const peer = this.peers.get(peerId);
       if (peer) {
-        console.log(`📥 Peer ${peerId} ahead (${blockData.index} > ${ourHeight - 1}). Requesting sync...`);
+        console.log(`📥 Peer ahead. Requesting sync...`);
         this._requestBlocks(peer.ws);
       }
     } catch (err) {
@@ -299,34 +435,26 @@ export class P2PServer {
       if (!msg.transaction) return;
 
       const { default: Transaction } = await import('../core/transaction.js');
-
       const tx = Transaction.fromJSON(msg.transaction);
 
-      // Already in mempool
       const mempoolDuplicate = this.blockchain.mempool.some(
         existing => existing.id === tx.id
       );
+      if (mempoolDuplicate) return;
 
-      if (mempoolDuplicate) {
-        return;
-      }
-
-      // Already confirmed on-chain
       const chainDuplicate = this.blockchain.chain.some(block =>
         block.transactions.some(existing => existing.id === tx.id)
       );
-
-      if (chainDuplicate) {
-        return;
-      }
+      if (chainDuplicate) return;
 
       this.blockchain.mempool.push(tx);
+      this._broadcastExcept({
+        type: 'new_transaction',
+        transaction: msg.transaction
+      }, peerId);
 
     } catch (err) {
-      console.error(
-        `❌ Failed to process tx from peer ${peerId}:`,
-        err.message
-      );
+      console.error(`❌ Failed to process tx from peer ${peerId}:`, err.message);
     }
   }
 
@@ -334,7 +462,7 @@ export class P2PServer {
 
   _requestBlocks(ws) {
     this._send(ws, {
-      type:      'get_blocks',
+      type: 'get_blocks',
       fromIndex: Math.max(0, this.blockchain.chain.length - 1),
     });
   }
@@ -343,12 +471,11 @@ export class P2PServer {
     const peer = this.peers.get(peerId);
     if (!peer) return;
 
-    const from   = msg.fromIndex || 0;
+    const from = msg.fromIndex || 0;
     const blocks = this.blockchain.chain.slice(from);
 
     if (!blocks.length) return;
 
-    // Send in batches of 50 to avoid giant messages
     const BATCH = 50;
     for (let i = 0; i < blocks.length; i += BATCH) {
       const batch = blocks.slice(i, i + BATCH).map(b => b.toJSON ? b.toJSON() : b);
@@ -366,49 +493,42 @@ export class P2PServer {
 
     try {
       let imported = 0;
+      const peer = this.peers.get(peerId);
 
       for (const blockData of blocks) {
         const ourHeight = this.blockchain.chain.length;
 
-        // Already have this block
         if (blockData.index < ourHeight) {
-          // Verify it matches — if not, we have a fork
-          const ours = this.blockchain.chain[blockData.index];
-          if (ours && ours.hash !== blockData.hash) {
-            console.warn(`⚠️  Fork detected at block ${blockData.index}. Peer hash differs.`);
-            // If peer chain is longer, we'll sync via replaceChain
-            const peer = this.peers.get(peerId);
-            if (peer && peer.chainHeight > this.blockchain.chain.length) {
-              console.log('🔄 Peer has longer chain. Requesting full sync...');
+          const localBlock = this.blockchain.chain[blockData.index];
+          if (localBlock && localBlock.hash !== blockData.hash) {
+            console.warn(`⚠️ Fork at block ${blockData.index}`);
+            if (peer && peer.chainHeight > ourHeight) {
+              console.log('🔄 Peer has longer chain. Syncing...');
               this._requestBlocks(peer.ws);
             }
           }
           continue;
         }
 
-        // Next block in sequence
         if (blockData.index === ourHeight) {
           const block = await Block.fromJSON(blockData);
           const added = await this.blockchain.addBlock(block);
           if (added) {
             imported++;
           } else {
-            console.warn(`⚠️  addBlock rejected block #${blockData.index}`);
-            break; // stop processing if a block is invalid
+            console.warn(`⚠️ addBlock rejected #${blockData.index}`);
+            break;
           }
           continue;
         }
 
-        // Gap — request missing blocks
-        console.log(`⚠️  Gap: we have ${ourHeight}, next block is ${blockData.index}. Re-requesting...`);
-        const peer = this.peers.get(peerId);
+        console.log(`⚠️ Gap: have ${ourHeight}, next is ${blockData.index}`);
         if (peer) this._requestBlocks(peer.ws);
         break;
       }
 
       if (imported > 0) {
         console.log(`✅ Synced ${imported} blocks. New height: ${this.blockchain.chain.length}`);
-        // Advertise updated height to all peers
         this._broadcastHandshake();
       }
     } catch (err) {
@@ -422,16 +542,15 @@ export class P2PServer {
 
   broadcastBlock(block) {
     this.broadcast({
-      type:  'new_block',
+      type: 'new_block',
       block: block.toJSON ? block.toJSON() : block,
     });
-    // Also update our handshake height advertised to peers
     this._broadcastHandshake();
   }
 
   broadcastTransaction(transaction) {
     this.broadcast({
-      type:        'new_transaction',
+      type: 'new_transaction',
       transaction: transaction.toJSON ? transaction.toJSON() : transaction,
     });
   }
@@ -468,22 +587,21 @@ export class P2PServer {
     }
   }
 
-  // ─── Legacy public aliases (used by server.js / routes.js) ──────────────────
+  // ─── Public API ──────────────────────────────────────────────────────────────
 
-  /** @deprecated use connectToBootstrapPeers */
   connectToPeerLegacy(url) { this.connectToPeer(url); }
 
   getStats() {
     return {
-      nodeId:   this.nodeId,
-      peers:    this.peers.size,
-      enabled:  !!this.wss,
+      nodeId: this.nodeId,
+      peers: this.peers.size,
+      enabled: !!this.wss,
       peerList: Array.from(this.peers.values()).map(p => ({
-        id:          p.id,
-        nodeId:      p.nodeId,
+        id: p.id,
+        nodeId: p.nodeId,
         chainHeight: p.chainHeight,
-        lastSeen:    p.lastSeen,
-        url:         p.url,
+        lastSeen: p.lastSeen,
+        url: p.url,
       })),
     };
   }
@@ -492,10 +610,15 @@ export class P2PServer {
     return {
       ...this.getStats(),
       mode: 'validator',
+      discovered: this.discoveredPeers.size,
     };
   }
 
   close() {
+    if (this.discoveryInterval) {
+      clearInterval(this.discoveryInterval);
+    }
+
     for (const [url, timer] of this.reconnectTimers.entries()) {
       clearTimeout(timer);
     }

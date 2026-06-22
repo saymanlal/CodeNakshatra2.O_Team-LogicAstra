@@ -12,11 +12,6 @@ let networkConfig  = null;
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // tag nav buttons with their page name so polling can read active page
-  document.querySelectorAll('.nav-btn[data-page]').forEach(btn => {
-    // already tagged via data-page attribute in HTML
-  });
-
   await loadNetworkConfig();
   updateHeaderInfo();
   showPage('dashboard');
@@ -31,7 +26,7 @@ function poll() {
   switch (active.dataset.page) {
     case 'dashboard':  loadDashboard();                    break;
     case 'explorer':   loadExplorer(explorerPage);         break;
-    case 'validators': /* validators don't auto-poll */    break;
+    case 'validators': break;
     case 'contracts':  loadContracts();                    break;
     case 'network':    loadNetwork();                      break;
   }
@@ -96,7 +91,7 @@ async function loadDashboard() {
     const feed   = document.getElementById('block-feed');
     if (feed) {
       feed.innerHTML = blocks.map(b => `
-        <div class="block-item">
+        <div class="block-item" onclick="showBlockDetail('${b.index}')">
           <div class="block-index">#${b.index}</div>
           <div class="block-hash">${(b.hash || '').slice(0, 52)}…</div>
           <div class="block-time">${fmtTime(b.timestamp)}</div>
@@ -109,9 +104,6 @@ async function loadDashboard() {
 // ── Explorer ──────────────────────────────────────────────────────────────────
 async function loadExplorer(page = 1) {
   explorerPage = page;
-
-  // clear search UI when paginating normally
-  const searchInput = document.getElementById('explorer-search');
 
   try {
     const data = await apiFetch(`/blocks?page=${page}&limit=${PG_SZ}`);
@@ -131,22 +123,19 @@ async function searchExplorer() {
 
   clearPagination();
   const tbody = document.getElementById('explorer-blocks');
-  if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;">Searching…</td></tr>`;
+  if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Searching…</td></tr>`;
 
   try {
-    // Try numeric block index first
     if (/^\d+$/.test(q)) {
       const block = await apiFetch(`/block/${q}`);
       renderExplorerRows(block ? [block] : []);
       setEl('explorer-page-info', block ? '1 result' : 'Block not found');
       return;
     }
-    // Otherwise search by hash
     const block = await apiFetch(`/block/hash/${q}`);
     renderExplorerRows(block ? [block] : []);
     setEl('explorer-page-info', block ? '1 result' : 'No block found for that hash');
   } catch {
-    // Fallback: filter client-side from current page
     try {
       const data = await apiFetch(`/blocks?page=1&limit=100`);
       const matches = (data.blocks || []).filter(b =>
@@ -157,7 +146,7 @@ async function searchExplorer() {
       renderExplorerRows(matches);
       setEl('explorer-page-info', `${matches.length} result${matches.length !== 1 ? 's' : ''}`);
     } catch (e2) {
-      if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*2);color:#c00;font-size:12px;">Search error</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*2);color:#c00;font-size:12px;text-align:center;">Search error</td></tr>`;
     }
   }
 }
@@ -168,7 +157,6 @@ function clearSearch() {
   loadExplorer(1);
 }
 
-// Jump to page
 function jumpToPage() {
   const el  = document.getElementById('explorer-jump');
   const val = parseInt(el?.value || '0', 10);
@@ -191,12 +179,10 @@ function renderExplorerRows(blocks) {
   tbody.innerHTML = blocks.map(b => {
     const gas = b.gasUsed ?? (b.transactions || []).reduce((s, tx) => s + (tx.gasUsed || 0), 0);
     return `
-      <tr style="cursor:pointer" onclick="showBlockDetail(${JSON.stringify(JSON.stringify(b))})"
-          title="Click for full details">
+      <tr onclick="showBlockDetail(${b.index})">
         <td>#${b.index}</td>
         <td class="mono">${(b.hash || '').slice(0, 20)}…</td>
-        <td class="mono link" onclick="event.stopPropagation();showValidatorDetail('${b.validator || ''}')"
-            title="View validator blocks">${(b.validator || '—').slice(0, 16)}…</td>
+        <td class="mono link" onclick="event.stopPropagation();showValidatorDetail('${b.validator || ''}')">${(b.validator || '—').slice(0, 16)}…</td>
         <td>${b.transactions?.length ?? 0}</td>
         <td>${gas.toLocaleString()}</td>
         <td>${fmtTime(b.timestamp)}</td>
@@ -205,6 +191,7 @@ function renderExplorerRows(blocks) {
   }).join('');
 }
 
+// ── FIXED: Pagination with correct Previous/Next labels ──────────────────────
 function renderPagination(page, totalPages, total) {
   const ctrl = document.getElementById('pagination-controls');
   if (!ctrl) return;
@@ -216,16 +203,18 @@ function renderPagination(page, totalPages, total) {
 
   ctrl.innerHTML = `
     <button onclick="loadExplorer(1)" ${page <= 1 ? 'disabled' : ''}>«</button>
-    <button onclick="loadExplorer(${page - 1})" ${page <= 1 ? 'disabled' : ''}>← Prev</button>
-    <span id="explorer-page-info">Page ${page} of ${totalPages} · ${total} blocks</span>
-    <button onclick="loadExplorer(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>Next →</button>
+    <button onclick="loadExplorer(${page - 1})" ${page <= 1 ? 'disabled' : ''}>Previous</button>
+    <span id="explorer-page-info" style="font-size:12px;color:var(--mono-400);margin:0 calc(var(--grid)*1);">
+      Page ${page} of ${totalPages} · ${total} blocks
+    </span>
+    <button onclick="loadExplorer(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>Next</button>
     <button onclick="loadExplorer(${totalPages})" ${page >= totalPages ? 'disabled' : ''}>»</button>
     <span style="display:flex;align-items:center;gap:4px;margin-left:calc(var(--grid)*2)">
       <input id="explorer-jump" type="number" min="1" max="${totalPages}"
-             placeholder="Page #"
-             style="width:72px;padding:5px 8px;border:var(--border);font-size:12px;"
+             placeholder="#"
+             style="width:60px;padding:5px 8px;border:var(--border);font-size:12px;text-align:center;"
              onkeydown="if(event.key==='Enter')jumpToPage()">
-      <button onclick="jumpToPage()">Go</button>
+      <button onclick="jumpToPage()" style="padding:5px 12px;border:var(--border);background:var(--mono-1000);cursor:pointer;font-size:11px;">Go</button>
     </span>
   `;
 }
@@ -235,47 +224,68 @@ function clearPagination() {
   if (ctrl) ctrl.innerHTML = '';
 }
 
-// Block detail modal
-function showBlockDetail(jsonStr) {
-  const b   = JSON.parse(jsonStr);
-  const gas = b.gasUsed ?? (b.transactions || []).reduce((s, tx) => s + (tx.gasUsed || 0), 0);
+// ── Block Detail Modal ────────────────────────────────────────────────────────
+async function showBlockDetail(index) {
+  try {
+    const block = await apiFetch(`/block/${index}`);
+    if (!block) {
+      showNotification('Block not found');
+      return;
+    }
 
-  const modal = makeModal(`Block #${b.index}`, `
-    <table style="width:100%;font-size:12px;border-collapse:collapse">
-      ${detailRow('Hash',          `<span class="mono" style="word-break:break-all">${b.hash || '—'}</span>`)}
-      ${detailRow('Previous Hash', `<span class="mono" style="word-break:break-all">${b.previousHash || '—'}</span>`)}
-      ${detailRow('Validator',     `<span class="mono">${b.validator || '—'}</span>`)}
-      ${detailRow('Timestamp',     fmtTime(b.timestamp))}
-      ${detailRow('Chain ID',      b.chainId || '—')}
-      ${detailRow('Gas Used',      gas.toLocaleString())}
-      ${detailRow('State Root',    `<span class="mono" style="word-break:break-all">${b.stateRoot || '—'}</span>`)}
-    </table>
-    <div style="margin-top:calc(var(--grid)*3);border-top:var(--border);padding-top:calc(var(--grid)*2)">
-      <div style="font-size:12px;font-weight:500;margin-bottom:calc(var(--grid)*1)">
-        Transactions (${b.transactions?.length ?? 0})
-      </div>
-      ${(b.transactions?.length
-        ? b.transactions.map(tx => `
-            <div style="border:var(--border);padding:calc(var(--grid)*2);margin-bottom:4px;font-size:11px">
-              <div><strong>Type:</strong> ${tx.type}</div>
-              <div><strong>ID:</strong> <span class="mono">${tx.id}</span></div>
-              ${tx.data?.from   ? `<div><strong>From:</strong> <span class="mono">${tx.data.from}</span></div>`   : ''}
-              ${tx.data?.to     ? `<div><strong>To:</strong> <span class="mono">${tx.data.to}</span></div>`     : ''}
-              ${tx.data?.amount ? `<div><strong>Amount:</strong> ${sayn(tx.data.amount)}</div>`                 : ''}
-              ${tx.gasUsed      ? `<div><strong>Gas:</strong> ${tx.gasUsed}</div>`                              : ''}
+    const gas = block.gasUsed ?? (block.transactions || []).reduce((s, tx) => s + (tx.gasUsed || 0), 0);
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>Block #${block.index}</h3>
+          <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">CLOSE</button>
+        </div>
+        <div class="modal-body">
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <tr class="detail-row"><td class="detail-label">Hash</td><td class="mono" style="word-break:break-all;">${block.hash || '—'}</td></tr>
+            <tr class="detail-row"><td class="detail-label">Previous Hash</td><td class="mono" style="word-break:break-all;">${block.previousHash || '—'}</td></tr>
+            <tr class="detail-row"><td class="detail-label">Validator</td><td class="mono">${block.validator || '—'}</td></tr>
+            <tr class="detail-row"><td class="detail-label">Timestamp</td><td>${fmtTime(block.timestamp)}</td></tr>
+            <tr class="detail-row"><td class="detail-label">Chain ID</td><td>${block.chainId || '—'}</td></tr>
+            <tr class="detail-row"><td class="detail-label">Gas Used</td><td>${gas.toLocaleString()}</td></tr>
+            <tr class="detail-row"><td class="detail-label">State Root</td><td class="mono" style="word-break:break-all;">${block.stateRoot || '—'}</td></tr>
+          </table>
+
+          <div style="margin-top:calc(var(--grid)*3);border-top:var(--border);padding-top:calc(var(--grid)*2);">
+            <div style="font-size:12px;font-weight:500;margin-bottom:calc(var(--grid)*1);">
+              Transactions (${block.transactions?.length ?? 0})
             </div>
-          `).join('')
-        : '<p style="color:var(--mono-400);font-size:12px">No transactions in this block</p>'
-      )}
-    </div>
-  `);
-  document.body.appendChild(modal);
+            ${(block.transactions?.length
+              ? block.transactions.map(tx => `
+                  <div class="tx-item">
+                    <div><strong>Type:</strong> ${tx.type}</div>
+                    <div><strong>ID:</strong> <span class="mono">${tx.id}</span></div>
+                    ${tx.data?.from   ? `<div><strong>From:</strong> <span class="mono">${tx.data.from}</span></div>`   : ''}
+                    ${tx.data?.to     ? `<div><strong>To:</strong> <span class="mono">${tx.data.to}</span></div>`     : ''}
+                    ${tx.data?.amount ? `<div><strong>Amount:</strong> ${sayn(tx.data.amount)}</div>`                 : ''}
+                    ${tx.gasUsed      ? `<div><strong>Gas:</strong> ${tx.gasUsed}</div>`                              : ''}
+                  </div>
+                `).join('')
+              : '<p style="color:var(--mono-400);font-size:12px;">No transactions in this block</p>'
+            )}
+          </div>
+        </div>
+      </div>
+    `;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+  } catch (e) {
+    showNotification('Error loading block details');
+  }
 }
 
 // ── Validators ────────────────────────────────────────────────────────────────
 async function loadValidators() {
   const tbody = document.getElementById('validator-list');
-  if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="padding:calc(var(--grid)*2);color:var(--mono-400);font-size:12px;">Loading…</td></tr>`;
+  if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="padding:calc(var(--grid)*2);color:var(--mono-400);font-size:12px;text-align:center;">Loading…</td></tr>`;
 
   try {
     const data = await apiFetch('/validators');
@@ -289,8 +299,7 @@ async function loadValidators() {
     }
 
     tbody.innerHTML = validators.map(v => `
-      <tr style="cursor:pointer" onclick="showValidatorDetail('${v.address || ''}')"
-          title="Click to see blocks validated by this address">
+      <tr onclick="showValidatorDetail('${v.address || ''}')">
         <td class="mono">${(v.address || '').slice(0, 20)}…</td>
         <td>${sayn(v.stake ?? 0)}</td>
         <td>${v.percentage ?? 0}%</td>
@@ -303,72 +312,80 @@ async function loadValidators() {
       </tr>
     `).join('');
 
-    // summary row
     setEl('val-total-stake', sayn(data.totalStake ?? 0));
     setEl('val-apr',         (data.estimatedAPR ?? 0) + '%');
     setEl('val-count',       validators.length);
 
   } catch (e) {
     console.error('Validators:', e);
-    if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="padding:calc(var(--grid)*2);color:#c00;font-size:12px;">Failed to load validators</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="padding:calc(var(--grid)*2);color:#c00;font-size:12px;text-align:center;">Failed to load validators</td></tr>`;
   }
 }
 
-// Show blocks validated by a specific address
+// ── Show validator blocks ─────────────────────────────────────────────────────
 async function showValidatorDetail(address) {
   if (!address) return;
 
-  const modal = makeModal(
-    `Validator: ${address.slice(0, 20)}…`,
-    `<div id="vd-loading" style="color:var(--mono-400);font-size:12px;padding:calc(var(--grid)*2)">Loading blocks…</div>`
-  );
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Validator: ${address.slice(0, 20)}…</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">CLOSE</button>
+      </div>
+      <div class="modal-body">
+        <div id="vd-loading" style="color:var(--mono-400);font-size:12px;padding:calc(var(--grid)*2);text-align:center;">Loading blocks…</div>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
 
   try {
-    // Fetch all blocks and filter — replace with a dedicated endpoint if you add one later
-    const data   = await apiFetch(`/blocks?page=1&limit=200`);
+    const data = await apiFetch(`/blocks?page=1&limit=200`);
     const blocks = (data.blocks || [])
       .filter(b => (b.validator || '').toLowerCase() === address.toLowerCase())
       .sort((a, b) => b.index - a.index);
 
-    const container = modal.querySelector('#vd-loading');
+    const container = document.getElementById('vd-loading');
     if (!container) return;
 
     if (!blocks.length) {
-      container.textContent = 'No blocks validated by this address (in last 200 blocks).';
+      container.innerHTML = '<p style="color:var(--mono-400);font-size:12px;text-align:center;">No blocks validated by this address (last 200 blocks).</p>';
       return;
     }
 
     container.innerHTML = `
-      <div style="font-size:12px;color:var(--mono-400);margin-bottom:calc(var(--grid)*2)">
+      <div style="font-size:12px;color:var(--mono-400);margin-bottom:calc(var(--grid)*2);">
         ${blocks.length} block${blocks.length !== 1 ? 's' : ''} validated (last 200 checked)
       </div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead style="border-bottom:var(--border)">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead style="border-bottom:var(--border);">
           <tr>
-            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:11px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em">Block</th>
-            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:11px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em">Hash</th>
-            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:11px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em">Txs</th>
-            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:11px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em">Gas</th>
-            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:11px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em">Time</th>
+            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:10px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em;">Block</th>
+            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:10px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em;">Hash</th>
+            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:10px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em;">Txs</th>
+            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:10px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em;">Gas</th>
+            <th style="text-align:left;padding:calc(var(--grid)*1);font-size:10px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em;">Time</th>
           </tr>
         </thead>
         <tbody>
           ${blocks.map(b => `
-            <tr style="border-bottom:1px solid var(--mono-900)">
-              <td style="padding:calc(var(--grid)*1)">#${b.index}</td>
-              <td style="padding:calc(var(--grid)*1);font-family:'SF Mono',monospace;font-size:11px">${(b.hash||'').slice(0,20)}…</td>
-              <td style="padding:calc(var(--grid)*1)">${b.transactions?.length ?? 0}</td>
-              <td style="padding:calc(var(--grid)*1)">${(b.gasUsed ?? 0).toLocaleString()}</td>
-              <td style="padding:calc(var(--grid)*1)">${fmtTime(b.timestamp)}</td>
+            <tr style="border-bottom:1px solid var(--mono-900);">
+              <td style="padding:calc(var(--grid)*1);">#${b.index}</td>
+              <td style="padding:calc(var(--grid)*1);font-family:'SF Mono',monospace;font-size:11px;">${(b.hash||'').slice(0,20)}…</td>
+              <td style="padding:calc(var(--grid)*1);">${b.transactions?.length ?? 0}</td>
+              <td style="padding:calc(var(--grid)*1);">${(b.gasUsed ?? 0).toLocaleString()}</td>
+              <td style="padding:calc(var(--grid)*1);">${fmtTime(b.timestamp)}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
     `;
   } catch (e) {
-    const c = modal.querySelector('#vd-loading');
-    if (c) c.textContent = 'Error loading validator blocks.';
+    const c = document.getElementById('vd-loading');
+    if (c) c.innerHTML = '<p style="color:#c00;font-size:12px;text-align:center;">Error loading validator blocks.</p>';
   }
 }
 
@@ -427,31 +444,6 @@ async function loadNetwork() {
   } catch (e) { console.error('Network:', e); }
 }
 
-// ── Modal helper ──────────────────────────────────────────────────────────────
-function makeModal(title, bodyHtml) {
-  const overlay = document.createElement('div');
-  overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:calc(var(--grid)*4)`;
-  overlay.innerHTML = `
-    <div style="background:var(--mono-1000);border:var(--border);max-width:820px;width:100%;max-height:82vh;display:flex;flex-direction:column">
-      <div style="border-bottom:var(--border);padding:calc(var(--grid)*2) calc(var(--grid)*3);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
-        <span style="font-size:14px;font-weight:500">${title}</span>
-        <button onclick="this.closest('[style*=inset]').remove()"
-                style="background:none;border:var(--border);padding:4px 10px;cursor:pointer;font-size:11px;letter-spacing:.06em">CLOSE</button>
-      </div>
-      <div style="padding:calc(var(--grid)*3);overflow-y:auto;flex:1">${bodyHtml}</div>
-    </div>
-  `;
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  return overlay;
-}
-
-function detailRow(label, value) {
-  return `<tr style="border-bottom:1px solid var(--mono-900)">
-    <td style="padding:calc(var(--grid)*1.5);color:var(--mono-400);white-space:nowrap;width:120px">${label}</td>
-    <td style="padding:calc(var(--grid)*1.5)">${value}</td>
-  </tr>`;
-}
-
 // ── API helper ────────────────────────────────────────────────────────────────
 async function apiFetch(path) {
   const res = await fetch(API + path);
@@ -491,7 +483,6 @@ function fmtUptime(s) {
   return parts.join(' ');
 }
 
-// sayn(baseUnits, withUnit=true) → "1.2345 SAYN" or "1.2345"
 function sayn(baseUnits, withUnit = true) {
   if (baseUnits === null || baseUnits === undefined) return '—';
   const v = Number(baseUnits) / 10000;
@@ -500,8 +491,8 @@ function sayn(baseUnits, withUnit = true) {
 
 function showNotification(msg) {
   const n = document.createElement('div');
-  n.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--mono-100);color:var(--mono-1000);padding:8px 16px;font-size:12px;letter-spacing:.05em;z-index:10000;';
+  n.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--mono-100);color:var(--mono-1000);padding:8px 16px;font-size:12px;letter-spacing:.05em;z-index:10000;border:var(--border);';
   n.textContent = msg;
   document.body.appendChild(n);
-  setTimeout(() => n.remove(), 2500);
+  setTimeout(() => n.remove(), 3000);
 }
