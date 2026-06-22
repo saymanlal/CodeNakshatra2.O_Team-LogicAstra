@@ -38,7 +38,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       minStake: config.minStake,
       gasLimits: stats.gasLimits,
       gasCosts: stats.gasCosts,
-      stateRoot: stats.stateRoot // ✅ Phase 8
+      stateRoot: stats.stateRoot
     });
   });
 
@@ -67,7 +67,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     });
   });
 
-  // Single block
+  // Single block by index (legacy)
   router.get('/blocks/:index', (req, res) => {
     const index = parseInt(req.params.index);
     const block = blockchain.chain[index];
@@ -79,7 +79,52 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     res.json(normalizeBlockForApi(block));
   });
 
-  // ✅ Phase 8: Light client endpoint - Block header only
+  // ─── FIX: Get block by index (frontend uses this) ──────────────────────────
+  router.get('/block/:index', (req, res) => {
+    try {
+      const index = parseInt(req.params.index);
+      if (isNaN(index) || index < 0) {
+        return res.status(400).json({ error: 'Invalid block index' });
+      }
+
+      if (index >= blockchain.chain.length) {
+        return res.status(404).json({ error: 'Block not found' });
+      }
+
+      const block = blockchain.chain[index];
+      res.json(normalizeBlockForApi(block));
+    } catch (err) {
+      console.error('Error fetching block:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── FIX: Get block by hash ──────────────────────────────────────────────────
+  router.get('/block/hash/:hash', (req, res) => {
+    try {
+      const hash = req.params.hash;
+      if (!hash || hash.length < 8) {
+        return res.status(400).json({ error: 'Invalid hash' });
+      }
+
+      const chain = blockchain.chain;
+      const block = chain.find(b => {
+        const blockHash = b.hash || '';
+        return blockHash === hash || blockHash.startsWith(hash);
+      });
+
+      if (!block) {
+        return res.status(404).json({ error: 'Block not found' });
+      }
+
+      res.json(normalizeBlockForApi(block));
+    } catch (err) {
+      console.error('Error fetching block by hash:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Light client endpoint - Block header only
   router.get('/light/block/:height', (req, res) => {
     try {
       const height = parseInt(req.params.height);
@@ -89,7 +134,6 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
         return res.status(404).json({ error: 'Block not found' });
       }
 
-      // Return only header info for light clients
       res.json({
         index: block.index,
         timestamp: block.timestamp,
@@ -106,15 +150,11 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     }
   });
 
-  // ✅ Phase 8: Merkle proof endpoint
+  // Merkle proof endpoint
   router.get('/proof/:address', (req, res) => {
     try {
       const { address } = req.params;
-      
-      // Compute current state root
       const stateRoot = blockchain.state.computeStateRoot();
-      
-      // Generate proof
       const proof = blockchain.state.generateProof(address);
       
       if (!proof) {
@@ -137,7 +177,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     }
   });
 
-  // ✅ Phase 8: Verify proof endpoint
+  // Verify proof endpoint
   router.post('/proof/verify', (req, res) => {
     try {
       const { proof, stateRoot } = req.body;
@@ -173,7 +213,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
           blockIndex: block.index,
           blockHash: block.hash,
           timestamp: block.timestamp,
-          stateRoot: block.stateRoot // ✅ Phase 8
+          stateRoot: block.stateRoot
         });
       }
     }
@@ -191,7 +231,6 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     const unlockBlock = blockchain.state.getUnlockBlock(address);
     const nonce = blockchain.state.getNonce(address);
     
-    // Get transaction history
     const transactions = [];
     for (const block of blockchain.chain) {
       for (const tx of block.transactions) {
@@ -304,7 +343,6 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       tx.gasPrice = gasPrice;
       tx.nonce = nonce;
 
-      // Verify address matches public key
       const derivedAddress = crypto
         .createHash('sha256')
         .update(publicKey)
@@ -317,14 +355,10 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
         });
       }
 
-      // CRITICAL: Register public key BEFORE validation
       blockchain.state.setPublicKey(data.from, publicKey);
 
-      // Now validate signature
       if (!tx.isValid(blockchain.state.publicKeys)) {
         console.error(`❌ Invalid signature for tx from ${data.from}`);
-        console.error(`   Public key: ${publicKey.substring(0, 20)}...`);
-        console.error(`   Signature: ${signature.substring(0, 20)}...`);
         return res.status(400).json({
           error: 'Invalid signature'
         });
@@ -355,24 +389,6 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
 
     } catch (error) {
       console.error('Broadcast error:', error);
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  // Admin fund endpoint (testnet only)
-  router.post('/admin/fund', (req, res) => {
-    try {
-      const { address, amount, secret } = req.body;
-      if (secret !== 'sayman-admin-2024') {
-        return res.status(403).json({ error: 'Unauthorized' });
-      }
-      if (!address || !amount) {
-        return res.status(400).json({ error: 'Address and amount required' });
-      }
-      blockchain.state.addBalance(address, amount);
-      blockchain.state.addBalance('faucet', 9999999999);
-      res.json({ success: true, message: 'Funded successfully' });
-    } catch (error) {
       res.status(400).json({ error: error.message });
     }
   });
@@ -540,7 +556,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
         averageBlockTime: Math.round(avgBlockTime),
         uptime: process.uptime(),
         timestamp: Date.now(),
-        stateRoot: stats.stateRoot // ✅ Phase 8
+        stateRoot: stats.stateRoot
       });
     } catch (error) {
       console.error('Network stats error:', error);
