@@ -1,98 +1,96 @@
 /**
- * GasCalculator — Phase 9 (fixed)
+ * GasCalculator — SAYN token model, 4 decimals
  *
- * Fixes applied:
- *  1. Renamed this.gasCosts → this.costs so ContractEngine (this.gas.costs.contractDeploy,
- *     this.gas.costs.storageByte, this.gas.costs.storageRead, this.gas.costs.storageWrite,
- *     this.gas.costs.contractCall, this.gas.costs.transfer) can resolve the table correctly.
- *     Previously `this.gas.costs` was undefined in ContractEngine, making every gas charge NaN,
- *     which bypassed the pre-flight balance check and caused "Insufficient balance for gas".
+ * Token: 1 SAYN = 10,000 base units
+ * Gas unit costs are in raw gas units (dimensionless).
+ * Actual fee = gasUsed × gasPrice (base units per gas unit).
  *
- *  2. Added storageByte cost (0.01) — used by ContractEngine deploy formula.
+ * Testnet gasPrice: 1 base unit/gas → transfer costs 0.0021 SAYN
+ * Mainnet gasPrice: 5 base units/gas → transfer costs 0.0105 SAYN
  *
- *  3. calculateTransactionGas() now uses this.costs (not this.gasCosts) and uses /100
- *     instead of /1000 for CONTRACT_DEPLOY so the pre-flight gasLimit estimate
- *     actually covers what ContractEngine will charge at execution time.
+ * Sponsorship / fee policy (per contract, set at deploy time):
+ *   'user'    — normal: gas deducted from tx sender (default)
+ *   'sponsor' — gas deducted from contract deployer's sponsor balance
+ *   'free'    — no gas deducted anywhere (testnet / internal dApps only)
  *
- *  4. Added REPORT_CREATE / REPORT_VERIFY / REPORT_RESOLVE cases so the pre-flight
- *     balance check in blockchain.js uses the same value that createBlock() charges.
- *
- *  5. Null-safe code.length in CONTRACT_DEPLOY case (guards against missing code key).
+ * Gas unit table is identical on testnet and mainnet.
+ * Only gasPrice differs between networks.
  */
 
 class GasCalculator {
   constructor(config) {
     this.config = config;
 
-    // ─── Single source of truth for all gas costs ────────────────────────────
-    // Previously named `gasCosts`; ContractEngine accesses this as `this.gas.costs`
-    // so the property MUST be named `costs`.  Both camelCase keys (used by
-    // ContractEngine) and UPPER_SNAKE keys (legacy callers) are provided.
+    // ─── Gas unit table ───────────────────────────────────────────────────
+    // One source of truth. Both camelCase (ContractEngine) and UPPER_SNAKE
+    // (legacy callers) provided. Numbers are gas units, not base units.
     this.costs = {
       // Wallet operations
-      transfer:           6,
-      TRANSFER:           6,
+      transfer:           21_000,
+      TRANSFER:           21_000,
 
-      stake:              50,
-      STAKE:              50,
+      stake:              50_000,
+      STAKE:              50_000,
 
-      unstake:            50,
-      UNSTAKE:            50,
+      unstake:            50_000,
+      UNSTAKE:            50_000,
 
       // Contract operations
-      contractDeploy:     5,   // ContractEngine: this.gas.costs.contractDeploy
-      CONTRACT_DEPLOY:    5,
+      contractDeploy:    200_000,   // base; +1 per 10 code bytes
+      CONTRACT_DEPLOY:   200_000,
 
-      contractCall:       100,   // ContractEngine: this.gas.costs.contractCall (unused directly but kept for symmetry)
-      CONTRACT_CALL_BASE: 100,
+      contractCall:       50_000,   // base; +storage charges during execution
+      CONTRACT_CALL:      50_000,
+      CONTRACT_CALL_BASE: 50_000,
 
-      contractUpgrade:    300,
-      CONTRACT_UPGRADE:   300,
+      contractUpgrade:   300_000,
+      CONTRACT_UPGRADE:  300_000,
 
-      // Storage — ContractEngine charges per read/write/byte
-      storageRead:        5,     // ContractEngine: this.gas.costs.storageRead
-      STATE_READ:         5,
+      // Storage — charged inside ContractEngine per operation
+      storageRead:           500,
+      STORAGE_READ:          500,
 
-      storageWrite:       20,    // ContractEngine: this.gas.costs.storageWrite
-      STATE_WRITE:        20,
+      storageWrite:        2_000,
+      STORAGE_WRITE:       2_000,
 
-      storageByte:        0.01,  // ContractEngine deploy: code.length * storageByte
+      storageByte:             1,   // per byte of contract code stored
+      STORAGE_BYTE:            1,
 
-      // Native CrowdPulse tx types (blockchain.js createBlock charges this.gas.costs.transfer)
-      reportCreate:       6,
-      REPORT_CREATE:      6,
+      // Native tx types
+      reportCreate:       21_000,
+      REPORT_CREATE:      21_000,
 
-      reportVerify:       6,
-      REPORT_VERIFY:      6,
+      reportVerify:       21_000,
+      REPORT_VERIFY:      21_000,
 
-      reportResolve:      6,
-      REPORT_RESOLVE:     6,
+      reportResolve:      21_000,
+      REPORT_RESOLVE:     21_000,
 
-      // Misc
-      COMPUTATION:        1,
-      defaultMin:         6
+      // Fallback
+      defaultMin:         21_000,
+      DEFAULT:            21_000,
     };
 
-    // Keep a `gasCosts` alias so any legacy code that still reads this.gasCosts
-    // doesn't break silently.
+    // Legacy alias — some old callers may read this.gasCosts
     this.gasCosts = this.costs;
 
-    // ─── Limits ──────────────────────────────────────────────────────────────
+    // ─── Limits ──────────────────────────────────────────────────────────
     this.limits = {
-      maxGasPerBlock:   10_000_000,
-      maxGasPerTx:       5_000_000,
-      minGasPrice:       1,       // 1 wei per gas unit
-      maxExecutionTime:  50,      // ms
-      maxStateSize:      51_200,  // 50 KB
-      maxInstructions:   10_000
+      maxGasPerBlock:    config.maxGasPerBlock    || 50_000_000,
+      maxGasPerTx:       config.maxGasPerTx       || 10_000_000,
+      minGasPrice:       config.minGasPrice        || 1,
+      maxExecutionTime:  config.maxExecutionTime   || 5_000,    // ms
+      maxStateSize:      config.maxStateSize       || 512_000,  // bytes
+      maxInstructions:   config.maxInstructions    || 100_000,
     };
+
+    // Base units per gas unit (from config — differs testnet vs mainnet)
+    this.defaultGasPrice = config.defaultGasPrice || 1;
   }
 
-  /**
-   * Pre-flight gas estimate used by addTransaction() to validate gasLimit.
-   * Must be ≤ what execution will actually charge (execution gets billed on top
-   * of this via gasTracker; we just need the floor here).
-   */
+  // ─── Pre-flight gas estimate ──────────────────────────────────────────────
+  // Returns the minimum gas units this tx type must declare as gasLimit.
+  // Execution may use more (storage ops inside contracts) but never less.
   calculateTransactionGas(tx) {
     switch (tx.type) {
       case 'TRANSFER':
@@ -103,63 +101,80 @@ class GasCalculator {
         return this.costs.stake;
 
       case 'CONTRACT_DEPLOY': {
-        // Guard against payload styles: tx.data.code may be top-level or nested
-        const code = tx.data.code || '';
-        // Base cost + 1 gas per 100 bytes of code (ContractEngine bills per byte
-        // at storageByte=0.01, so 100 bytes = 1 gas unit — same formula, consistent)
-        return this.costs.contractDeploy + Math.floor(code.length / 100);
+        const code = tx.data?.code || '';
+        // +1 gas unit per 10 bytes of code (matches ContractEngine storageByte billing)
+        return this.costs.contractDeploy + Math.floor(code.length / 10);
       }
 
       case 'CONTRACT_CALL':
-        return this.costs.CONTRACT_CALL_BASE;
+        return this.costs.contractCall;
 
       case 'CONTRACT_UPGRADE': {
-        const code = tx.data.newCode || '';
-        return this.costs.contractUpgrade + Math.floor(code.length / 100);
+        const code = tx.data?.newCode || '';
+        return this.costs.contractUpgrade + Math.floor(code.length / 10);
       }
 
-      // ✅ Phase 9 native types — must match what blockchain.js createBlock() charges
-      case 'REPORT_CREATE':
-        return this.costs.reportCreate;
-
-      case 'REPORT_VERIFY':
-        return this.costs.reportVerify;
-
-      case 'REPORT_RESOLVE':
-        return this.costs.reportResolve;
+      case 'REPORT_CREATE':  return this.costs.reportCreate;
+      case 'REPORT_VERIFY':  return this.costs.reportVerify;
+      case 'REPORT_RESOLVE': return this.costs.reportResolve;
 
       default:
         return this.costs.defaultMin;
     }
   }
 
+  // ─── Fee calculation ──────────────────────────────────────────────────────
+  // Returns fee in base units. This is what gets deducted from wallet balance.
+  calculateFee(gasUsed, gasPrice) {
+    return gasUsed * (gasPrice || this.defaultGasPrice);
+  }
+
+  // ─── Sponsorship ──────────────────────────────────────────────────────────
+  // Determine who pays gas for a contract call based on contract's feePolicy.
+  // Returns: { payer: 'user'|'sponsor'|'none', payerAddress: string }
+  resolveFeePolicy(contract, callerAddress) {
+    const policy = contract?.feePolicy || 'user';
+
+    switch (policy) {
+      case 'free':
+        return { payer: 'none', payerAddress: null };
+
+      case 'sponsor':
+        // Gas comes from contract deployer's sponsor balance.
+        // If sponsor balance is exhausted, fall back to user.
+        return { payer: 'sponsor', payerAddress: contract.creator };
+
+      case 'user':
+      default:
+        return { payer: 'user', payerAddress: callerAddress };
+    }
+  }
+
+  // ─── Validation ──────────────────────────────────────────────────────────
   validateGasParams(tx) {
-    if (!tx.gasLimit || !tx.gasPrice) {
-      throw new Error('Missing gas parameters');
+    if (tx.gasLimit === undefined || tx.gasLimit === null) {
+      throw new Error('gasLimit is required');
     }
-
+    if (tx.gasPrice === undefined || tx.gasPrice === null) {
+      throw new Error('gasPrice is required');
+    }
     if (tx.gasPrice < this.limits.minGasPrice) {
-      throw new Error(`Gas price too low. Minimum: ${this.limits.minGasPrice}`);
+      throw new Error(`gasPrice too low. Minimum: ${this.limits.minGasPrice} base units/gas`);
     }
-
     if (tx.gasLimit > this.limits.maxGasPerTx) {
-      throw new Error(`Gas limit too high. Maximum: ${this.limits.maxGasPerTx}`);
+      throw new Error(`gasLimit too high. Maximum: ${this.limits.maxGasPerTx}`);
     }
-
     return true;
   }
 
-  calculateGasCost(gasUsed, gasPrice) {
-    return gasUsed * gasPrice;
-  }
-
+  // ─── Execution tracker ───────────────────────────────────────────────────
   trackExecution() {
     return {
       gasUsed:      0,
       stateReads:   0,
       stateWrites:  0,
       instructions: 0,
-      startTime:    Date.now()
+      startTime:    Date.now(),
     };
   }
 
@@ -170,13 +185,25 @@ class GasCalculator {
     if (tracker.instructions > this.limits.maxInstructions) {
       throw new Error('Execution limit exceeded: too many instructions');
     }
-
-    const elapsed = Date.now() - tracker.startTime;
-    if (elapsed > this.limits.maxExecutionTime) {
+    if (Date.now() - tracker.startTime > this.limits.maxExecutionTime) {
       throw new Error('Execution limit exceeded: timeout');
     }
 
     return tracker;
+  }
+
+  // ─── Display helpers ─────────────────────────────────────────────────────
+  // Convert base units → SAYN string with 4 decimal places.
+  // e.g. formatSAYN(105000) → "0.0105 SAYN"
+  formatSAYN(baseUnits) {
+    const decimals = this.config.decimals || 10_000;
+    return (baseUnits / decimals).toFixed(4) + ' SAYN';
+  }
+
+  // Human-readable fee string for a transaction.
+  describeFee(gasUsed, gasPrice) {
+    const fee = this.calculateFee(gasUsed, gasPrice);
+    return `${gasUsed.toLocaleString()} gas × ${gasPrice} = ${this.formatSAYN(fee)}`;
   }
 }
 
