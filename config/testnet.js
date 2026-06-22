@@ -107,6 +107,5 @@ export default {
   maxStateSize:      512_000,               // 500 KB per contract state
 
   // ─── Supply ──────────────────────────────────────────────────────────────
-  // Testnet has no hard supply cap — tokens are not real value.
   maxSupply:         0,                     // 0 = unlimited on testnet
 };
