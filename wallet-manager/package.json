@@ -4,6 +4,14 @@
     "description": "Multi-wallet manager for Sayman Blockchain with Swiss design",
     "main": "index.html",
     "scripts": {
-      "start": "npx http-server -p 8080"
+        "start": "npx http-server -p 8080"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@capacitor/android": "^8.4.0",
+        "@capacitor/cli": "^7.6.6",
+        "@capacitor/core": "^8.4.0"
     }
-  }
+}

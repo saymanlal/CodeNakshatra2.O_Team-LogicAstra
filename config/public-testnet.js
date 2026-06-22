@@ -12,9 +12,9 @@ export default {
   maxPeers: 50,
   bootstrapPeers: [],
   faucetEnabled: true,
-  faucetAmount: 100,
-  faucetCooldown: 600000,
-  
+  faucetAmount: 1000,
+  faucetCooldown: 60000,
+
   genesis: {
     timestamp: 1704067200000,
     allocations: {
@@ -23,20 +23,24 @@ export default {
       'validator1': 10000
     }
   },
-  
+
   gasLimits: {
     maxGasPerBlock: 10000000,
     minGasPrice: 1
   },
-  
+
+  // ✅ Realistic gas costs — total deploy costs ~5-10 SAYM, not 100,000
   gasCosts: {
-    TRANSFER: 21000,
-    STAKE: 50000,
-    UNSTAKE: 50000,
-    CONTRACT_DEPLOY: 100000,
-    CONTRACT_CALL: 50000
+    TRANSFER:        6,
+    STAKE:           10,
+    UNSTAKE:         10,
+    CONTRACT_DEPLOY: 5,
+    CONTRACT_CALL:   2,
+    REPORT_CREATE:   3,
+    REPORT_VERIFY:   2,
+    REPORT_RESOLVE:  2
   },
-  
+
   maxContractSize: 100000,
   maxExecutionSteps: 50000,
   maxSupply: 21000000

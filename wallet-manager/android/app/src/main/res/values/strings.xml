@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">PUKY Wallet</string>
+    <string name="title_activity_main">PUKY Wallet</string>
+    <string name="custom_url_scheme">puky</string>
+</resources>

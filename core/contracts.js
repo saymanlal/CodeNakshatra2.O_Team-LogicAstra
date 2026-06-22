@@ -1,147 +1,191 @@
+/**
+ * ContractEngine — SAYMAN Chain
+ *
+ * Key improvements over previous version:
+ *
+ * 1. STATE PERSISTENCE — the single most critical fix.
+ *    Previously contract.state mutations inside the sandbox were not written
+ *    back to the chain's state store. setState() now calls both
+ *    state.setContractState() AND updates contract.state in-memory so both
+ *    the persistent store and the in-memory contracts Map stay in sync.
+ *    On next call, state is loaded from the persistent store first.
+ *
+ * 2. SPONSORSHIP / FEE POLICY
+ *    Contracts declare feePolicy at deploy time:
+ *      'user'    — gas paid by tx sender (default)
+ *      'sponsor' — gas paid from deployer's sponsor balance
+ *      'free'    — no gas charged at all (testnet / internal apps)
+ *    GasCalculator.resolveFeePolicy() handles routing.
+ *
+ * 3. CLEAN CONTRACT FORMAT
+ *    Contracts are plain JS classes or objects. The VM wraps them safely.
+ *    Three styles supported (backward compatible):
+ *      A. Class: class MyContract { createReport(args) { ... } }
+ *      B. Object: const contract = { methods: { createReport(args){} } }
+ *      C. Flat functions: function createReport(args) { ... }
+ *
+ * 4. RETURN VALUES & EVENTS
+ *    Method return values are captured and passed back to the caller.
+ *    emit() logs events to both in-memory array and persistent state store.
+ *
+ * 5. READABLE LOGS
+ *    Every deploy and call logs name, method, gas used, and events emitted.
+ */
+
 import crypto from 'crypto';
 import vm from 'vm';
 
-/**
- * Contract Engine — Phase 9: Smart Contract Platform
- *
- * Fixes from Phase 8:
- *  - contract.state exposed as `state` (not contract.state) in sandbox
- *  - msg.sender available inside contracts
- *  - Return values captured and returned to caller
- *  - emit() event system wired in
- *  - Contract metadata (name, version, abi) stored on deploy
- *  - New contract style: `contract = { methods: { ... } }`
- *  - Backward-compatible with old flat function style
- *  - Execution memory limit added
- */
-
 class ContractEngine {
   constructor(state, gas) {
-    this.state = state;
-    this.gas = gas;
-    this.contracts = new Map();
-    // Phase 9: global event log
-    this.events = [];
+    this.state    = state;
+    this.gas      = gas;
+    this.contracts = new Map();   // in-memory cache
+    this.events    = [];          // global event log (in-memory)
   }
 
+  // ─── Deploy ────────────────────────────────────────────────────────────────
+
   /**
-   * Deploy a contract.
    * @param {string} from - deployer address
-   * @param {object|string} contractPayload - { name, version, abi, code } or raw code string
+   * @param {object|string} payload - { name, version, abi, code, feePolicy? } or raw string
    * @param {number} timestamp
    * @param {object} gasTracker
    * @returns {string} contractAddress
    */
-  deploy(from, contractPayload, timestamp, gasTracker) {
-    // Support both old (raw string) and new (object) deploy format
-    let name, version, abi, code;
+  deploy(from, payload, timestamp, gasTracker) {
+    let name, version, abi, code, feePolicy;
 
-    if (typeof contractPayload === 'string') {
-      code = contractPayload;
-      name = 'UnnamedContract';
-      version = '1.0.0';
-      abi = this._extractABI(code);
+    if (typeof payload === 'string') {
+      code       = payload;
+      name       = 'Contract';
+      version    = '1.0.0';
+      abi        = this._extractABI(code);
+      feePolicy  = 'user';
     } else {
-      code    = contractPayload.code;
-      name    = contractPayload.name    || 'UnnamedContract';
-      version = contractPayload.version || '1.0.0';
-      abi     = contractPayload.abi     || this._extractABI(code);
+      code       = payload.code;
+      name       = payload.name       || 'Contract';
+      version    = payload.version    || '1.0.0';
+      abi        = payload.abi        || this._extractABI(code);
+      feePolicy  = payload.feePolicy  || 'user';   // 'user' | 'sponsor' | 'free'
     }
 
-    const contractAddress = this.generateContractAddress(from, timestamp);
-    const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+    if (!code) throw new Error('Contract code is required');
+
+    // Validate feePolicy value
+    if (!['user', 'sponsor', 'free'].includes(feePolicy)) {
+      throw new Error(`Invalid feePolicy: ${feePolicy}. Must be 'user', 'sponsor', or 'free'`);
+    }
+
+    const contractAddress = this._generateAddress(from, timestamp);
+    const codeHash        = crypto.createHash('sha256').update(code).digest('hex');
+
+    // Charge gas: base deploy cost + 1 gas unit per 10 bytes of code
+    const deployGas = this.gas.costs.contractDeploy + Math.floor(code.length / 10);
+    gasTracker.gasUsed += deployGas;
 
     const contract = {
-      address: contractAddress,
+      address:     contractAddress,
       name,
       version,
       abi,
       code,
       codeHash,
-      creator: from,
-      state: {},
-      createdAt: timestamp
+      creator:     from,
+      feePolicy,
+      state:       {},              // persistent state — key/value store
+      sponsorBalance: 0,           // base units available for 'sponsor' policy
+      createdAt:   timestamp,
     };
 
+    // Save to in-memory cache
     this.contracts.set(contractAddress, contract);
-    this.state.deployContract(contractAddress, code, from, { name, version, abi, codeHash });
 
-    gasTracker.gasUsed += this.gas.costs.contractDeploy + (code.length * this.gas.costs.storageByte);
+    // Save to persistent state store
+    this.state.deployContract(contractAddress, code, from, {
+      name, version, abi, codeHash, feePolicy,
+    });
 
-    console.log(`📜 Contract deployed: [${name} v${version}] ${contractAddress.substring(0, 8)}... by ${from.substring(0, 8)}... | CodeHash: ${codeHash.substring(0, 8)}...`);
+    console.log(
+      `📜 Deployed [${name} v${version}] ${contractAddress.slice(0, 8)}...` +
+      ` by ${from.slice(0, 8)}... | policy: ${feePolicy} | gas: ${deployGas}`
+    );
 
     return contractAddress;
   }
 
+  // ─── Call ──────────────────────────────────────────────────────────────────
+
   /**
-   * Call a contract method.
-   * @returns {*} return value from the method
+   * @param {string} from - caller address
+   * @param {string} contractAddress
+   * @param {string} method
+   * @param {object} args
+   * @param {object} gasTracker
+   * @param {number} gasLimit - caller's declared gasLimit
+   * @returns {*} return value from method
    */
   call(from, contractAddress, method, args, gasTracker, gasLimit) {
-    const contract = this.contracts.get(contractAddress) || this.state.getContract(contractAddress);
+    // Load contract — persistent store is source of truth, in-memory is cache
+    const contract = this._loadContract(contractAddress);
+    if (!contract) throw new Error(`Contract not found: ${contractAddress}`);
 
-    if (!contract) {
-      throw new Error(`Contract not found: ${contractAddress}`);
-    }
+    // Resolve fee policy
+    const feeInfo = this.gas.resolveFeePolicy(contract, from);
 
+    // Base call gas charge
     gasTracker.gasUsed += this.gas.costs.contractCall;
 
-    // Captured events from this call
     const callEvents = [];
-    let returnValue = undefined;
+    let returnValue  = undefined;
+
+    // ─── Sandbox ────────────────────────────────────────────────────────────
+    // Load current persistent state snapshot for this contract
+    const persistedState = this.state.getContractFullState(contractAddress) || {};
+    // Merge with in-memory (persistent is authoritative)
+    const stateSnapshot  = { ...contract.state, ...persistedState };
 
     const sandbox = {
-      // ✅ Fix 1: expose state directly (not contract.state)
-      state: contract.state,
+      // msg — standard across all contract calls
+      msg: { sender: from, caller: from },
 
-      // ✅ Fix 2: msg.sender
-      msg: {
-        sender: from,
-        caller: from
-      },
-
-      caller: from,
+      // args passed to this method call
       args: args || {},
-      method,
+
+      // blockTimestamp — available for contracts that need it
       blockTimestamp: Date.now(),
 
+      // Safe console inside contract VM
       console: {
-        log: (...a) => console.log('[Contract Log]', ...a),
-        error: (...a) => console.error('[Contract Error]', ...a)
+        log:   (...a) => console.log(`  [${contract.name}]`, ...a),
+        error: (...a) => console.error(`  [${contract.name}]`, ...a),
       },
 
-      // ✅ Fix 3: emit() event support
-      emit: (eventName, data) => {
-        const event = {
-          contract: contractAddress,
-          contractName: contract.name || 'Unknown',
-          event: eventName,
-          data: data || {},
-          timestamp: Date.now()
-        };
-        callEvents.push(event);
-        this.events.push(event);
-        this.state.addEvent(event);
-        console.log(`📡 Event [${eventName}] from ${contractAddress.substring(0, 8)}...`);
-      },
-
+      // ── State access ──────────────────────────────────────────────────────
+      // getState / setState persist through both in-memory AND state store.
+      // This is the core fix: mutations inside the VM are not lost.
       getState: (key) => {
         gasTracker.gasUsed += this.gas.costs.storageRead;
-        return this.state.getContractState(contractAddress, key);
+        gasTracker.stateReads++;
+        const value = this.state.getContractState(contractAddress, key)
+                   ?? stateSnapshot[key];
+        return value;
       },
 
       setState: (key, value) => {
         gasTracker.gasUsed += this.gas.costs.storageWrite;
+        gasTracker.stateWrites++;
+        // Write to persistent store
         this.state.setContractState(contractAddress, key, value);
-        contract.state[key] = value;
+        // Keep in-memory contract in sync
+        contract.state[key]    = value;
+        stateSnapshot[key]     = value;
       },
 
+      // ── Token transfers from contract ────────────────────────────────────
       transfer: (to, amount) => {
         gasTracker.gasUsed += this.gas.costs.transfer;
-        const contractBalance = this.state.getBalance(contractAddress);
-        if (contractBalance < amount) {
-          throw new Error('Insufficient contract balance');
-        }
+        const bal = this.state.getBalance(contractAddress);
+        if (bal < amount) throw new Error(`Contract balance too low: has ${bal}, needs ${amount}`);
         this.state.subtractBalance(contractAddress, amount);
         this.state.addBalance(to, amount);
       },
@@ -151,141 +195,253 @@ class ContractEngine {
         return this.state.getBalance(address);
       },
 
-      // ✅ Fix 4: require() helper for contract assertions
-      require: (condition, message) => {
-        if (!condition) throw new Error(message || 'Requirement not met');
+      // ── Events ───────────────────────────────────────────────────────────
+      emit: (eventName, data) => {
+        const event = {
+          contract:     contractAddress,
+          contractName: contract.name,
+          event:        eventName,
+          data:         data || {},
+          timestamp:    Date.now(),
+        };
+        callEvents.push(event);
+        this.events.push(event);
+        this.state.addEvent(event);
       },
 
-      // Expose crypto hash utility for contracts
-      hash: (data) => crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex')
+      // ── Utility ──────────────────────────────────────────────────────────
+      require: (condition, message) => {
+        if (!condition) throw new Error(message || 'Requirement failed');
+      },
+
+      hash: (data) =>
+        crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex'),
+
+      // For contracts that need to generate addresses (e.g. sub-contracts)
+      generateAddress: (seed) =>
+        crypto.createHash('sha256').update(seed + Date.now()).digest('hex').slice(0, 40),
+
+      // Internal — captured return value
+      __returnValue: undefined,
     };
 
     const context = vm.createContext(sandbox);
 
+    // ─── Execution ──────────────────────────────────────────────────────────
     try {
-      // ✅ Phase 9: Support BOTH contract styles:
-      //
-      // Style A (new — preferred):
-      //   contract = { methods: { createReport(args) { ... } } }
-      //
-      // Style B (old — backward compatible):
-      //   function createReport(args) { ... }
-
       const script = new vm.Script(`
         (function() {
           ${contract.code}
 
-          // Style A: contract = { methods: { ... } }
-          if (typeof contract !== 'undefined' && contract.methods && typeof contract.methods['${method}'] === 'function') {
+          // Style A: class MyContract { methodName(args) {} }
+          // Instantiate with current state so 'this' works normally
+          const _classes = Object.keys(globalThis).filter(k => {
+            try { return typeof globalThis[k] === 'function' && /^[A-Z]/.test(k); } catch { return false; }
+          });
+          for (const _cls of _classes) {
+            try {
+              const _inst = new globalThis[_cls]();
+              if (typeof _inst['${method}'] === 'function') {
+                // Give instance access to state helpers via 'this.state'
+                _inst.getState  = getState;
+                _inst.setState  = setState;
+                _inst.emit      = emit;
+                _inst.transfer  = transfer;
+                _inst.getBalance = getBalance;
+                _inst.require   = require;
+                _inst.msg       = msg;
+                __returnValue   = _inst['${method}'](args);
+                return;
+              }
+            } catch (_e) {}
+          }
+
+          // Style B: const contract = { methods: { methodName(args){} } }
+          if (typeof contract !== 'undefined' && contract && contract.methods &&
+              typeof contract.methods['${method}'] === 'function') {
             __returnValue = contract.methods['${method}'](args);
             return;
           }
 
-          // Style B: flat function
+          // Style C: flat function methodName(args) {}
           if (typeof ${method} === 'function') {
             __returnValue = ${method}(args);
             return;
           }
 
-          throw new Error('Method ${method} not found in contract');
+          throw new Error('Method not found: ${method}');
         })();
       `);
 
-      sandbox.__returnValue = undefined;
-
       script.runInContext(context, {
-        timeout: 5000,
-        breakOnSigint: true
+        timeout:       this.gas.limits.maxExecutionTime || 5000,
+        breakOnSigint: true,
       });
 
-      // ✅ Fix 5: capture return value
       returnValue = sandbox.__returnValue;
 
-      if (gasTracker.gasUsed > gasLimit) {
-        throw new Error('Out of gas');
-      }
-
-      console.log(`📞 Contract call: ${contractAddress.substring(0, 8)}...::${method} | Gas: ${gasTracker.gasUsed} | Events: ${callEvents.length}`);
-
-    } catch (error) {
-      console.error(`Contract execution error in ${contract.name || contractAddress}::${method}: ${error.message}`);
-      throw new Error(`Contract execution failed: ${error.message}`);
+    } catch (err) {
+      throw new Error(`${contract.name}::${method} failed — ${err.message}`);
     }
+
+    // ─── Gas limit check ────────────────────────────────────────────────────
+    if (gasTracker.gasUsed > gasLimit) {
+      throw new Error(
+        `Out of gas: used ${gasTracker.gasUsed}, limit ${gasLimit}`
+      );
+    }
+
+    console.log(
+      `📞 ${contract.name}::${method} | gas: ${gasTracker.gasUsed}` +
+      ` | reads: ${gasTracker.stateReads} | writes: ${gasTracker.stateWrites}` +
+      ` | events: ${callEvents.length} | fee: ${feeInfo.payer}`
+    );
 
     return returnValue;
   }
 
+  // ─── Query (read-only, no gas) ────────────────────────────────────────────
+
   /**
-   * Query events — filter by contract, event name, or block range
+   * Read-only contract call — no gas charged, state writes are silently ignored.
+   * Use for frontend queries like getBalance(), getReport(), etc.
    */
+  query(contractAddress, method, args) {
+    const contract = this._loadContract(contractAddress);
+    if (!contract) throw new Error(`Contract not found: ${contractAddress}`);
+
+    const persistedState = this.state.getContractFullState(contractAddress) || {};
+    const stateSnapshot  = { ...contract.state, ...persistedState };
+
+    const sandbox = {
+      msg:            { sender: '0x0', caller: '0x0' },
+      args:           args || {},
+      blockTimestamp: Date.now(),
+      console:        { log: () => {}, error: () => {} },
+
+      getState:       (key) => stateSnapshot[key] ?? this.state.getContractState(contractAddress, key),
+      setState:       () => {},   // no-op in query mode
+      emit:           () => {},
+      transfer:       () => { throw new Error('transfer not allowed in query'); },
+      getBalance:     (address) => this.state.getBalance(address),
+      require:        (cond, msg) => { if (!cond) throw new Error(msg || 'Requirement failed'); },
+      hash:           (data) => crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex'),
+      __returnValue:  undefined,
+    };
+
+    const context = vm.createContext(sandbox);
+
+    new vm.Script(`
+      (function() {
+        ${contract.code}
+
+        const _classes = Object.keys(globalThis).filter(k => {
+          try { return typeof globalThis[k] === 'function' && /^[A-Z]/.test(k); } catch { return false; }
+        });
+        for (const _cls of _classes) {
+          try {
+            const _inst = new globalThis[_cls]();
+            if (typeof _inst['${method}'] === 'function') {
+              _inst.getState = getState; _inst.setState = setState;
+              _inst.emit = emit; _inst.require = require;
+              _inst.msg = msg;
+              __returnValue = _inst['${method}'](args);
+              return;
+            }
+          } catch {}
+        }
+        if (typeof contract !== 'undefined' && contract?.methods?.['${method}']) {
+          __returnValue = contract.methods['${method}'](args); return;
+        }
+        if (typeof ${method} === 'function') {
+          __returnValue = ${method}(args); return;
+        }
+        throw new Error('Method not found: ${method}');
+      })();
+    `).runInContext(context, { timeout: 2000 });
+
+    return sandbox.__returnValue;
+  }
+
+  // ─── Sponsor balance management ───────────────────────────────────────────
+
+  /**
+   * Deployer tops up the contract's sponsor gas tank.
+   * Called when feePolicy is 'sponsor' and deployer sends SAYN to fund user txs.
+   */
+  topUpSponsorBalance(contractAddress, amountBaseUnits) {
+    const contract = this._loadContract(contractAddress);
+    if (!contract) throw new Error(`Contract not found: ${contractAddress}`);
+    contract.sponsorBalance = (contract.sponsorBalance || 0) + amountBaseUnits;
+    this.state.setContractMeta(contractAddress, 'sponsorBalance', contract.sponsorBalance);
+    console.log(`💰 Sponsor balance topped up: ${contractAddress.slice(0, 8)}... +${amountBaseUnits} base units`);
+  }
+
+  getSponsorBalance(contractAddress) {
+    const contract = this._loadContract(contractAddress);
+    return contract?.sponsorBalance || 0;
+  }
+
+  // ─── Event queries ────────────────────────────────────────────────────────
+
   getEvents({ contractAddress, eventName, limit } = {}) {
     let results = [...this.events];
-
-    if (contractAddress) {
-      results = results.filter(e => e.contract === contractAddress);
-    }
-    if (eventName) {
-      results = results.filter(e => e.event === eventName);
-    }
-    if (limit) {
-      results = results.slice(-limit);
-    }
-
+    if (contractAddress) results = results.filter(e => e.contract === contractAddress);
+    if (eventName)       results = results.filter(e => e.event   === eventName);
+    if (limit)           results = results.slice(-limit);
     return results;
   }
 
-  /**
-   * Get all events for a specific contract
-   */
   getContractEvents(contractAddress) {
     return this.events.filter(e => e.contract === contractAddress);
   }
 
-  /**
-   * Simple ABI extractor — reads method names from contract code
-   * Supports both styles
-   */
-  _extractABI(code) {
-    const methods = [];
+  // ─── Registry ─────────────────────────────────────────────────────────────
 
-    // Style A: contract = { methods: { methodName(
-    const styleARegex = /(\w+)\s*\(/g;
-    // Style B: function methodName(
-    const styleBRegex = /function\s+(\w+)\s*\(/g;
-
-    let match;
-    while ((match = styleBRegex.exec(code)) !== null) {
-      if (!['if', 'for', 'while', 'switch'].includes(match[1])) {
-        methods.push(match[1]);
-      }
-    }
-
-    return [...new Set(methods)];
+  getContract(address) {
+    return this._loadContract(address);
   }
 
-  generateContractAddress(from, timestamp) {
+  getAllContracts() {
+    const stateContracts = this.state.getAllContracts?.() || [];
+    const combined = new Map(this.contracts);
+    stateContracts.forEach(c => {
+      if (!combined.has(c.address)) combined.set(c.address, c);
+    });
+    return Array.from(combined.values());
+  }
+
+  // ─── Internal helpers ─────────────────────────────────────────────────────
+
+  // Load from in-memory cache first, fall back to persistent state store.
+  _loadContract(address) {
+    if (this.contracts.has(address)) return this.contracts.get(address);
+    const persisted = this.state.getContract(address);
+    if (persisted) {
+      this.contracts.set(address, persisted); // warm the cache
+      return persisted;
+    }
+    return null;
+  }
+
+  _generateAddress(from, timestamp) {
     return crypto
       .createHash('sha256')
       .update(from + timestamp.toString())
       .digest('hex')
-      .substring(0, 40);
+      .slice(0, 40);
   }
 
-  getContract(address) {
-    return this.contracts.get(address) || this.state.getContract(address);
-  }
-
-  getAllContracts() {
-    const stateContracts = this.state.getAllContracts();
-    const combined = new Map(this.contracts);
-
-    stateContracts.forEach(contract => {
-      if (!combined.has(contract.address)) {
-        combined.set(contract.address, contract);
-      }
-    });
-
-    return Array.from(combined.values());
+  // Extracts method names from flat-function style contracts for ABI generation.
+  _extractABI(code) {
+    const methods   = [];
+    const fnRegex   = /function\s+(\w+)\s*\(/g;
+    let match;
+    const reserved  = new Set(['if', 'for', 'while', 'switch', 'catch', 'function']);
+    while ((match = fnRegex.exec(code)) !== null) {
+      if (!reserved.has(match[1])) methods.push(match[1]);
+    }
+    return [...new Set(methods)];
   }
 }
 

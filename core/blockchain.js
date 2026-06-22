@@ -1,3 +1,31 @@
+/**
+ * Blockchain — SAYMAN Chain
+ *
+ * Key changes from previous version:
+ *
+ * 1. HALVING BLOCK REWARD
+ *    createBlock() calls config.getBlockReward(blockHeight) if available,
+ *    falling back to config.blockReward. Mainnet reward halves every
+ *    ~12.6M blocks (2 years). Testnet uses fixed reward.
+ *
+ * 2. SPONSORSHIP GAS ROUTING
+ *    When a CONTRACT_CALL targets a contract with feePolicy 'sponsor',
+ *    gas fee is deducted from the contract's sponsorBalance (funded by
+ *    deployer) instead of the caller's wallet. feePolicy 'free' skips
+ *    all gas deduction. applyTransaction() handles all three cases.
+ *
+ * 3. BASE UNIT MATH
+ *    All balances, rewards, and fees are in base units (1 SAYN = 10,000).
+ *    No floating point anywhere in chain logic.
+ *
+ * 4. READABLE VALIDATOR LOGS
+ *    Block log shows block reward in SAYN display units, not raw base units.
+ *
+ * 5. SUPPLY CAP ENFORCEMENT (mainnet)
+ *    createBlock() checks total supply before minting reward tx.
+ *    config.maxSupply = 0 means unlimited (testnet).
+ */
+
 import crypto from 'crypto';
 import elliptic from 'elliptic';
 import Block from './block.js';
@@ -11,31 +39,21 @@ import fs from 'fs';
 import path from 'path';
 
 const EC = elliptic.ec;
-const ec = new EC('secp256k1');
-
-/**
- * Blockchain — Phase 9: Smart Contract Platform
- *
- * New in Phase 9:
- *  - applyTransaction() handles REPORT_CREATE, REPORT_VERIFY, REPORT_RESOLVE, REPUTATION_UPDATE
- *  - createBlock() dispatches contract payload correctly (name/version/abi)
- *  - getEvents() / getContractEvents() public API
- *  - getReputation() public API
- *  - getContractRegistry() — list all deployed contracts with metadata
- *  - addTransaction() validates new tx types
- */
+const ec  = new EC('secp256k1');
 
 class Blockchain {
   constructor(config, dbPath = null) {
     this.config      = config;
     this.chainId     = config.chainId;
     this.networkName = config.networkName;
-    this.chain       = [];
-    this.mempool     = [];
-    this.state       = new StateEngine();
-    this.pos         = new ProofOfStake(this.state, config);
-    this.gas         = new GasCalculator(config);
-    this.contracts   = new ContractEngine(this.state, this.gas);
+    this.decimals    = config.decimals || 10_000;
+
+    this.chain     = [];
+    this.mempool   = [];
+    this.state     = new StateEngine();
+    this.pos       = new ProofOfStake(this.state, config);
+    this.gas       = new GasCalculator(config);
+    this.contracts = new ContractEngine(this.state, this.gas);
 
     const finalDbPath = dbPath || `./data/${config.chainId}`;
     this.db = new Level(finalDbPath, { valueEncoding: 'json' });
@@ -44,38 +62,37 @@ class Blockchain {
     this.snapshotDir      = `./data/snapshots/${config.chainId}`;
     this.ensureSnapshotDir();
 
-    this.isProducing   = false;
-    this.mempoolLimit  = 1000;
+    this.isProducing    = false;
+    this.mempoolLimit   = 1000;
     this.addressTxCount = new Map();
-    this.lastCleanup   = Date.now();
+    this.lastCleanup    = Date.now();
 
-    // ✅ Phase 9: in-memory report index for fast queries
+    // Mempool-level pending nonce tracking (reset after each block)
+    this.pendingNonces = new Map();
+
+    // In-memory report index
     this.reportIndex = new Map();
   }
 
   ensureSnapshotDir() {
-    if (!fs.existsSync('./data/snapshots')) {
-      fs.mkdirSync('./data/snapshots', { recursive: true });
-    }
-    if (!fs.existsSync(this.snapshotDir)) {
-      fs.mkdirSync(this.snapshotDir, { recursive: true });
-    }
+    fs.mkdirSync('./data/snapshots',  { recursive: true });
+    fs.mkdirSync(this.snapshotDir,    { recursive: true });
   }
 
   // ─── Initialization ─────────────────────────────────────────────────────────
 
   async initialize() {
-    console.log('🔄 Initializing blockchain...');
+    console.log(`\n🔄 Initializing ${this.networkName}...`);
 
     try {
       const snapshot = await this.loadLatestSnapshot();
 
       if (snapshot) {
-        console.log(`📸 Loading from snapshot at block ${snapshot.blockHeight}...`);
+        console.log(`📸 Snapshot at block ${snapshot.blockHeight} — loading...`);
         this.state.importState(snapshot.state);
 
-        const savedChain = await this.db.get('chain');
-        if (savedChain && savedChain.length > snapshot.blockHeight) {
+        const savedChain = await this.db.get('chain').catch(() => null);
+        if (savedChain?.length > snapshot.blockHeight) {
           for (let i = 0; i <= snapshot.blockHeight; i++) {
             this.chain.push(await Block.fromJSON(savedChain[i]));
           }
@@ -85,39 +102,38 @@ class Blockchain {
             this.applyBlock(block);
             this._verifyStateRoot(block);
           }
-          console.log(`✅ Loaded ${savedChain.length} blocks (${savedChain.length - snapshot.blockHeight} replayed)`);
         }
+
       } else {
         const savedChain = await this.db.get('chain').catch(() => null);
-
-        if (savedChain && savedChain.length > 0) {
-          console.log(`📚 Loading existing blockchain (${savedChain.length} blocks)...`);
-          for (const blockData of savedChain) {
-            this.chain.push(await Block.fromJSON(blockData));
-          }
-          console.log('🔄 Rebuilding state from blockchain...');
+        if (savedChain?.length > 0) {
+          console.log(`📚 Loading chain (${savedChain.length} blocks)...`);
+          for (const b of savedChain) this.chain.push(await Block.fromJSON(b));
           await this.replayState();
         } else {
           this.createGenesisBlock();
         }
       }
 
-      console.log('✅ Blockchain initialization complete');
-      console.log(`📊 Height: ${this.chain.length} | StateRoot: ${this.state.computeStateRoot().substring(0, 12)}...`);
+      const stateRoot = this.state.computeStateRoot().slice(0, 12);
+      console.log(`✅ Ready | Height: ${this.chain.length} | StateRoot: ${stateRoot}...`);
 
-    } catch (error) {
-      if (error.code === 'LEVEL_NOT_FOUND') {
+    } catch (err) {
+      if (err.code === 'LEVEL_NOT_FOUND') {
         this.createGenesisBlock();
       } else {
-        throw error;
+        throw err;
       }
     }
   }
 
   _verifyStateRoot(block) {
-    const computedRoot = this.state.computeStateRoot();
-    if (block.stateRoot && block.stateRoot !== computedRoot) {
-      throw new Error(`State root mismatch at block ${block.index}. Expected: ${block.stateRoot}, Got: ${computedRoot}`);
+    const computed = this.state.computeStateRoot();
+    if (block.stateRoot && block.stateRoot !== computed) {
+      throw new Error(
+        `State root mismatch at block ${block.index}. ` +
+        `Expected: ${block.stateRoot}, Got: ${computed}`
+      );
     }
   }
 
@@ -125,47 +141,54 @@ class Blockchain {
 
   createGenesisBlock() {
     console.log('🌱 Creating genesis block...');
-    const genesisConfig = this.config.genesis;
-    const allocations   = genesisConfig.allocations || {};
+    const alloc = this.config.genesis.allocations || {};
 
-    const faucetSeed    = 'sayman-faucet-seed-2024';
-    const faucetHash    = crypto.createHash('sha256').update(faucetSeed).digest('hex');
-    const faucetKP      = ec.keyFromPrivate(faucetHash);
-    const faucetPub     = faucetKP.getPublic('hex');
-    const faucetAddress = crypto.createHash('sha256').update(faucetPub).digest('hex').substring(0, 40);
+    // Derive deterministic faucet keypair
+    const faucetKP  = ec.keyFromPrivate(
+      crypto.createHash('sha256').update('sayman-faucet-seed-2024').digest('hex')
+    );
+    const faucetPub = faucetKP.getPublic('hex');
+    const faucetAddr = crypto.createHash('sha256').update(faucetPub).digest('hex').slice(0, 40);
+    this.state.setPublicKey(faucetAddr, faucetPub);
 
-    this.state.setPublicKey(faucetAddress, faucetPub);
-
-    Object.entries(allocations).forEach(([key, amount]) => {
+    for (const [key, amount] of Object.entries(alloc)) {
       let address;
+
       if (key === 'faucet1') {
-        address = faucetAddress;
+        address = faucetAddr;
         this.state.addBalance(address, amount);
-        console.log(`✓ Faucet: ${address.substring(0, 8)}... (${amount} SAYM)`);
+        console.log(`  ✓ Faucet    ${address.slice(0, 10)}... ${this._fmt(amount)}`);
+
       } else if (key === 'validator1') {
-        const seed  = 'genesis-validator-' + this.chainId;
-        const kp    = ec.keyFromPrivate(crypto.createHash('sha256').update(seed).digest('hex'));
-        const pub   = kp.getPublic('hex');
-        address     = crypto.createHash('sha256').update(pub).digest('hex').substring(0, 40);
+        const kp  = ec.keyFromPrivate(
+          crypto.createHash('sha256').update('genesis-validator-' + this.chainId).digest('hex')
+        );
+        const pub = kp.getPublic('hex');
+        address   = crypto.createHash('sha256').update(pub).digest('hex').slice(0, 40);
+        // Give validator 2× so they have operating budget after staking
         this.state.addBalance(address, amount * 2);
         this.state.stake(address, amount);
         this.pos.addValidator(address, amount);
-        console.log(`✓ Validator: ${address.substring(0, 8)}... (Stake: ${amount})`);
-      } else {
-        const kp  = ec.keyFromPrivate(crypto.createHash('sha256').update(`genesis-${key}-${this.chainId}`).digest('hex'));
-        address   = crypto.createHash('sha256').update(kp.getPublic('hex')).digest('hex').substring(0, 40);
-        this.state.addBalance(address, amount);
-        console.log(`✓ ${key}: ${address.substring(0, 8)}... (${amount} SAYM)`);
-      }
-    });
+        console.log(`  ✓ Validator ${address.slice(0, 10)}... stake: ${this._fmt(amount)}`);
 
-    const genesis     = new Block(0, genesisConfig.timestamp, [], '0', 'genesis-validator', 0);
+      } else {
+        const kp = ec.keyFromPrivate(
+          crypto.createHash('sha256').update(`genesis-${key}-${this.chainId}`).digest('hex')
+        );
+        address = crypto.createHash('sha256').update(kp.getPublic('hex')).digest('hex').slice(0, 40);
+        this.state.addBalance(address, amount);
+        console.log(`  ✓ ${key.padEnd(10)} ${address.slice(0, 10)}... ${this._fmt(amount)}`);
+      }
+    }
+
+    const genesis     = new Block(0, this.config.genesis.timestamp, [], '0', 'genesis', 0);
+    genesis.chainId   = this.chainId;
     genesis.stateRoot = this.state.computeStateRoot();
     genesis.hash      = genesis.calculateHash();
 
     this.chain.push(genesis);
     this.saveBlock(genesis);
-    console.log(`✅ Genesis block | StateRoot: ${genesis.stateRoot.substring(0, 12)}...`);
+    console.log(`✅ Genesis | StateRoot: ${genesis.stateRoot.slice(0, 12)}...\n`);
     return genesis;
   }
 
@@ -176,8 +199,8 @@ class Blockchain {
     this.isProducing = true;
 
     try {
-      const lastBlock  = this.getLastBlock();
-      const validator  = this.pos.selectValidator(lastBlock.hash);
+      const lastBlock = this.getLastBlock();
+      const validator = this.pos.selectValidator(lastBlock.hash);
 
       if (!validator) {
         this.isProducing = false;
@@ -187,102 +210,129 @@ class Blockchain {
       const transactions = [];
       let blockGasUsed   = 0;
 
+      // ─── Process mempool ──────────────────────────────────────────────────
       for (const tx of this.mempool) {
         try {
           const gasTracker = this.gas.trackExecution();
 
-          if (tx.type === TX_TYPES.CONTRACT_DEPLOY) {
-            // ✅ Phase 9: pass full payload (name, version, abi, code)
-            const payload = tx.data.code
-              ? { name: tx.data.name, version: tx.data.version, abi: tx.data.abi, code: tx.data.code }
-              : tx.data.contractPayload;
-            this.contracts.deploy(tx.data.from, payload, tx.timestamp, gasTracker);
+          switch (tx.type) {
 
-          } else if (tx.type === TX_TYPES.CONTRACT_CALL) {
-            this.contracts.call(
-              tx.data.from,
-              tx.data.contractAddress,
-              tx.data.method,
-              tx.data.args,
-              gasTracker,
-              tx.gasLimit
-            );
-
-          } else if (tx.type === TX_TYPES.REPORT_CREATE) {
-            // ✅ Phase 9: index report for fast queries
-            gasTracker.gasUsed += this.gas.costs.transfer || 1000;
-            this.reportIndex.set(tx.id, {
-              txId:         tx.id,
-              reporter:     tx.data.from,
-              category:     tx.data.category,
-              severity:     tx.data.severity,
-              location:     tx.data.location,
-              evidenceHash: tx.data.evidenceHash,
-              description:  tx.data.description,
-              status:       'OPEN',
-              createdAt:    tx.timestamp
-            });
-
-          } else if (tx.type === TX_TYPES.REPORT_VERIFY) {
-            gasTracker.gasUsed += this.gas.costs.transfer || 1000;
-            const report = this.reportIndex.get(tx.data.reportId);
-            if (report) {
-              report.verified      = true;
-              report.confidence    = tx.data.confidence;
-              report.verifiedBy    = tx.data.verifier;
-              report.verifiedAt    = Date.now();
-              report.aiCategory    = tx.data.aiCategory;
+            case TX_TYPES.CONTRACT_DEPLOY: {
+              const payload = {
+                name:       tx.data.name,
+                version:    tx.data.version,
+                abi:        tx.data.abi,
+                code:       tx.data.code,
+                feePolicy:  tx.data.feePolicy || 'user',
+              };
+              this.contracts.deploy(tx.data.from, payload, tx.timestamp, gasTracker);
+              break;
             }
-            // Reward reporter reputation if valid
-            if (tx.data.isValid) {
-              const repTx = Transaction.updateReputation(
-                this.reportIndex.get(tx.data.reportId)?.reporter,
-                20,
-                'Valid report verified'
+
+            case TX_TYPES.CONTRACT_CALL: {
+              this.contracts.call(
+                tx.data.from,
+                tx.data.contractAddress,
+                tx.data.method,
+                tx.data.args,
+                gasTracker,
+                tx.gasLimit
               );
-              transactions.push(repTx);
+              break;
             }
 
-          } else if (tx.type === TX_TYPES.REPORT_RESOLVE) {
-            gasTracker.gasUsed += this.gas.costs.transfer || 1000;
-            const report = this.reportIndex.get(tx.data.reportId);
-            if (report) {
-              report.status     = tx.data.resolution;
-              report.resolvedBy = tx.data.authority;
-              report.resolvedAt = tx.data.resolvedAt;
-              report.note       = tx.data.note;
+            case TX_TYPES.REPORT_CREATE: {
+              gasTracker.gasUsed += this.gas.costs.reportCreate;
+              this.reportIndex.set(tx.id, {
+                txId:         tx.id,
+                reporter:     tx.data.from,
+                category:     tx.data.category,
+                severity:     tx.data.severity,
+                location:     tx.data.location,
+                evidenceHash: tx.data.evidenceHash,
+                description:  tx.data.description,
+                status:       'OPEN',
+                createdAt:    tx.timestamp,
+              });
+              break;
             }
 
-          } else {
-            gasTracker.gasUsed = this.gas.calculateTransactionGas(tx);
+            case TX_TYPES.REPORT_VERIFY: {
+              gasTracker.gasUsed += this.gas.costs.reportVerify;
+              const report = this.reportIndex.get(tx.data.reportId);
+              if (report) {
+                report.verified   = true;
+                report.confidence = tx.data.confidence;
+                report.verifiedBy = tx.data.verifier;
+                report.verifiedAt = Date.now();
+                report.aiCategory = tx.data.aiCategory;
+              }
+              if (tx.data.isValid && report?.reporter) {
+                transactions.push(Transaction.updateReputation(report.reporter, 20, 'Valid report'));
+              }
+              break;
+            }
+
+            case TX_TYPES.REPORT_RESOLVE: {
+              gasTracker.gasUsed += this.gas.costs.reportResolve;
+              const report = this.reportIndex.get(tx.data.reportId);
+              if (report) {
+                report.status     = tx.data.resolution;
+                report.resolvedBy = tx.data.authority;
+                report.resolvedAt = tx.data.resolvedAt;
+                report.note       = tx.data.note;
+              }
+              break;
+            }
+
+            default:
+              gasTracker.gasUsed = this.gas.calculateTransactionGas(tx);
           }
 
           if (blockGasUsed + gasTracker.gasUsed > this.gas.limits.maxGasPerBlock) continue;
 
-          tx.gasUsed = gasTracker.gasUsed;
+          tx.gasUsed    = gasTracker.gasUsed;
+          tx.feePolicy  = this._resolveTxFeePolicy(tx);
+
           transactions.push(tx);
           blockGasUsed += gasTracker.gasUsed;
 
-          const gasFee = tx.gasUsed * tx.gasPrice;
+          // Gas fee goes to validator (only if policy is 'user' or 'sponsor')
+          const gasFee = this._calculateTxFee(tx);
           if (gasFee > 0) {
             transactions.push(Transaction.createRewardFee(validator, gasFee));
           }
 
-        } catch (error) {
-          console.log(`⚠ Transaction ${tx.id.substring(0, 8)} failed: ${error.message}`);
+        } catch (err) {
+          console.log(`  ⚠ Tx ${tx.id.slice(0, 8)} failed: ${err.message}`);
         }
       }
 
+      // Clear mempool and pending nonces
       this.mempool = [];
+      this.pendingNonces.clear();
 
-      transactions.push(Transaction.createReward(validator, this.config.blockReward));
+      // ─── Block reward with halving ─────────────────────────────────────────
+      const blockHeight  = this.chain.length;
+      const blockReward  = typeof this.config.getBlockReward === 'function'
+        ? this.config.getBlockReward(blockHeight)
+        : this.config.blockReward;
 
+      // Enforce supply cap on mainnet (maxSupply = 0 means unlimited)
+      const maxSupply = this.config.maxSupply || 0;
+      if (maxSupply === 0 || this.state.getTotalSupply?.() + blockReward <= maxSupply) {
+        if (blockReward > 0) {
+          transactions.push(Transaction.createReward(validator, blockReward));
+        }
+      }
+
+      // Slashing
       for (const slash of this.pos.checkSlashing(this.config)) {
         transactions.push(Transaction.createSlash(slash.validator, slash.amount, slash.reason));
       }
 
       const block = new Block(
-        this.chain.length,
+        blockHeight,
         Date.now(),
         transactions,
         lastBlock.hash,
@@ -304,13 +354,19 @@ class Blockchain {
         await this.saveSnapshot(block.index);
       }
 
-      console.log(`✅ Block #${block.index} | Validator: ${validator.substring(0, 8)}... | Txs: ${block.transactions.length} | Gas: ${blockGasUsed} | Root: ${block.stateRoot.substring(0, 8)}...`);
+      console.log(
+        `✅ Block #${block.index} | ${validator.slice(0, 8)}...` +
+        ` | txs: ${block.transactions.length}` +
+        ` | gas: ${blockGasUsed.toLocaleString()}` +
+        ` | reward: ${this._fmt(blockReward)}` +
+        ` | root: ${block.stateRoot.slice(0, 8)}...`
+      );
 
       this.isProducing = false;
       return block;
 
-    } catch (error) {
-      console.error('Error creating block:', error);
+    } catch (err) {
+      console.error('Error creating block:', err);
       this.isProducing = false;
       return null;
     }
@@ -326,19 +382,21 @@ class Blockchain {
 
   applyTransaction(tx, blockIndex) {
     try {
-      const userTxTypes = new Set([
+      const userTypes = new Set([
         TX_TYPES.TRANSFER, TX_TYPES.STAKE, TX_TYPES.UNSTAKE,
         TX_TYPES.CONTRACT_DEPLOY, TX_TYPES.CONTRACT_CALL, TX_TYPES.CONTRACT_UPGRADE,
-        TX_TYPES.REPORT_CREATE, TX_TYPES.REPORT_VERIFY, TX_TYPES.REPORT_RESOLVE
+        TX_TYPES.REPORT_CREATE, TX_TYPES.REPORT_VERIFY, TX_TYPES.REPORT_RESOLVE,
       ]);
-
-      if (userTxTypes.has(tx.type)) {
+      if (userTypes.has(tx.type)) {
         this.state.incrementNonce(tx.data.from);
       }
 
-      const gasCost = (tx.gasUsed || 0) * (tx.gasPrice || 0);
+      const gasUsed  = tx.gasUsed   || 0;
+      const gasPrice = tx.gasPrice  || 0;
+      const gasCost  = gasUsed * gasPrice;   // base units
 
       switch (tx.type) {
+
         case TX_TYPES.GENESIS:
           this.state.addBalance(tx.data.to, tx.data.amount);
           break;
@@ -369,18 +427,34 @@ class Blockchain {
           break;
 
         case TX_TYPES.CONTRACT_DEPLOY:
+          // Gas deducted from deployer regardless of feePolicy (you pay to deploy)
           this.state.subtractBalance(tx.data.from, gasCost);
           break;
 
         case TX_TYPES.CONTRACT_CALL:
-          this.state.subtractBalance(tx.data.from, gasCost);
-          break;
+        case TX_TYPES.CONTRACT_UPGRADE: {
+          // Route gas based on feePolicy
+          const feePolicy = tx.feePolicy || 'user';
 
-        case TX_TYPES.CONTRACT_UPGRADE:
-          this.state.subtractBalance(tx.data.from, gasCost);
+          if (feePolicy === 'free') {
+            // No deduction anywhere
+          } else if (feePolicy === 'sponsor') {
+            // Deduct from contract's sponsor balance
+            const contract = this.contracts.getContract(tx.data.contractAddress);
+            if (contract && (contract.sponsorBalance || 0) >= gasCost) {
+              contract.sponsorBalance -= gasCost;
+              this.state.setContractMeta?.(tx.data.contractAddress, 'sponsorBalance', contract.sponsorBalance);
+            } else {
+              // Sponsor balance exhausted — fall back to user
+              this.state.subtractBalance(tx.data.from, gasCost);
+            }
+          } else {
+            // 'user' — standard
+            this.state.subtractBalance(tx.data.from, gasCost);
+          }
           break;
+        }
 
-        // ✅ Phase 9: native report tx types
         case TX_TYPES.REPORT_CREATE:
           if (gasCost > 0) this.state.subtractBalance(tx.data.from, gasCost);
           break;
@@ -393,14 +467,10 @@ class Blockchain {
           if (gasCost > 0) this.state.subtractBalance(tx.data.authority || tx.data.from, gasCost);
           break;
 
-        // ✅ Phase 9: reputation update (no gas, no signature)
         case TX_TYPES.REPUTATION_UPDATE:
           if (tx.data.address && tx.data.delta !== undefined) {
-            if (tx.data.delta > 0) {
-              this.state.increaseReputation(tx.data.address, tx.data.delta);
-            } else {
-              this.state.decreaseReputation(tx.data.address, Math.abs(tx.data.delta));
-            }
+            if (tx.data.delta > 0) this.state.increaseReputation(tx.data.address, tx.data.delta);
+            else                   this.state.decreaseReputation(tx.data.address, Math.abs(tx.data.delta));
           }
           break;
 
@@ -409,8 +479,8 @@ class Blockchain {
           this.state.resetMissedBlocks(tx.data.validator);
           break;
       }
-    } catch (error) {
-      console.error(`Error applying transaction ${tx.id}: ${error.message}`);
+    } catch (err) {
+      console.error(`  ✗ applyTransaction ${tx.id?.slice(0, 8)}: ${err.message}`);
     }
   }
 
@@ -422,46 +492,50 @@ class Blockchain {
     }
 
     this.cleanupRateLimit();
-    const addressCount = this.addressTxCount.get(tx.data.from) || 0;
-    if (addressCount >= 10) {
-      throw new Error('Rate limit exceeded. Please wait.');
-    }
+    const addrCount = this.addressTxCount.get(tx.data.from) || 0;
+    if (addrCount >= 10) throw new Error('Rate limit: max 10 pending txs per address.');
 
-    if (tx.data.from) {
-      this.state.setPublicKey(tx.data.from, publicKey);
-    }
+    if (tx.data.from) this.state.setPublicKey(tx.data.from, publicKey);
 
     if (!tx.isValid(this.state.publicKeys)) {
       throw new Error('Invalid transaction signature');
     }
 
-    const expectedNonce = this.state.getNonce(tx.data.from);
+    // Pending nonce check
+    const confirmedNonce = this.state.getNonce(tx.data.from);
+    const pendingNonce   = this.pendingNonces.get(tx.data.from) ?? confirmedNonce;
+    const expectedNonce  = Math.max(confirmedNonce, pendingNonce);
+
     if (tx.nonce !== expectedNonce) {
       throw new Error(`Invalid nonce. Expected: ${expectedNonce}, Got: ${tx.nonce}`);
     }
 
     this.gas.validateGasParams(tx);
 
-    const minGas    = this.gas.calculateTransactionGas(tx);
+    const minGas = this.gas.calculateTransactionGas(tx);
     if (tx.gasLimit < minGas) {
-      throw new Error(`Gas limit too low. Minimum: ${minGas}`);
+      throw new Error(`gasLimit too low. Minimum for ${tx.type}: ${minGas}`);
     }
 
-    const maxGasCost = tx.gasLimit * tx.gasPrice;
+    // For 'free' or 'sponsor' contract calls, skip balance check for gas
+    const feePolicy = this._resolveTxFeePolicy(tx);
+    const maxGasCost = feePolicy === 'free' ? 0
+                     : feePolicy === 'sponsor' ? 0   // sponsor pays, not user
+                     : tx.gasLimit * tx.gasPrice;
 
     switch (tx.type) {
       case TX_TYPES.TRANSFER:
-        if (this.state.getBalance(tx.data.from) < (tx.data.amount + maxGasCost)) {
+        if (this.state.getBalance(tx.data.from) < tx.data.amount + maxGasCost) {
           throw new Error('Insufficient balance for transfer + gas');
         }
         break;
 
       case TX_TYPES.STAKE:
-        if (this.state.getBalance(tx.data.from) < (tx.data.amount + maxGasCost)) {
-          throw new Error('Insufficient balance for staking + gas');
+        if (this.state.getBalance(tx.data.from) < tx.data.amount + maxGasCost) {
+          throw new Error('Insufficient balance for stake + gas');
         }
         if (tx.data.amount < this.config.minStake) {
-          throw new Error(`Minimum stake is ${this.config.minStake} SAYM`);
+          throw new Error(`Minimum stake: ${this._fmt(this.config.minStake)}`);
         }
         break;
 
@@ -469,80 +543,72 @@ class Blockchain {
         if (this.state.getBalance(tx.data.from) < maxGasCost) {
           throw new Error('Insufficient balance for gas');
         }
-        if (this.state.getStake(tx.data.from) === 0) {
-          throw new Error('No stake to unstake');
-        }
-        if (this.state.isUnstaking(tx.data.from)) {
-          throw new Error('Already unstaking');
-        }
+        if (this.state.getStake(tx.data.from) === 0) throw new Error('No stake to unstake');
+        if (this.state.isUnstaking(tx.data.from))    throw new Error('Already unstaking');
         break;
 
-      case TX_TYPES.CONTRACT_DEPLOY:
-      case TX_TYPES.CONTRACT_CALL:
-      case TX_TYPES.CONTRACT_UPGRADE:
-      case TX_TYPES.REPORT_CREATE:
-      case TX_TYPES.REPORT_VERIFY:
-      case TX_TYPES.REPORT_RESOLVE:
-        if (this.state.getBalance(tx.data.from) < maxGasCost) {
+      default:
+        if (maxGasCost > 0 && this.state.getBalance(tx.data.from) < maxGasCost) {
           throw new Error('Insufficient balance for gas');
         }
-        break;
     }
 
+    // All checks passed — advance pending nonce
+    this.pendingNonces.set(tx.data.from, expectedNonce + 1);
     this.mempool.push(tx);
-    this.addressTxCount.set(tx.data.from, addressCount + 1);
+    this.addressTxCount.set(tx.data.from, addrCount + 1);
   }
 
   cleanupRateLimit() {
-    const now = Date.now();
-    if (now - this.lastCleanup > 60000) {
+    if (Date.now() - this.lastCleanup > 60_000) {
       this.addressTxCount.clear();
-      this.lastCleanup = now;
+      this.lastCleanup = Date.now();
     }
   }
 
-  // ─── Phase 9: Query APIs ─────────────────────────────────────────────────────
+  // ─── Fee policy helpers ──────────────────────────────────────────────────────
 
-  /**
-   * Get all emitted contract events, optionally filtered.
-   */
-  getEvents({ contractAddress, eventName, limit } = {}) {
-    return this.state.getEvents({ contractAddress, eventName, limit });
+  // Determine the effective fee policy for a tx.
+  // For contract calls: read from the contract's feePolicy.
+  // For all other tx types: always 'user'.
+  _resolveTxFeePolicy(tx) {
+    if (tx.type === TX_TYPES.CONTRACT_CALL || tx.type === TX_TYPES.CONTRACT_UPGRADE) {
+      const contract = this.contracts.getContract(tx.data.contractAddress);
+      return contract?.feePolicy || 'user';
+    }
+    return 'user';
   }
 
-  getContractEvents(contractAddress) {
-    return this.state.getContractEvents(contractAddress);
+  // Calculate actual fee in base units for a tx, accounting for fee policy.
+  _calculateTxFee(tx) {
+    const feePolicy = tx.feePolicy || 'user';
+    if (feePolicy === 'free') return 0;
+    return (tx.gasUsed || 0) * (tx.gasPrice || 0);
   }
 
-  /**
-   * Get reputation score for an address.
-   */
-  getReputation(address) {
-    return this.state.getReputation(address);
-  }
+  // ─── Public query APIs ───────────────────────────────────────────────────────
 
-  /**
-   * Get all deployed contracts with their metadata (contract registry).
-   */
+  getEvents(opts = {})                     { return this.state.getEvents(opts); }
+  getContractEvents(addr)                  { return this.state.getContractEvents(addr); }
+  getReputation(address)                   { return this.state.getReputation(address); }
+
   getContractRegistry() {
     return this.contracts.getAllContracts().map(c => ({
-      address:   c.address,
-      name:      c.name    || 'Unknown',
-      version:   c.version || '1.0.0',
-      abi:       c.abi     || [],
-      codeHash:  c.codeHash,
-      creator:   c.creator,
-      createdAt: c.createdAt
+      address:    c.address,
+      name:       c.name       || 'Unknown',
+      version:    c.version    || '1.0.0',
+      abi:        c.abi        || [],
+      codeHash:   c.codeHash,
+      creator:    c.creator,
+      feePolicy:  c.feePolicy  || 'user',
+      createdAt:  c.createdAt,
     }));
   }
 
-  /**
-   * Get all civic reports from native tx index.
-   */
   getReports({ category, status, limit } = {}) {
     let results = Array.from(this.reportIndex.values());
     if (category) results = results.filter(r => r.category === category);
-    if (status)   results = results.filter(r => r.status === status);
+    if (status)   results = results.filter(r => r.status   === status);
     if (limit)    results = results.slice(-limit);
     return results;
   }
@@ -553,13 +619,10 @@ class Blockchain {
 
   // ─── Persistence ────────────────────────────────────────────────────────────
 
-  saveBlock(_block) {
-    this.saveChain();
-  }
+  saveBlock(_block) { this.saveChain(); }
 
   async saveChain() {
-    const chainData = this.chain.map(block => block.toJSON());
-    await this.db.put('chain', chainData);
+    await this.db.put('chain', this.chain.map(b => b.toJSON()));
   }
 
   async replayState() {
@@ -572,80 +635,74 @@ class Blockchain {
 
   async saveSnapshot(blockHeight) {
     try {
-      const snapshot = {
+      const snap = {
         blockHeight,
         timestamp: Date.now(),
         state:     this.state.exportState(),
-        stateRoot: this.state.computeStateRoot()
+        stateRoot: this.state.computeStateRoot(),
       };
-
-      const snapshotPath = path.join(this.snapshotDir, `snapshot-${blockHeight}.json`);
-      fs.writeFileSync(snapshotPath, JSON.stringify(snapshot, null, 2));
+      const p = path.join(this.snapshotDir, `snapshot-${blockHeight}.json`);
+      fs.writeFileSync(p, JSON.stringify(snap, null, 2));
       console.log(`📸 Snapshot saved at block ${blockHeight}`);
       this.cleanOldSnapshots();
-    } catch (error) {
-      console.error('Error saving snapshot:', error);
+    } catch (err) {
+      console.error('Snapshot error:', err);
     }
   }
 
   async loadLatestSnapshot() {
     try {
-      const files = fs.readdirSync(this.snapshotDir);
-      const snapshots = files
-        .filter(f => f.startsWith('snapshot-') && f.endsWith('.json'))
-        .map(f => ({ file: f, height: parseInt(f.match(/snapshot-(\d+)\.json/)[1]) }))
+      const files = fs.readdirSync(this.snapshotDir)
+        .filter(f => /^snapshot-\d+\.json$/.test(f))
+        .map(f => ({ file: f, height: parseInt(f.match(/\d+/)[0]) }))
         .sort((a, b) => b.height - a.height);
-
-      if (!snapshots.length) return null;
-
-      const snapshotPath = path.join(this.snapshotDir, snapshots[0].file);
-      return JSON.parse(fs.readFileSync(snapshotPath, 'utf8'));
-    } catch {
-      return null;
-    }
+      if (!files.length) return null;
+      return JSON.parse(fs.readFileSync(path.join(this.snapshotDir, files[0].file), 'utf8'));
+    } catch { return null; }
   }
 
   cleanOldSnapshots() {
     try {
-      const files = fs.readdirSync(this.snapshotDir);
-      const snapshots = files
-        .filter(f => f.startsWith('snapshot-') && f.endsWith('.json'))
-        .map(f => ({ file: f, height: parseInt(f.match(/snapshot-(\d+)\.json/)[1]) }))
+      const files = fs.readdirSync(this.snapshotDir)
+        .filter(f => /^snapshot-\d+\.json$/.test(f))
+        .map(f => ({ file: f, height: parseInt(f.match(/\d+/)[0]) }))
         .sort((a, b) => b.height - a.height);
-
-      snapshots.slice(3).forEach(s => {
+      files.slice(3).forEach(s => {
         fs.unlinkSync(path.join(this.snapshotDir, s.file));
-        console.log(`🗑️  Deleted old snapshot: ${s.file}`);
       });
-    } catch (error) {
-      console.error('Error cleaning snapshots:', error);
-    }
+    } catch {}
   }
 
-  // ─── Stats ──────────────────────────────────────────────────────────────────
+  // ─── Stats & utilities ───────────────────────────────────────────────────────
 
   getLastBlock() {
     return this.chain[this.chain.length - 1];
   }
 
   getStats() {
-    const validatorCount = this.pos?.validators?.size || 0;
-    const contractCount  = this.contracts?.contracts instanceof Map ? this.contracts.contracts.size : 0;
-    const totalStake     = this.pos?.validators
-      ? Array.from(this.pos.validators.values()).reduce((sum, v) => sum + v.stake, 0)
-      : 0;
+    const blockHeight = this.chain.length;
+    const blockReward = typeof this.config.getBlockReward === 'function'
+      ? this.config.getBlockReward(blockHeight)
+      : this.config.blockReward;
 
     return {
-      network:       this.networkName,
-      chainId:       this.chainId,
-      blocks:        this.chain.length,
-      mempool:       this.mempool.length,
-      validators:    validatorCount,
-      totalStake,
-      contracts:     contractCount,
-      reports:       this.reportIndex.size,       // ✅ Phase 9
-      stateRoot:     this.state.computeStateRoot()
+      network:         this.networkName,
+      chainId:         this.chainId,
+      blocks:          blockHeight,
+      mempool:         this.mempool.length,
+      validators:      this.state.getValidators?.()?.length || 0,
+      totalStake:      this.state.getTotalStake?.() || 0,
+      contracts:       this.contracts.contracts.size,
+      reports:         this.reportIndex.size,
+      blockReward,
+      blockRewardSAYN: this._fmt(blockReward),
+      stateRoot:       this.state.computeStateRoot(),
     };
+  }
+
+  // Format base units → "X.XXXX SAYN"
+  _fmt(baseUnits) {
+    return (baseUnits / this.decimals).toFixed(4) + ' SAYN';
   }
 
   async close() {
