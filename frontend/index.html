@@ -3,510 +3,311 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sayman Blockchain Network</title>
-  
-  <!-- Load elliptic.js from CDN FIRST -->
+  <title>SAYMAN Blockchain</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js"></script>
-  
   <style>
     :root {
-      --mono-000: #000000;
-      --mono-100: #1a1a1a;
-      --mono-400: #666666;
-      --mono-800: #cccccc;
-      --mono-900: #e6e6e6;
-      --mono-950: #f5f5f5;
-      --mono-1000: #ffffff;
-      --grid: 8px;
-      --border: 1px solid var(--mono-800);
+      --mono-100: #1a1a1a; --mono-400: #666666; --mono-800: #cccccc;
+      --mono-900: #e6e6e6; --mono-950: #f5f5f5; --mono-1000: #ffffff;
+      --grid: 8px; --border: 1px solid var(--mono-800);
     }
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-      font-size: 14px;
-      line-height: 1.6;
-      color: var(--mono-100);
-      background: var(--mono-1000);
-      letter-spacing: -0.01em;
+      font-size: 14px; line-height: 1.6; color: var(--mono-100);
+      background: var(--mono-1000); letter-spacing: -0.01em;
     }
+    .container { max-width: 1440px; margin: 0 auto; padding: calc(var(--grid)*4); }
+    h1 { font-size: 30px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: calc(var(--grid)*1); }
+    h2 { font-size: 16px; font-weight: 500; letter-spacing: -0.01em; margin-bottom: calc(var(--grid)*2); }
 
-    .container {
-      max-width: 1440px;
-      margin: 0 auto;
-      padding: calc(var(--grid) * 4);
-    }
-
-    h1 { font-size: 32px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: calc(var(--grid) * 2); }
-    h2 { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: calc(var(--grid) * 2); }
-
-    .header {
-      border-bottom: var(--border);
-      padding-bottom: calc(var(--grid) * 4);
-      margin-bottom: calc(var(--grid) * 4);
-    }
-
-    .header-subtitle { color: var(--mono-400); font-size: 14px; }
-
-    .header-meta {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: calc(var(--grid) * 2);
-      margin-top: calc(var(--grid) * 3);
-    }
-
-    .meta-item {
-      display: flex;
-      justify-content: space-between;
-      padding: calc(var(--grid) * 2);
-      border: var(--border);
-      font-size: 12px;
-    }
-
+    /* ── Header ── */
+    .header { border-bottom: var(--border); padding-bottom: calc(var(--grid)*4); margin-bottom: calc(var(--grid)*4); }
+    .header-subtitle { color: var(--mono-400); font-size: 12px; margin-bottom: calc(var(--grid)*3); }
+    .header-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: calc(var(--grid)*2); }
+    .meta-item { display: flex; justify-content: space-between; padding: calc(var(--grid)*2); border: var(--border); font-size: 12px; }
     .meta-label { color: var(--mono-400); text-transform: uppercase; letter-spacing: 0.05em; }
     .meta-value { font-weight: 500; font-variant-numeric: tabular-nums; }
 
-    .nav {
-      border-bottom: var(--border);
-      margin-bottom: calc(var(--grid) * 4);
-    }
-
-    .nav-list {
-      display: flex;
-      list-style: none;
-      overflow-x: auto;
-    }
-
-    .nav-item {
-      border-right: var(--border);
-    }
-
+    /* ── Nav ── */
+    .nav { border-bottom: var(--border); margin-bottom: calc(var(--grid)*4); }
+    .nav-list { display: flex; list-style: none; overflow-x: auto; }
+    .nav-item { border-right: var(--border); }
     .nav-item:last-child { border-right: none; }
-
     .nav-btn {
-      display: block;
-      padding: calc(var(--grid) * 2) calc(var(--grid) * 3);
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--mono-400);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      transition: all 0.15s;
+      display: block; padding: calc(var(--grid)*2) calc(var(--grid)*3);
+      background: none; border: none; cursor: pointer;
+      font-size: 12px; font-weight: 500; color: var(--mono-400);
+      text-transform: uppercase; letter-spacing: 0.08em; transition: all 0.15s;
+      white-space: nowrap; text-decoration: none;
     }
-
     .nav-btn:hover { background: var(--mono-950); color: var(--mono-100); }
     .nav-btn.active { background: var(--mono-100); color: var(--mono-1000); }
+    .nav-ext { margin-left: auto; border-left: var(--border); border-right: none; }
 
+    /* ── Pages ── */
     .page { display: none; }
     .page.active { display: block; }
 
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: calc(var(--grid) * 2);
-      margin-bottom: calc(var(--grid) * 4);
-    }
+    /* ── Stats grid ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: calc(var(--grid)*2); margin-bottom: calc(var(--grid)*4); }
+    .stat-card { border: var(--border); padding: calc(var(--grid)*3); }
+    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mono-400); margin-bottom: 4px; }
+    .stat-value { font-size: 24px; font-weight: 400; font-variant-numeric: tabular-nums; }
+    .stat-unit { font-size: 12px; color: var(--mono-400); margin-left: 3px; }
 
-    .stat-card {
-      border: var(--border);
-      padding: calc(var(--grid) * 3);
-    }
-
-    .stat-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--mono-400);
-      margin-bottom: calc(var(--grid) * 1);
-    }
-
-    .stat-value {
-      font-size: 28px;
-      font-weight: 400;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .stat-unit {
-      font-size: 14px;
-      color: var(--mono-400);
-      margin-left: calc(var(--grid) * 1);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      margin-bottom: calc(var(--grid) * 4);
-    }
-
-    thead {
-      border-bottom: var(--border);
-    }
-
-    th {
-      text-align: left;
-      padding: calc(var(--grid) * 2);
-      font-weight: 500;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--mono-400);
-    }
-
-    td {
-      padding: calc(var(--grid) * 2);
-      border-bottom: 1px solid var(--mono-900);
-      font-variant-numeric: tabular-nums;
-    }
-
-    tr:hover { background: var(--mono-950); }
-
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead { border-bottom: var(--border); }
+    th { text-align: left; padding: calc(var(--grid)*2); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mono-400); }
+    td { padding: calc(var(--grid)*2); border-bottom: 1px solid var(--mono-900); font-variant-numeric: tabular-nums; }
+    tr:hover td { background: var(--mono-950); }
     .mono { font-family: 'SF Mono', 'Consolas', monospace; font-size: 12px; }
+    .link { color: var(--mono-100); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+    .link:hover { color: var(--mono-400); }
 
-    .section {
-      margin-bottom: calc(var(--grid) * 6);
+    /* ── Section ── */
+    .section { margin-bottom: calc(var(--grid)*5); }
+    .section-header { border-bottom: var(--border); padding-bottom: calc(var(--grid)*2); margin-bottom: calc(var(--grid)*3); display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: calc(var(--grid)*2); }
+
+    /* ── Block feed ── */
+    .block-feed { border: var(--border); margin-bottom: calc(var(--grid)*3); }
+    .block-item { padding: calc(var(--grid)*2); border-bottom: 1px solid var(--mono-900); display: grid; grid-template-columns: 80px 1fr 160px; gap: calc(var(--grid)*2); align-items: center; font-size: 13px; }
+    .block-item:last-child { border-bottom: none; }
+    .block-item:hover { background: var(--mono-950); }
+    .block-index { font-weight: 500; font-variant-numeric: tabular-nums; }
+    .block-hash { font-family: 'SF Mono', monospace; font-size: 11px; color: var(--mono-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .block-time { text-align: right; font-size: 11px; color: var(--mono-400); }
+
+    /* ── Explorer search bar ── */
+    .search-bar { display: flex; gap: calc(var(--grid)*1); margin-bottom: calc(var(--grid)*3); }
+    .search-bar input {
+      flex: 1; padding: calc(var(--grid)*1.5) calc(var(--grid)*2);
+      border: var(--border); font-size: 13px; font-family: 'SF Mono', monospace;
+      color: var(--mono-100); outline: none; background: var(--mono-1000);
     }
-
-    .section-header {
-      border-bottom: var(--border);
-      padding-bottom: calc(var(--grid) * 2);
-      margin-bottom: calc(var(--grid) * 3);
+    .search-bar input:focus { border-color: var(--mono-100); }
+    .search-bar input::placeholder { color: var(--mono-800); font-family: inherit; }
+    .search-bar button {
+      padding: calc(var(--grid)*1.5) calc(var(--grid)*2.5);
+      border: var(--border); background: var(--mono-1000);
+      font-size: 12px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: 0.06em; cursor: pointer; color: var(--mono-100); white-space: nowrap;
     }
+    .search-bar button:hover { background: var(--mono-100); color: var(--mono-1000); }
+    .search-bar button.secondary { color: var(--mono-400); }
+    .search-bar button.secondary:hover { background: var(--mono-950); color: var(--mono-100); }
 
-    .block-feed {
-      max-height: 600px;
-      overflow-y: auto;
-      border: var(--border);
+    /* ── Pagination ── */
+    #pagination-controls {
+      display: flex; align-items: center; gap: calc(var(--grid)*1);
+      padding: calc(var(--grid)*2); border-top: var(--border);
+      flex-wrap: wrap;
     }
-
-    .block-item {
-      padding: calc(var(--grid) * 2);
-      border-bottom: 1px solid var(--mono-900);
-      display: grid;
-      grid-template-columns: 80px 1fr 120px;
-      gap: calc(var(--grid) * 2);
-      align-items: center;
-      font-size: 13px;
+    #pagination-controls button {
+      padding: 5px 12px; border: var(--border); background: var(--mono-1000);
+      cursor: pointer; font-size: 12px; color: var(--mono-100); letter-spacing: 0.04em;
     }
+    #pagination-controls button:hover:not(:disabled) { background: var(--mono-100); color: var(--mono-1000); }
+    #pagination-controls button:disabled { color: var(--mono-800); cursor: not-allowed; background: var(--mono-950); }
+    #pagination-controls span { font-size: 12px; color: var(--mono-400); }
+    #explorer-page-info { font-size: 12px; color: var(--mono-400); margin: 0 calc(var(--grid)*1); }
 
-    .block-item:hover {
-      background: var(--mono-950);
-    }
+    /* ── Validator summary strip ── */
+    .val-summary { display: flex; gap: calc(var(--grid)*4); padding: calc(var(--grid)*2) 0 calc(var(--grid)*3); font-size: 12px; }
+    .val-summary-item { display: flex; flex-direction: column; gap: 2px; }
+    .val-summary-label { color: var(--mono-400); text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; }
+    .val-summary-val { font-weight: 500; font-variant-numeric: tabular-nums; }
 
-    .block-item:last-child {
-      border-bottom: none;
-    }
+    /* ── Peer rows ── */
+    .peer-row { padding: calc(var(--grid)*2); border: var(--border); margin-bottom: calc(var(--grid)*1); font-size: 12px; font-family: 'SF Mono', monospace; }
 
-    .block-index {
-      font-weight: 500;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .block-hash {
-      font-family: 'SF Mono', monospace;
-      font-size: 11px;
-      color: var(--mono-400);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .block-time {
-      text-align: right;
-      font-size: 11px;
-      color: var(--mono-400);
-    }
-
+    /* ── Footer ── */
     footer {
-      border-top: var(--border);
-      padding: calc(var(--grid) * 3) 0;
-      margin-top: calc(var(--grid) * 6);
-      text-align: center;
-      font-size: 11px;
-      color: var(--mono-400);
+      border-top: var(--border); padding: calc(var(--grid)*3) 0; margin-top: calc(var(--grid)*6);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: calc(var(--grid)*2); font-size: 11px; color: var(--mono-400);
     }
-
-    footer p {
-      margin-bottom: calc(var(--grid) * 1);
-    }
-
-    footer a {
-      color: var(--mono-400);
-      text-decoration: none;
-      border-bottom: 1px solid var(--mono-800);
-      transition: all 0.15s;
-    }
-
-    footer a:hover {
-      color: var(--mono-100);
-      border-bottom-color: var(--mono-100);
-    }
-
-    .pagination-note {
-      padding: calc(var(--grid) * 2);
-      text-align: center;
-      color: var(--mono-400);
-      font-size: 12px;
-      border-top: var(--border);
-    }
-
-    /* Tooltip styles for hover */
-    tr[title] {
-      cursor: pointer;
-      position: relative;
-    }
-
-    tr[title]:hover {
-      background: var(--mono-950);
-    }
+    footer a { color: var(--mono-400); text-decoration: none; border-bottom: 1px solid var(--mono-800); }
+    footer a:hover { color: var(--mono-100); }
+    .footer-links { display: flex; gap: calc(var(--grid)*3); }
 
     @media (max-width: 768px) {
-      .stats-grid { grid-template-columns: 1fr; }
-      .header-meta { grid-template-columns: 1fr; }
-      .block-item {
-        grid-template-columns: 60px 1fr 100px;
-        font-size: 12px;
-      }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .block-item { grid-template-columns: 60px 1fr; }
+      .block-time { display: none; }
+      .val-summary { flex-wrap: wrap; gap: calc(var(--grid)*2); }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header class="header">
-      <h1>SAYMAN BLOCKCHAIN</h1>
-      <p class="header-subtitle">Decentralized Network Infrastructure / Public Testnet</p>
-      
-      <div class="header-meta">
-        <div class="meta-item">
-          <span class="meta-label">Network</span>
-          <span class="meta-value" id="header-network">Loading...</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Chain ID</span>
-          <span class="meta-value mono" id="header-chain">Loading...</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Node ID</span>
-          <span class="meta-value mono" id="header-node">Loading...</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Mode</span>
-          <span class="meta-value" id="header-mode">Loading...</span>
-        </div>
-      </div>
-    </header>
+<div class="container">
 
-    <nav class="nav">
-      <ul class="nav-list">
-        <li class="nav-item">
-          <button class="nav-btn active" onclick="showPage('dashboard')">Dashboard</button>
-        </li>
-        <li class="nav-item">
-          <button class="nav-btn" onclick="showPage('explorer')">Explorer</button>
-        </li>
-        <li class="nav-item">
-          <button class="nav-btn" onclick="showPage('validators')">Validators</button>
-        </li>
-        <li class="nav-item">
-          <button class="nav-btn" onclick="showPage('contracts')">Contracts</button>
-        </li>
-        <li class="nav-item">
-          <button class="nav-btn" onclick="showPage('network')">Network</button>
-        </li>
-      </ul>
-    </nav>
-
-    <div id="dashboard" class="page active">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Total Blocks</div>
-          <div class="stat-value" id="stat-blocks">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Validators</div>
-          <div class="stat-value" id="stat-validators">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Stake</div>
-          <div class="stat-value"><span id="stat-stake">0</span><span class="stat-unit">SAYM</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Mempool</div>
-          <div class="stat-value" id="stat-mempool">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Contracts</div>
-          <div class="stat-value" id="stat-contracts">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Block Reward</div>
-          <div class="stat-value"><span id="stat-reward">10</span><span class="stat-unit">SAYM</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Block Time</div>
-          <div class="stat-value"><span id="stat-blocktime">5</span><span class="stat-unit">s</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Est. APR</div>
-          <div class="stat-value"><span id="stat-apr">0</span><span class="stat-unit">%</span></div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-header">
-          <h2>Live Block Feed</h2>
-        </div>
-        <div class="block-feed" id="block-feed"></div>
-      </div>
+  <!-- ── Header ── -->
+  <header class="header">
+    <h1>SAYMAN BLOCKCHAIN</h1>
+    <p class="header-subtitle">Decentralized Network Infrastructure · Public Testnet</p>
+    <div class="header-meta">
+      <div class="meta-item"><span class="meta-label">Network</span><span class="meta-value" id="header-network">—</span></div>
+      <div class="meta-item"><span class="meta-label">Chain ID</span><span class="meta-value mono" id="header-chain">—</span></div>
+      <div class="meta-item"><span class="meta-label">Node ID</span><span class="meta-value mono" id="header-node">—</span></div>
+      <div class="meta-item"><span class="meta-label">Mode</span><span class="meta-value" id="header-mode">—</span></div>
     </div>
+  </header>
 
-    <div id="explorer" class="page">
-      <div class="section">
-        <div class="section-header">
-          <h2>Block Explorer</h2>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Block</th>
-              <th>Hash</th>
-              <th>Validator</th>
-              <th>Txs</th>
-              <th>Gas Used</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody id="explorer-blocks"></tbody>
-        </table>
-        
-        <!-- ✅ ADD PAGINATION CONTROLS -->
-        <div id="pagination-controls" style="
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: calc(var(--grid) * 2);
-          padding: calc(var(--grid) * 2);
-          border-top: var(--border);
-        "></div>
-        
-        <div class="pagination-note">
-          Hover over any block for details • Click to view full information
-        </div>
-      </div>
+  <!-- ── Nav ── -->
+  <nav class="nav">
+    <ul class="nav-list">
+      <li class="nav-item"><button class="nav-btn active" data-page="dashboard"  onclick="showPage('dashboard')">Dashboard</button></li>
+      <li class="nav-item"><button class="nav-btn"        data-page="explorer"   onclick="showPage('explorer')">Explorer</button></li>
+      <li class="nav-item"><button class="nav-btn"        data-page="validators" onclick="showPage('validators')">Validators</button></li>
+      <li class="nav-item"><button class="nav-btn"        data-page="contracts"  onclick="showPage('contracts')">Contracts</button></li>
+      <li class="nav-item"><button class="nav-btn"        data-page="network"    onclick="showPage('network')">Network</button></li>
+      <li class="nav-item nav-ext"><a class="nav-btn" href="/wallet">Wallet</a></li>
+      <li class="nav-item"><a class="nav-btn" href="/faucet">Faucet</a></li>
+    </ul>
+  </nav>
+
+  <!-- ════════════════ DASHBOARD ════════════════ -->
+  <div id="dashboard" class="page active">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Total Blocks</div><div class="stat-value" id="stat-blocks">—</div></div>
+      <div class="stat-card"><div class="stat-label">Validators</div><div class="stat-value" id="stat-validators">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Stake</div><div class="stat-value"><span id="stat-stake">—</span><span class="stat-unit">SAYN</span></div></div>
+      <div class="stat-card"><div class="stat-label">Mempool</div><div class="stat-value" id="stat-mempool">—</div></div>
+      <div class="stat-card"><div class="stat-label">Contracts</div><div class="stat-value" id="stat-contracts">—</div></div>
+      <div class="stat-card"><div class="stat-label">Block Reward</div><div class="stat-value"><span id="stat-reward">—</span><span class="stat-unit">SAYN</span></div></div>
+      <div class="stat-card"><div class="stat-label">Block Time</div><div class="stat-value"><span id="stat-blocktime">5</span><span class="stat-unit">s</span></div></div>
+      <div class="stat-card"><div class="stat-label">Est. APR</div><div class="stat-value"><span id="stat-apr">—</span><span class="stat-unit">%</span></div></div>
     </div>
-
-    <div id="validators" class="page">
-      <div class="section">
-        <div class="section-header">
-          <h2>Active Validators</h2>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Address</th>
-              <th>Stake</th>
-              <th>Share</th>
-              <th>Missed Blocks</th>
-            </tr>
-          </thead>
-          <tbody id="validator-list"></tbody>
-        </table>
-      </div>
+    <div class="section">
+      <div class="section-header"><h2>Live Block Feed</h2></div>
+      <div class="block-feed" id="block-feed"></div>
     </div>
-
-    <div id="contracts" class="page">
-      <div class="section">
-        <div class="section-header">
-          <h2>Smart Contracts</h2>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Address</th>
-              <th>Owner</th>
-              <th>Code Size</th>
-            </tr>
-          </thead>
-          <tbody id="contract-list"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div id="network" class="page">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Connected Peers</div>
-          <div class="stat-value" id="net-peers">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Block Height</div>
-          <div class="stat-value" id="net-height">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Avg Block Time</div>
-          <div class="stat-value"><span id="net-blocktime">0</span><span class="stat-unit">ms</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Mempool Size</div>
-          <div class="stat-value" id="net-mempool">0</div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-header">
-          <h2>Network Information</h2>
-        </div>
-        <table>
-          <tbody>
-            <tr>
-              <td><strong>Node ID</strong></td>
-              <td class="mono" id="net-node-id">Loading...</td>
-            </tr>
-            <tr>
-              <td><strong>Mode</strong></td>
-              <td id="net-mode">Loading...</td>
-            </tr>
-            <tr>
-              <td><strong>Network</strong></td>
-              <td id="net-network">Loading...</td>
-            </tr>
-            <tr>
-              <td><strong>Chain ID</strong></td>
-              <td class="mono" id="net-chain">Loading...</td>
-            </tr>
-            <tr>
-              <td><strong>Uptime</strong></td>
-              <td id="net-uptime">Loading...</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="section">
-        <div class="section-header">
-          <h2>Connected Peers</h2>
-        </div>
-        <div id="peer-list"></div>
-      </div>
-    </div>
-
-    <footer>
-      <p>© 2026 Sayman Blockchain. Decentralized Network Infrastructure.</p>
-      <p>
-        <a href="https://github.com/saymanlal/SAYMAN" target="_blank">GitHub</a>
-        <span style="margin: 0 calc(var(--grid) * 2);">•</span>
-        <a href="https://sayman-wallet-manager.vercel.app" target="_blank">Wallet</a>
-        <span style="margin: 0 calc(var(--grid) * 2);">•</span>
-        <a href="https://sayman-faucet-site.vercel.app" target="_blank">Faucet</a>
-      </p>
-    </footer>
   </div>
 
-  <script src="crypto-client.js"></script>
-  <script src="app.js"></script>
+  <!-- ════════════════ EXPLORER ════════════════ -->
+  <div id="explorer" class="page">
+    <div class="section">
+      <div class="section-header"><h2>Block Explorer</h2></div>
+
+      <!-- Search bar -->
+      <div class="search-bar">
+        <input type="text" id="explorer-search"
+               placeholder="Search by block number or hash prefix…"
+               onkeydown="if(event.key==='Enter')searchExplorer()">
+        <button onclick="searchExplorer()">Search</button>
+        <button class="secondary" onclick="clearSearch()">Clear</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Block</th>
+            <th>Hash</th>
+            <th>Validator</th>
+            <th>Txs</th>
+            <th>Gas Used</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody id="explorer-blocks"></tbody>
+      </table>
+
+      <!-- Pagination + jump-to-page (rendered by JS) -->
+      <div id="pagination-controls"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════ VALIDATORS ════════════════ -->
+  <div id="validators" class="page">
+    <div class="section">
+      <div class="section-header"><h2>Active Validators</h2></div>
+
+      <!-- Summary strip -->
+      <div class="val-summary">
+        <div class="val-summary-item">
+          <span class="val-summary-label">Count</span>
+          <span class="val-summary-val" id="val-count">—</span>
+        </div>
+        <div class="val-summary-item">
+          <span class="val-summary-label">Total Stake</span>
+          <span class="val-summary-val" id="val-total-stake">—</span>
+        </div>
+        <div class="val-summary-item">
+          <span class="val-summary-label">Est. APR</span>
+          <span class="val-summary-val" id="val-apr">—</span>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Address</th>
+            <th>Stake (SAYN)</th>
+            <th>Share</th>
+            <th>Missed Blocks</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="validator-list"></tbody>
+      </table>
+      <p style="font-size:11px;color:var(--mono-400);margin-top:calc(var(--grid)*1)">
+        Click any row to see blocks validated by that address.
+      </p>
+    </div>
+  </div>
+
+  <!-- ════════════════ CONTRACTS ════════════════ -->
+  <div id="contracts" class="page">
+    <div class="section">
+      <div class="section-header"><h2>Smart Contracts</h2></div>
+      <table>
+        <thead>
+          <tr><th>Address</th><th>Creator</th><th>Code Size</th></tr>
+        </thead>
+        <tbody id="contract-list"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ════════════════ NETWORK ════════════════ -->
+  <div id="network" class="page">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Connected Peers</div><div class="stat-value" id="net-peers">—</div></div>
+      <div class="stat-card"><div class="stat-label">Block Height</div><div class="stat-value" id="net-height">—</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Block Time</div><div class="stat-value"><span id="net-blocktime">—</span><span class="stat-unit">ms</span></div></div>
+      <div class="stat-card"><div class="stat-label">Mempool</div><div class="stat-value" id="net-mempool">—</div></div>
+    </div>
+    <div class="section">
+      <div class="section-header"><h2>Node Info</h2></div>
+      <table>
+        <tbody>
+          <tr><td style="color:var(--mono-400);width:140px">Node ID</td>   <td class="mono" id="net-node-id">—</td></tr>
+          <tr><td style="color:var(--mono-400)">Mode</td>                  <td id="net-mode">—</td></tr>
+          <tr><td style="color:var(--mono-400)">Network</td>               <td id="net-network">—</td></tr>
+          <tr><td style="color:var(--mono-400)">Chain ID</td>              <td class="mono" id="net-chain">—</td></tr>
+          <tr><td style="color:var(--mono-400)">Uptime</td>                <td id="net-uptime">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="section">
+      <div class="section-header"><h2>Connected Peers</h2></div>
+      <div id="peer-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <span>© 2026 SAYMAN Blockchain</span>
+    <span class="footer-links">
+      <a href="https://github.com/saymanlal/SAYMAN" target="_blank" rel="noopener">GitHub</a>
+      <a href="/wallet">Wallet</a>
+      <a href="/faucet">Faucet</a>
+    </span>
+  </footer>
+
+</div>
+<script src="app.js"></script>
 </body>
 </html>
