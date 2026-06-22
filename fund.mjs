@@ -13,10 +13,10 @@ const tx = {
   id: crypto.randomUUID(),
   type: 'TRANSFER',
   timestamp: Date.now(),
-  data: { from, to, amount: 50 },
+  data: { from, to, amount: 50000 },
   gasLimit: 21000,
   gasPrice: 1,
-  nonce: 0,
+  nonce: 1,
   gasUsed: 0
 };
 
