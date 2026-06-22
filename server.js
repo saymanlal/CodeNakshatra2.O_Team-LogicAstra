@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import crypto from 'crypto';                // ✅ top-level ESM import — no await/require mix
 import Blockchain from './core/blockchain.js';
 import { P2PServer } from './p2p/server.js';
 import { setupRoutes } from './api/routes.js';
@@ -22,8 +23,8 @@ let miningInterval;
 let server;
 
 // ── Persistent Node ID ───────────────────────────────────────────────────────
-// Keeps the same nodeId across restarts instead of generating a new one.
-// Store in DB_PATH or /tmp so it survives Render restarts (if disk is mounted).
+// Keeps the same nodeId across restarts.
+// Stored in dbPath/node-id.txt (survives Render restarts if disk is mounted).
 function loadOrCreateNodeId(dbPath) {
   const idFile = path.join(dbPath, 'node-id.txt');
   try {
@@ -32,9 +33,9 @@ function loadOrCreateNodeId(dbPath) {
       if (id.length === 32) return id;
     }
   } catch {}
-  const { randomBytes } = await import('crypto').catch(() => require('crypto'));
-  // Synchronous fallback
-  const id = Math.random().toString(36).slice(2).padEnd(32, '0').slice(0, 32);
+
+  // ✅ crypto is already imported at the top — no await, no require
+  const id = crypto.randomBytes(16).toString('hex'); // 32 hex chars
   try {
     fs.mkdirSync(dbPath, { recursive: true });
     fs.writeFileSync(idFile, id);
@@ -79,17 +80,21 @@ async function startServer() {
     console.log(`📁 Database path: ${dbPath}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}\n`);
 
+    // ── Node ID ───────────────────────────────────────────────────────────────
+    const nodeId = loadOrCreateNodeId(dbPath);
+    console.log(`📡 Node ID: ${nodeId}`);
+
     // ── Blockchain ────────────────────────────────────────────────────────────
     blockchain = new Blockchain(config, dbPath);
     await blockchain.initialize();
 
-    // ── P2P ──────────────────────────────────────────────────────────────────
+    // ── P2P ───────────────────────────────────────────────────────────────────
     p2pServer = new P2PServer(blockchain, config.p2pPort);
 
     // ── Routes ────────────────────────────────────────────────────────────────
     setupRoutes(app, blockchain, p2pServer, config);
 
-    // ── Health check (Render keep-alive) ─────────────────────────────────────
+    // ── Health check (Render keep-alive) ──────────────────────────────────────
     app.get('/health', (_req, res) => {
       res.status(200).json({
         status:    'ok',
@@ -104,14 +109,10 @@ async function startServer() {
     const PORT = config.apiPort;
 
     server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 API server running on port ${PORT}`);
-    });
-
-    server.on('listening', () => {
-      console.log(`📡 Node ID: ${p2pServer.nodeId}`);
+      console.log(`\n🚀 API server running on port ${PORT}`);
       console.log(`🔗 Mode: ${mode.toUpperCase()}`);
 
-      // ── Start P2P on the HTTP server (WSS at /p2p) ────────────────────────
+      // ── Attach P2P to the HTTP server (WebSocket at /p2p) ─────────────────
       if (mode === 'validator' || mode === 'full') {
         try {
           p2pServer.listen(server);
@@ -121,8 +122,8 @@ async function startServer() {
         }
       }
 
-      // ── Connect to bootstrap peers ────────────────────────────────────────
-      // Small delay so our own server is fully ready before opening outbound WS
+      // ── Connect to bootstrap peers ─────────────────────────────────────────
+      // Small delay so our server is ready before opening outbound connections
       if (config.bootstrapPeers?.length > 0) {
         console.log(`\n🔗 Connecting to ${config.bootstrapPeers.length} bootstrap peer(s)...`);
         setTimeout(() => {
@@ -130,9 +131,9 @@ async function startServer() {
         }, 2000);
       }
 
-      // ── Start mining ──────────────────────────────────────────────────────
+      // ── Start mining ───────────────────────────────────────────────────────
       if (mode === 'validator') {
-        console.log('\n⛏️  Starting mining...');
+        console.log('\n⛏️  Starting block production...');
         startMining();
       }
     });
@@ -156,7 +157,7 @@ function startMining() {
         p2pServer.broadcastBlock(block);
       }
     } catch (err) {
-      console.error('Mining error:', err);
+      console.error('Mining error:', err.message);
     }
   }, config.blockTime);
 }
@@ -164,8 +165,8 @@ function startMining() {
 function gracefulShutdown() {
   console.log('\n🛑 Shutting down gracefully...');
 
-  if (miningInterval)  clearInterval(miningInterval);
-  if (p2pServer)       p2pServer.close();
+  if (miningInterval) clearInterval(miningInterval);
+  if (p2pServer)      p2pServer.close();
 
   const finish = () => {
     if (server) {
