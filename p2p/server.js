@@ -158,10 +158,10 @@ export class P2PServer {
   // ─── Shared per-socket event registration ────────────────────────────────────
 
   _registerHandlers(ws, peerId) {
-    ws.on('message', (data) => {
+    ws.on('message', async (data) => {
       try {
         const msg = JSON.parse(data.toString());
-        this._handleMessage(msg, peerId);
+        await this._handleMessage(msg, peerId);
       } catch (err) {
         console.error(`P2P parse error from ${peerId}:`, err.message);
       }
@@ -182,22 +182,22 @@ export class P2PServer {
 
   // ─── Message dispatch ────────────────────────────────────────────────────────
 
-  _handleMessage(msg, peerId) {
+  async _handleMessage(msg, peerId) {
     const peer = this.peers.get(peerId);
     if (peer) peer.lastSeen = Date.now();
 
     switch (msg.type) {
 
       case 'handshake':
-        this._handleHandshake(msg, peerId);
+        await this._handleHandshake(msg, peerId);
         break;
 
       case 'new_block':
-        this._handleNewBlock(msg, peerId);
+        await this._handleNewBlock(msg, peerId);
         break;
 
       case 'new_transaction':
-        this._handleNewTransaction(msg, peerId);
+        await this._handleNewTransaction(msg, peerId);
         break;
 
       case 'get_blocks':
@@ -205,7 +205,7 @@ export class P2PServer {
         break;
 
       case 'blocks':
-        this._handleBlocks(msg, peerId);
+        await this._handleBlocks(msg, peerId);
         break;
 
       default:
@@ -215,7 +215,7 @@ export class P2PServer {
 
   // ─── Handshake ──────────────────────────────────────────────────────────────
 
-  _handleHandshake(msg, peerId) {
+  async _handleHandshake(msg, peerId) {
     const peer = this.peers.get(peerId);
     if (!peer) return;
 
@@ -267,6 +267,13 @@ export class P2PServer {
         const block = await Block.fromJSON(blockData);
         const added = await this.blockchain.addBlock(block);
         if (added) {
+          const peer = this.peers.get(peerId);
+          if (peer) {
+            peer.chainHeight = Math.max(
+              peer.chainHeight || 0,
+              block.index + 1
+            );
+          }
           console.log(`📦 Accepted block #${block.index} from peer ${peerId}`);
           // Re-broadcast to other peers (flood)
           this._broadcastExcept({ type: 'new_block', block: blockData }, peerId);
@@ -281,22 +288,45 @@ export class P2PServer {
         this._requestBlocks(peer.ws);
       }
     } catch (err) {
-      console.error(`❌ _handleNewBlock error:`, err.message);
+      console.error('❌ _handleNewBlock error:', err.message);
     }
   }
 
   // ─── New transaction from peer ───────────────────────────────────────────────
 
-  _handleNewTransaction(msg, peerId) {
+  async _handleNewTransaction(msg, peerId) {
     try {
       if (!msg.transaction) return;
-      // Reconstruct and add to mempool (will throw if duplicate / invalid)
-      const { default: Transaction } = await import('../core/transaction.js').catch(() => ({}));
-      if (!Transaction) return;
+
+      const { default: Transaction } = await import('../core/transaction.js');
+
       const tx = Transaction.fromJSON(msg.transaction);
+
+      // Already in mempool
+      const mempoolDuplicate = this.blockchain.mempool.some(
+        existing => existing.id === tx.id
+      );
+
+      if (mempoolDuplicate) {
+        return;
+      }
+
+      // Already confirmed on-chain
+      const chainDuplicate = this.blockchain.chain.some(block =>
+        block.transactions.some(existing => existing.id === tx.id)
+      );
+
+      if (chainDuplicate) {
+        return;
+      }
+
       this.blockchain.mempool.push(tx);
-    } catch {
-      // duplicate or invalid — ignore
+
+    } catch (err) {
+      console.error(
+        `❌ Failed to process tx from peer ${peerId}:`,
+        err.message
+      );
     }
   }
 
@@ -305,7 +335,7 @@ export class P2PServer {
   _requestBlocks(ws) {
     this._send(ws, {
       type:      'get_blocks',
-      fromIndex: this.blockchain.chain.length,
+      fromIndex: Math.max(0, this.blockchain.chain.length - 1),
     });
   }
 
@@ -346,7 +376,12 @@ export class P2PServer {
           const ours = this.blockchain.chain[blockData.index];
           if (ours && ours.hash !== blockData.hash) {
             console.warn(`⚠️  Fork detected at block ${blockData.index}. Peer hash differs.`);
-            // For now: if peer chain becomes longer we'll sync; simple longest-chain rule
+            // If peer chain is longer, we'll sync via replaceChain
+            const peer = this.peers.get(peerId);
+            if (peer && peer.chainHeight > this.blockchain.chain.length) {
+              console.log('🔄 Peer has longer chain. Requesting full sync...');
+              this._requestBlocks(peer.ws);
+            }
           }
           continue;
         }
