@@ -1,17 +1,24 @@
 // contracts/token.js
 // Simple Token Contract — Phase 9 style
-// ✅ Fix: uses `caller` / `msg.sender` (not the broken `msg.sender` from old sandbox)
 // Deploy: Transaction.createContractDeploy(from, { name: 'SAYMToken', version: '1.0.0', code: <this file> })
+//
+// FIX: the VM sandbox in core/contracts.js does not inject a bare global
+// `state` object — persistent storage is only reachable through
+// getState(key) / setState(key, value). The previous version referenced
+// `state.owner` directly, which is undefined and threw a ReferenceError on
+// every call to mint() and setOwner(). Fixed below to read/write the owner
+// through getState/setState like every other piece of contract state.
 
 const contract = {
   methods: {
 
     mint(args) {
-      require(msg.sender === state.owner || !state.owner, 'Only owner can mint');
+      const owner = getState('owner');
+      require(msg.sender === owner || !owner, 'Only owner can mint');
 
       const { to, amount } = args;
-      require(to,     'Recipient address required');
-      require(amount > 0, 'Amount must be positive');
+      require(to,          'Recipient address required');
+      require(amount > 0,  'Amount must be positive');
 
       const balances = getState('balances') || {};
       balances[to]   = (balances[to] || 0) + amount;
@@ -25,7 +32,7 @@ const contract = {
     },
 
     transfer(args) {
-      const from   = msg.sender;
+      const from = msg.sender;
       const { to, amount } = args;
 
       require(to,         'Recipient address required');
@@ -52,7 +59,8 @@ const contract = {
     },
 
     setOwner(args) {
-      require(!state.owner || msg.sender === state.owner, 'Not authorized');
+      const owner = getState('owner');
+      require(!owner || msg.sender === owner, 'Not authorized');
       setState('owner', args.owner);
       emit('OWNER_SET', { owner: args.owner });
     }
