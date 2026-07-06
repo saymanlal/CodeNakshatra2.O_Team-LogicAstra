@@ -15,7 +15,54 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// ── Serve static files from frontend directory ──
 app.use(express.static(path.join(__dirname, 'frontend')));
+
+// ── ADD THIS: Serve docs.html at /docs route ──
+app.get('/docs', (req, res) => {
+  const docsPath = path.join(__dirname, 'frontend', 'docs.html');
+  console.log(`📚 Docs requested, looking for: ${docsPath}`);
+  if (fs.existsSync(docsPath)) {
+    res.sendFile(docsPath);
+  } else {
+    res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Docs Not Found</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; color: #1a1a1a; }
+          h1 { font-size: 24px; font-weight: 500; }
+          p { color: #666; }
+          a { color: #667eea; text-decoration: none; }
+          a:hover { text-decoration: underline; }
+          .code { background: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 13px; margin: 10px 0; }
+        </style>
+      </head>
+      <body>
+        <h1>📚 Documentation Not Found</h1>
+        <p>The documentation page could not be found. Please make sure <code>docs.html</code> exists in the <code>frontend</code> directory.</p>
+        <div class="code">frontend/docs.html</div>
+        <p><a href="/">← Return to Explorer</a></p>
+      </body>
+      </html>
+    `);
+  }
+});
+
+// ── Handle /docs/* routes (for any sub-pages) ──
+app.get('/docs/*', (req, res) => {
+  const docsPath = path.join(__dirname, 'frontend', 'docs.html');
+  if (fs.existsSync(docsPath)) {
+    res.sendFile(docsPath);
+  } else {
+    res.status(404).send('Docs page not found');
+  }
+});
+
+// ── Serve assets from frontend ──
+app.use('/assets', express.static(path.join(__dirname, 'frontend', 'assets')));
 
 let blockchain;
 let p2pServer;
@@ -77,7 +124,6 @@ async function startServer() {
 
     p2pServer = new P2PServer(blockchain, config.p2pPort);
 
-    // ── Set bootstrap peers for auto-discovery ────────────────────
     if (config.bootstrapPeers?.length > 0) {
       p2pServer.setBootstrapPeers(config.bootstrapPeers);
     }
@@ -98,6 +144,8 @@ async function startServer() {
 
     server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`\n🚀 API server running on port ${PORT}`);
+      console.log(`📊 Explorer: http://localhost:${PORT}`);
+      console.log(`📚 Docs: http://localhost:${PORT}/docs`);
       console.log(`🔗 Mode: ${mode.toUpperCase()}`);
 
       if (mode === 'validator' || mode === 'full') {
@@ -109,7 +157,6 @@ async function startServer() {
         }
       }
 
-      // ── Connect to bootstrap peers ──────────────────────────────
       if (config.bootstrapPeers?.length > 0) {
         console.log(`\n🔗 Connecting to ${config.bootstrapPeers.length} bootstrap peer(s)...`);
         setTimeout(() => {
