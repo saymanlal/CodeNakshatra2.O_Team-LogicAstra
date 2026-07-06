@@ -1,557 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SAYMAN Documentation</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --mono-100: #1a1a1a;
-      --mono-200: #2d2d2d;
-      --mono-300: #404040;
-      --mono-400: #666666;
-      --mono-500: #888888;
-      --mono-600: #aaaaaa;
-      --mono-700: #cccccc;
-      --mono-800: #e0e0e0;
-      --mono-900: #f0f0f0;
-      --mono-1000: #ffffff;
-      --primary: #667eea;
-      --primary-dark: #5a67d8;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--mono-100);
-      color: var(--mono-800);
-      line-height: 1.6;
-    }
-
-    .docs-container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
-
-    /* Header */
-    .docs-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 0 2rem;
-      border-bottom: 1px solid var(--mono-300);
-      margin-bottom: 3rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .docs-header-left {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .docs-logo {
-      height: 40px;
-      width: auto;
-    }
-
-    .docs-header h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--mono-1000);
-    }
-
-    .docs-header-actions {
-      display: flex;
-      gap: 1rem;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.6rem 1.2rem;
-      border-radius: 8px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.2s;
-      font-size: 0.9rem;
-      border: none;
-      cursor: pointer;
-    }
-
-    .btn-primary {
-      background: var(--primary);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: var(--primary-dark);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
-    }
-
-    .btn-secondary {
-      background: var(--mono-200);
-      color: var(--mono-800);
-      border: 1px solid var(--mono-300);
-    }
-
-    .btn-secondary:hover {
-      background: var(--mono-300);
-    }
-
-    /* Hero Section */
-    .docs-hero {
-      text-align: center;
-      padding: 4rem 0;
-      border-bottom: 1px solid var(--mono-300);
-      margin-bottom: 3rem;
-    }
-
-    .docs-hero h1 {
-      font-size: 3.5rem;
-      font-weight: 800;
-      color: var(--mono-1000);
-      margin-bottom: 1rem;
-      letter-spacing: -0.02em;
-    }
-
-    .docs-hero .subtitle {
-      font-size: 1.2rem;
-      color: var(--mono-500);
-      max-width: 600px;
-      margin: 0 auto 2rem;
-    }
-
-    .hero-buttons {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    /* Sections */
-    .section {
-      margin-bottom: 4rem;
-    }
-
-    .section h2 {
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--mono-1000);
-      margin-bottom: 1.5rem;
-    }
-
-    .section h3 {
-      font-size: 1.3rem;
-      font-weight: 600;
-      color: var(--mono-900);
-      margin: 2rem 0 1rem;
-    }
-
-    .section p {
-      color: var(--mono-600);
-      margin-bottom: 1rem;
-      line-height: 1.8;
-    }
-
-    .section ul, .section ol {
-      color: var(--mono-600);
-      margin: 1rem 0 1rem 1.5rem;
-      line-height: 1.8;
-    }
-
-    .section li {
-      margin-bottom: 0.5rem;
-    }
-
-    .section code {
-      background: var(--mono-200);
-      padding: 0.2rem 0.4rem;
-      border-radius: 4px;
-      font-size: 0.85rem;
-      color: var(--mono-900);
-      font-family: 'SF Mono', 'Consolas', monospace;
-    }
-
-    .section pre {
-      background: var(--mono-200);
-      padding: 1.5rem;
-      border-radius: 8px;
-      overflow-x: auto;
-      margin: 1rem 0;
-      border: 1px solid var(--mono-300);
-    }
-
-    .section pre code {
-      background: none;
-      padding: 0;
-      color: var(--mono-700);
-      font-size: 0.85rem;
-      line-height: 1.6;
-    }
-
-    .note {
-      background: rgba(102, 126, 234, 0.08);
-      border-left: 3px solid var(--primary);
-      padding: 1rem 1.5rem;
-      border-radius: 4px;
-      margin: 1.5rem 0;
-    }
-
-    .warning {
-      background: rgba(245, 158, 11, 0.08);
-      border-left: 3px solid #f59e0b;
-      padding: 1rem 1.5rem;
-      border-radius: 4px;
-      margin: 1.5rem 0;
-    }
-
-    .tip {
-      background: rgba(16, 185, 129, 0.08);
-      border-left: 3px solid #10b981;
-      padding: 1rem 1.5rem;
-      border-radius: 4px;
-      margin: 1.5rem 0;
-    }
-
-    .download-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin: 1.5rem 0;
-    }
-
-    .download-item {
-      background: var(--mono-200);
-      border: 1px solid var(--mono-300);
-      border-radius: 8px;
-      padding: 1.5rem;
-      text-align: center;
-      transition: all 0.2s;
-    }
-
-    .download-item:hover {
-      transform: translateY(-4px);
-      border-color: var(--primary);
-    }
-
-    .download-item i {
-      font-size: 2rem;
-      color: var(--primary);
-      margin-bottom: 0.5rem;
-    }
-
-    .download-item .download-name {
-      color: var(--mono-900);
-      font-weight: 600;
-      display: block;
-      margin-bottom: 0.25rem;
-    }
-
-    .download-item .download-size {
-      color: var(--mono-500);
-      font-size: 0.8rem;
-    }
-
-    .download-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 500;
-      margin-top: 0.75rem;
-      text-decoration: none;
-      transition: all 0.2s;
-    }
-
-    .download-btn:hover {
-      background: var(--primary-dark);
-      transform: translateY(-2px);
-    }
-
-    /* Footer */
-    .docs-footer {
-      border-top: 1px solid var(--mono-300);
-      padding: 2rem 0;
-      margin-top: 3rem;
-      text-align: center;
-      color: var(--mono-500);
-      font-size: 0.9rem;
-    }
-
-    .docs-footer a {
-      color: var(--primary);
-      text-decoration: none;
-    }
-
-    .docs-footer a:hover {
-      text-decoration: underline;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      .docs-hero h1 {
-        font-size: 2.5rem;
-      }
-
-      .docs-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .docs-header-actions {
-        width: 100%;
-        flex-wrap: wrap;
-      }
-
-      .hero-buttons {
-        flex-direction: column;
-        align-items: center;
-      }
-
-      .download-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .docs-hero h1 {
-        font-size: 2rem;
-      }
-
-      .docs-container {
-        padding: 1rem;
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAYMAN Documentation</title>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="docs.css">
 </head>
 <body>
-  <div class="docs-container">
-    <!-- Header -->
-    <header class="docs-header">
-      <div class="docs-header-left">
-        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%23667eea'/%3E%3Ctext x='8' y='28' font-family='Arial' font-size='20' font-weight='bold' fill='white'%3ES%3C/text%3E%3C/svg%3E" alt="SAYMAN" class="docs-logo">
-        <h1>SAYMAN Docs</h1>
+
+<button class="mobile-menu-toggle" onclick="toggleSidebar()" aria-label="Open menu">
+  <i class="fas fa-bars"></i>
+</button>
+
+<div class="docs-wrapper">
+
+  <!-- ── Sidebar ── -->
+  <aside class="docs-sidebar" id="docsSidebar">
+
+    <div class="sidebar-header">
+      <a href="/" class="sidebar-logo">
+        <img src="/assets/sayman-logo.svg" alt="SAYMAN">
+        SAYMAN Docs
+      </a>
+      <button class="sidebar-close" onclick="toggleSidebar()" aria-label="Close menu">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="sidebar-search">
+      <div class="search-wrapper">
+        <i class="fas fa-search search-icon"></i>
+        <input
+          type="text"
+          id="docsSearch"
+          placeholder="Search docs... (Ctrl+K)"
+          oninput="searchDocs()"
+          autocomplete="off"
+        >
       </div>
-      <div class="docs-header-actions">
-        <a href="/" class="btn btn-secondary"><i class="fas fa-eye"></i> Explorer</a>
-        <a href="https://github.com/saymanlabs" class="btn btn-secondary" target="_blank"><i class="fab fa-github"></i> GitHub</a>
-      </div>
-    </header>
+    </div>
 
-    <!-- Hero -->
-    <section class="docs-hero">
-      <h1>SAYMAN Documentation</h1>
-      <p class="subtitle">Everything you need to build, validate, deploy and integrate with SAYMAN Blockchain.</p>
-      <div class="hero-buttons">
-        <a href="#getting-started" class="btn btn-primary"><i class="fas fa-rocket"></i> Get Started</a>
-        <a href="#downloads" class="btn btn-secondary"><i class="fas fa-download"></i> Download Wallet</a>
-        <a href="#sdk" class="btn btn-secondary"><i class="fas fa-code"></i> Download SDK</a>
-        <a href="#whitepaper" class="btn btn-secondary"><i class="fas fa-file-pdf"></i> Read Whitepaper</a>
-      </div>
-    </section>
+    <nav class="sidebar-nav" id="sidebarNav">
+      <!-- populated by renderSidebar() in docs.js -->
+    </nav>
 
-    <!-- Getting Started -->
-    <section id="getting-started" class="section">
-      <h2>Getting Started</h2>
-      <p>Start building on SAYMAN in minutes with our comprehensive guides and SDKs.</p>
+  </aside>
 
-      <h3>Install SDK</h3>
-      <pre><code>npm install @sayman/sdk</code></pre>
+  <!-- ── Main content ── -->
+  <main class="docs-main">
+    <div class="docs-content" id="docsContent">
+      <!-- populated by renderContent() in docs.js -->
+    </div>
+  </main>
 
-      <h3>Create a Wallet</h3>
-      <pre><code>const { Wallet } = require('@sayman/sdk');
-const wallet = new Wallet();
-const address = wallet.generateAddress();
-console.log('Address:', address);</code></pre>
+  <!-- ── Table of contents ── -->
+  <aside class="docs-toc">
+    <div class="toc-header">On this page</div>
+    <nav class="toc-nav" id="tocNav">
+      <!-- populated by updateTOC() in docs.js -->
+    </nav>
+  </aside>
 
-      <div class="tip">
-        <strong>💡 Tip:</strong> Always back up your private key securely. Never share it with anyone.
-      </div>
+</div>
 
-      <h3>Get Test Tokens</h3>
-      <p>Visit the <a href="/faucet" style="color:var(--primary);">SAYMAN Faucet</a> to get test tokens for development.</p>
-    </section>
-
-    <!-- SDK -->
-    <section id="sdk" class="section">
-      <h2>SDK</h2>
-      <p>Build SAYMAN applications with our SDKs.</p>
-
-      <div class="download-grid">
-        <div class="download-item">
-          <i class="fab fa-js"></i>
-          <span class="download-name">JavaScript SDK</span>
-          <span class="download-size">NPM Package</span>
-          <a href="/downloads/sdk-js" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-        <div class="download-item">
-          <i class="fab fa-python"></i>
-          <span class="download-name">Python SDK</span>
-          <span class="download-size">PyPI Package</span>
-          <a href="/downloads/sdk-py" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-        <div class="download-item">
-          <i class="fab fa-golang"></i>
-          <span class="download-name">Go SDK</span>
-          <span class="download-size">GitHub</span>
-          <a href="/downloads/sdk-go" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-        <div class="download-item">
-          <i class="fas fa-crab"></i>
-          <span class="download-name">Rust SDK</span>
-          <span class="download-size">Crate</span>
-          <a href="/downloads/sdk-rust" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-      </div>
-    </section>
-
-    <!-- API Reference -->
-    <section id="api" class="section">
-      <h2>API Reference</h2>
-      <p>REST API endpoints for blockchain interaction.</p>
-
-      <h3>Get Block</h3>
-      <pre><code>GET /api/block/:index</code></pre>
-
-      <h3>Get Balance</h3>
-      <pre><code>GET /api/balance/:address</code></pre>
-
-      <h3>Get Validators</h3>
-      <pre><code>GET /api/validators</code></pre>
-
-      <h3>Broadcast Transaction</h3>
-      <pre><code>POST /api/broadcast</code></pre>
-
-      <div class="note">
-        <strong>📖 Full API Reference:</strong> All endpoints are documented in the <a href="#" style="color:var(--primary);">API Reference</a> section.
-      </div>
-    </section>
-
-    <!-- Downloads -->
-    <section id="downloads" class="section">
-      <h2>Downloads</h2>
-      <p>All SAYMAN downloads in one place.</p>
-
-      <div class="download-grid">
-        <div class="download-item">
-          <i class="fab fa-android"></i>
-          <span class="download-name">Android Wallet APK</span>
-          <span class="download-size">15.2 MB</span>
-          <a href="/downloads/android" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-        <div class="download-item">
-          <i class="fas fa-windows"></i>
-          <span class="download-name">Windows Wallet</span>
-          <span class="download-size">24.8 MB</span>
-          <a href="/downloads/windows" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-        <div class="download-item">
-          <i class="fab fa-apple"></i>
-          <span class="download-name">Mac Wallet</span>
-          <span class="download-size">22.1 MB</span>
-          <a href="/downloads/mac" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-        <div class="download-item">
-          <i class="fab fa-linux"></i>
-          <span class="download-name">Linux Wallet</span>
-          <span class="download-size">18.6 MB</span>
-          <a href="/downloads/linux" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-        <div class="download-item">
-          <i class="fas fa-code"></i>
-          <span class="download-name">CLI Tool</span>
-          <span class="download-size">12.3 MB</span>
-          <a href="/downloads/cli" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-        <div class="download-item">
-          <i class="fas fa-file"></i>
-          <span class="download-name">Genesis File</span>
-          <span class="download-size">8.4 MB</span>
-          <a href="/downloads/genesis" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-        <div class="download-item">
-          <i class="fas fa-file-pdf"></i>
-          <span class="download-name">Whitepaper PDF</span>
-          <span class="download-size">2.4 MB</span>
-          <a href="/downloads/whitepaper" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-        <div class="download-item">
-          <i class="fas fa-file-alt"></i>
-          <span class="download-name">Litepaper PDF</span>
-          <span class="download-size">1.2 MB</span>
-          <a href="/downloads/litepaper" class="download-btn"><i class="fas fa-download"></i> Download</a>
-        </div>
-      </div>
-    </section>
-
-    <!-- Whitepaper -->
-    <section id="whitepaper" class="section">
-      <h2>Whitepaper</h2>
-      <p>The comprehensive technical whitepaper detailing SAYMAN's architecture, consensus, and vision.</p>
-
-      <div class="download-grid">
-        <div class="download-item">
-          <i class="fas fa-file-pdf"></i>
-          <span class="download-name">Technical Whitepaper</span>
-          <span class="download-size">2.4 MB</span>
-          <a href="/downloads/whitepaper" class="download-btn"><i class="fas fa-download"></i> Download PDF</a>
-        </div>
-        <div class="download-item">
-          <i class="fas fa-file-alt"></i>
-          <span class="download-name">Litepaper</span>
-          <span class="download-size">1.2 MB</span>
-          <a href="/downloads/litepaper" class="download-btn"><i class="fas fa-download"></i> Download PDF</a>
-        </div>
-      </div>
-
-      <h3>Abstract</h3>
-      <p>SAYMAN proposes a novel blockchain architecture that integrates artificial intelligence capabilities directly into the protocol layer. This enables the creation of intelligent, autonomous decentralized applications that can learn, adapt, and interact with both on-chain and off-chain data.</p>
-
-      <div class="note">
-        <strong>📄 Download:</strong> The whitepaper is available for download above. Feel free to share and cite it in your research.
-      </div>
-    </section>
-
-    <!-- Community -->
-    <section id="community" class="section">
-      <h2>Community</h2>
-      <p>Join the SAYMAN community on our social channels.</p>
-
-      <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem;">
-        <a href="https://discord.gg/sayman" class="btn btn-secondary" target="_blank"><i class="fab fa-discord"></i> Discord</a>
-        <a href="https://t.me/sayman" class="btn btn-secondary" target="_blank"><i class="fab fa-telegram"></i> Telegram</a>
-        <a href="https://twitter.com/sayman" class="btn btn-secondary" target="_blank"><i class="fab fa-twitter"></i> X (Twitter)</a>
-        <a href="https://github.com/saymanlabs" class="btn btn-secondary" target="_blank"><i class="fab fa-github"></i> GitHub</a>
-        <a href="https://linkedin.com/company/sayman" class="btn btn-secondary" target="_blank"><i class="fab fa-linkedin"></i> LinkedIn</a>
-        <a href="https://youtube.com/sayman" class="btn btn-secondary" target="_blank"><i class="fab fa-youtube"></i> YouTube</a>
-      </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="docs-footer">
-      <p>© 2026 SAYMAN Blockchain. All rights reserved.</p>
-      <p style="margin-top: 0.5rem;">
-        <a href="/">Explorer</a> · 
-        <a href="https://github.com/saymanlabs/SAYMAN">GitHub</a> · 
-        <a href="/faucet">Faucet</a>
-      </p>
-    </footer>
-  </div>
+<script src="docs.js"></script>
 </body>
 </html>
