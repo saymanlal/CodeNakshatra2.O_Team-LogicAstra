@@ -14,7 +14,7 @@
   <!-- ── Header ── -->
   <header class="header">
     <div class="header-left">
-      <img src="./public/sayman-logo.png" alt="SAYMAN Logo" class="logo">
+      <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%231a1a1a'/%3E%3Ctext x='8' y='32' font-family='Arial' font-size='24' fill='white'%3ES%3C/text%3E%3C/svg%3E" alt="SAYMAN Logo" class="logo">
       <div>
         <h1>SAYMAN BLOCKCHAIN</h1>
         <p class="header-subtitle">Decentralized Network Infrastructure · Public Testnet</p>
@@ -36,7 +36,7 @@
       <li class="nav-item"><button class="nav-btn" data-page="validators" onclick="showPage('validators')"><i class="fas fa-user-check"></i> Validators</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="contracts" onclick="showPage('contracts')"><i class="fas fa-file-contract"></i> Contracts</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="network" onclick="showPage('network')"><i class="fas fa-network-wired"></i> Network</button></li>
-      <li class="nav-item"><button class="nav-btn" data-page="docs" onclick="showPage('docs')"><i class="fas fa-book"></i> Docs</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="docs" onclick="window.location.href='/docs'"><i class="fas fa-book"></i> Docs</button></li>
     </ul>
   </nav>
 
@@ -88,7 +88,6 @@
     <div class="section">
       <div class="section-header"><h2>Active Validators</h2></div>
 
-      <!-- Validator Search -->
       <div class="search-bar">
         <div class="search-wrapper">
           <i class="fas fa-search search-icon"></i>
@@ -117,7 +116,6 @@
     <div class="section">
       <div class="section-header"><h2>Smart Contracts</h2></div>
 
-      <!-- Contract Search -->
       <div class="search-bar">
         <div class="search-wrapper">
           <i class="fas fa-search search-icon"></i>
@@ -154,7 +152,6 @@
     </div>
     <div class="section">
       <div class="section-header"><h2>Connected Peers</h2></div>
-      <!-- Peer Search -->
       <div class="search-bar">
         <div class="search-wrapper">
           <i class="fas fa-search search-icon"></i>
@@ -162,42 +159,6 @@
         </div>
       </div>
       <div id="peer-list"><p style="color:var(--mono-400);padding:calc(var(--grid)*2);font-size:12px;">No peers connected</p></div>
-    </div>
-  </div>
-
-  <!-- ═══ DOCS ═══ -->
-  <div id="docs" class="page">
-    <div class="section">
-      <div class="section-header"><h2>Documentation</h2></div>
-      <div style="border:var(--border);padding:calc(var(--grid)*4);">
-        <h3 style="font-weight:500;margin-bottom:calc(var(--grid)*3);">SAYMAN Blockchain Explorer</h3>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:calc(var(--grid)*3);">
-          <div style="border:var(--border);padding:calc(var(--grid)*3);">
-            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-cubes"></i> Dashboard</h4>
-            <p style="font-size:13px;color:var(--mono-400);">View real-time network statistics including total blocks, validators, stake, mempool, contracts, and estimated APR.</p>
-          </div>
-          <div style="border:var(--border);padding:calc(var(--grid)*3);">
-            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-search"></i> Explorer</h4>
-            <p style="font-size:13px;color:var(--mono-400);">Search and browse blocks by number or hash prefix. View detailed block information including transactions.</p>
-          </div>
-          <div style="border:var(--border);padding:calc(var(--grid)*3);">
-            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-user-check"></i> Validators</h4>
-            <p style="font-size:13px;color:var(--mono-400);">View active validators with their stake, share, missed blocks, and status. Search by wallet address.</p>
-          </div>
-          <div style="border:var(--border);padding:calc(var(--grid)*3);">
-            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-file-contract"></i> Contracts</h4>
-            <p style="font-size:13px;color:var(--mono-400);">Browse deployed smart contracts with their addresses, creators, and code sizes. Search by address or creator.</p>
-          </div>
-          <div style="border:var(--border);padding:calc(var(--grid)*3);">
-            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-network-wired"></i> Network</h4>
-            <p style="font-size:13px;color:var(--mono-400);">Monitor network health with connected peers, block height, average block time, and node information.</p>
-          </div>
-          <div style="border:var(--border);padding:calc(var(--grid)*3);">
-            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-code"></i> API</h4>
-            <p style="font-size:13px;color:var(--mono-400);">REST API endpoints available at <span class="mono" style="font-size:12px;">/api/*</span> for programmatic access to blockchain data.</p>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 

@@ -29,9 +29,10 @@ function poll() {
   switch (active.dataset.page) {
     case 'dashboard':  loadDashboard();                    break;
     case 'explorer':   loadExplorer(explorerPage);         break;
-    case 'validators': break;
+    case 'validators': loadValidators();                   break;
     case 'contracts':  loadContracts();                    break;
     case 'network':    loadNetwork();                      break;
+    case 'docs':       break;
   }
 }
 
