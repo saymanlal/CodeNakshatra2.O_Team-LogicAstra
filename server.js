@@ -16,10 +16,12 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// ── Serve static files from frontend directory ──
 app.use(express.static(path.join(__dirname, 'frontend')));
 
-// ── ADD THIS: Serve docs.html at /docs route ──
+// Serve the built Android APK from the repo-root apk/ folder.
+// Without this, /apk/base.apk 404s because only frontend/ is mounted above.
+app.use('/apk', express.static(path.join(__dirname, 'apk')));
+
 app.get('/docs', (req, res) => {
   const docsPath = path.join(__dirname, 'frontend', 'docs.html');
   console.log(`📚 Docs requested, looking for: ${docsPath}`);
@@ -51,7 +53,6 @@ app.get('/docs', (req, res) => {
   }
 });
 
-// ── Handle /docs/* routes (for any sub-pages) ──
 app.get('/docs/*', (req, res) => {
   const docsPath = path.join(__dirname, 'frontend', 'docs.html');
   if (fs.existsSync(docsPath)) {
@@ -61,7 +62,6 @@ app.get('/docs/*', (req, res) => {
   }
 });
 
-// ── Serve assets from frontend ──
 app.use('/assets', express.static(path.join(__dirname, 'frontend', 'assets')));
 
 let blockchain;
