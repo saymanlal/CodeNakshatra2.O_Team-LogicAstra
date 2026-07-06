@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAYMAN Documentation</title>
+  <link rel="stylesheet" href="docs.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-wrapper">
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" onclick="toggleSidebar()">
+      <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Left Sidebar -->
+    <aside class="docs-sidebar" id="docsSidebar">
+      <div class="sidebar-header">
+        <a href="/docs" class="sidebar-logo">
+          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23667eea'/%3E%3Ctext x='6' y='22' font-family='Arial' font-size='18' font-weight='bold' fill='white'%3ES%3C/text%3E%3C/svg%3E" alt="SAYMAN">
+          <span>SAYMAN Docs</span>
+        </a>
+        <button class="sidebar-close" onclick="toggleSidebar()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Search -->
+      <div class="sidebar-search">
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="docsSearch" placeholder="Search documentation..." oninput="searchDocs()">
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">Overview</div>
+          <a href="#overview" class="nav-link active" data-section="overview"><i class="fas fa-home"></i> Introduction</a>
+          <a href="#why-sayman" class="nav-link" data-section="why-sayman"><i class="fas fa-question-circle"></i> Why SAYMAN</a>
+          <a href="#architecture" class="nav-link" data-section="architecture"><i class="fas fa-sitemap"></i> Architecture</a>
+          <a href="#roadmap" class="nav-link" data-section="roadmap"><i class="fas fa-road"></i> Roadmap</a>
+          <a href="#faq" class="nav-link" data-section="faq"><i class="fas fa-question"></i> FAQ</a>
+          <a href="#whitepaper" class="nav-link" data-section="whitepaper"><i class="fas fa-file-pdf"></i> Whitepaper</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Getting Started</div>
+          <a href="#install-sdk" class="nav-link" data-section="install-sdk"><i class="fas fa-download"></i> Install SDK</a>
+          <a href="#create-wallet" class="nav-link" data-section="create-wallet"><i class="fas fa-wallet"></i> Create Wallet</a>
+          <a href="#get-test-tokens" class="nav-link" data-section="get-test-tokens"><i class="fas fa-tint"></i> Get Test Tokens</a>
+          <a href="#connect-wallet" class="nav-link" data-section="connect-wallet"><i class="fas fa-plug"></i> Connect Wallet</a>
+          <a href="#first-transaction" class="nav-link" data-section="first-transaction"><i class="fas fa-paper-plane"></i> First Transaction</a>
+          <a href="#deploy-contract" class="nav-link" data-section="deploy-contract"><i class="fas fa-file-contract"></i> Deploy Contract</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Wallet</div>
+          <a href="#wallet-overview" class="nav-link" data-section="wallet-overview"><i class="fas fa-wallet"></i> Overview</a>
+          <a href="#android-wallet" class="nav-link" data-section="android-wallet"><i class="fab fa-android"></i> Android APK</a>
+          <a href="#desktop-wallet" class="nav-link" data-section="desktop-wallet"><i class="fas fa-desktop"></i> Desktop Wallet</a>
+          <a href="#browser-extension" class="nav-link" data-section="browser-extension"><i class="fas fa-puzzle-piece"></i> Browser Extension</a>
+          <a href="#wallet-security" class="nav-link" data-section="wallet-security"><i class="fas fa-shield-alt"></i> Security</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">SDK</div>
+          <a href="#javascript-sdk" class="nav-link" data-section="javascript-sdk"><i class="fab fa-js"></i> JavaScript SDK</a>
+          <a href="#python-sdk" class="nav-link" data-section="python-sdk"><i class="fab fa-python"></i> Python SDK</a>
+          <a href="#go-sdk" class="nav-link" data-section="go-sdk"><i class="fab fa-golang"></i> Go SDK</a>
+          <a href="#rust-sdk" class="nav-link" data-section="rust-sdk"><i class="fas fa-crab"></i> Rust SDK</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">RPC API</div>
+          <a href="#testnet-rpc" class="nav-link" data-section="testnet-rpc"><i class="fas fa-server"></i> Testnet RPC</a>
+          <a href="#rest-api" class="nav-link" data-section="rest-api"><i class="fas fa-code"></i> REST API</a>
+          <a href="#json-rpc" class="nav-link" data-section="json-rpc"><i class="fas fa-code-branch"></i> JSON RPC</a>
+          <a href="#websocket" class="nav-link" data-section="websocket"><i class="fas fa-bolt"></i> WebSocket</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">API Reference</div>
+          <a href="#get-block" class="nav-link" data-section="get-block"><i class="fas fa-cube"></i> Get Block</a>
+          <a href="#get-blocks" class="nav-link" data-section="get-blocks"><i class="fas fa-cubes"></i> Get Blocks</a>
+          <a href="#get-transaction" class="nav-link" data-section="get-transaction"><i class="fas fa-exchange-alt"></i> Get Transaction</a>
+          <a href="#get-balance" class="nav-link" data-section="get-balance"><i class="fas fa-coins"></i> Get Balance</a>
+          <a href="#get-validators" class="nav-link" data-section="get-validators"><i class="fas fa-user-check"></i> Get Validators</a>
+          <a href="#get-contracts" class="nav-link" data-section="get-contracts"><i class="fas fa-file-contract"></i> Get Contracts</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Smart Contracts</div>
+          <a href="#contracts-overview" class="nav-link" data-section="contracts-overview"><i class="fas fa-file-contract"></i> Overview</a>
+          <a href="#deploy-contract-doc" class="nav-link" data-section="deploy-contract-doc"><i class="fas fa-rocket"></i> Deploy Contract</a>
+          <a href="#call-contract" class="nav-link" data-section="call-contract"><i class="fas fa-phone"></i> Call Contract</a>
+          <a href="#contract-standards" class="nav-link" data-section="contract-standards"><i class="fas fa-list"></i> Contract Standards</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Node</div>
+          <a href="#run-full-node" class="nav-link" data-section="run-full-node"><i class="fas fa-server"></i> Run Full Node</a>
+          <a href="#run-validator" class="nav-link" data-section="run-validator"><i class="fas fa-user-check"></i> Run Validator</a>
+          <a href="#docker-setup" class="nav-link" data-section="docker-setup"><i class="fab fa-docker"></i> Docker Setup</a>
+          <a href="#node-configuration" class="nav-link" data-section="node-configuration"><i class="fas fa-cog"></i> Configuration</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Testnet</div>
+          <a href="#chain-info" class="nav-link" data-section="chain-info"><i class="fas fa-info-circle"></i> Chain Information</a>
+          <a href="#faucet" class="nav-link" data-section="faucet"><i class="fas fa-tint"></i> Faucet</a>
+          <a href="#genesis-file" class="nav-link" data-section="genesis-file"><i class="fas fa-file"></i> Genesis File</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Validators</div>
+          <a href="#become-validator" class="nav-link" data-section="become-validator"><i class="fas fa-user-plus"></i> Become Validator</a>
+          <a href="#staking" class="nav-link" data-section="staking"><i class="fas fa-coins"></i> Staking</a>
+          <a href="#rewards" class="nav-link" data-section="rewards"><i class="fas fa-gift"></i> Rewards</a>
+          <a href="#slashing" class="nav-link" data-section="slashing"><i class="fas fa-exclamation-triangle"></i> Slashing</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Tokenomics</div>
+          <a href="#token-supply" class="nav-link" data-section="token-supply"><i class="fas fa-coins"></i> Token Supply</a>
+          <a href="#staking-tokenomics" class="nav-link" data-section="staking-tokenomics"><i class="fas fa-chart-line"></i> Staking</a>
+          <a href="#inflation" class="nav-link" data-section="inflation"><i class="fas fa-chart-line"></i> Inflation</a>
+          <a href="#gas" class="nav-link" data-section="gas"><i class="fas fa-gas-pump"></i> Gas</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Hackathon</div>
+          <a href="#hackathon-overview" class="nav-link" data-section="hackathon-overview"><i class="fas fa-trophy"></i> Overview</a>
+          <a href="#hackathon-tracks" class="nav-link" data-section="hackathon-tracks"><i class="fas fa-code-branch"></i> Tracks</a>
+          <a href="#hackathon-rules" class="nav-link" data-section="hackathon-rules"><i class="fas fa-gavel"></i> Rules</a>
+          <a href="#hackathon-prize" class="nav-link" data-section="hackathon-prize"><i class="fas fa-award"></i> Prize Pool</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Ecosystem</div>
+          <a href="#ecosystem-projects" class="nav-link" data-section="ecosystem-projects"><i class="fas fa-project-diagram"></i> Projects</a>
+          <a href="#ecosystem-wallets" class="nav-link" data-section="ecosystem-wallets"><i class="fas fa-wallet"></i> Wallets</a>
+          <a href="#ecosystem-dex" class="nav-link" data-section="ecosystem-dex"><i class="fas fa-chart-bar"></i> DEX</a>
+          <a href="#ecosystem-ai" class="nav-link" data-section="ecosystem-ai"><i class="fas fa-brain"></i> AI</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Security</div>
+          <a href="#security-best-practices" class="nav-link" data-section="security-best-practices"><i class="fas fa-shield-alt"></i> Best Practices</a>
+          <a href="#bug-reporting" class="nav-link" data-section="bug-reporting"><i class="fas fa-bug"></i> Bug Reporting</a>
+          <a href="#audits" class="nav-link" data-section="audits"><i class="fas fa-check-double"></i> Audits</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Downloads</div>
+          <a href="#downloads" class="nav-link" data-section="downloads"><i class="fas fa-download"></i> All Downloads</a>
+          <a href="#android-apk" class="nav-link" data-section="android-apk"><i class="fab fa-android"></i> Android APK</a>
+          <a href="#desktop-wallet-dl" class="nav-link" data-section="desktop-wallet-dl"><i class="fas fa-desktop"></i> Desktop Wallet</a>
+          <a href="#cli" class="nav-link" data-section="cli"><i class="fas fa-terminal"></i> CLI</a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Community</div>
+          <a href="#discord" class="nav-link" data-section="discord"><i class="fab fa-discord"></i> Discord</a>
+          <a href="#telegram" class="nav-link" data-section="telegram"><i class="fab fa-telegram"></i> Telegram</a>
+          <a href="#twitter" class="nav-link" data-section="twitter"><i class="fab fa-twitter"></i> X (Twitter)</a>
+          <a href="#github" class="nav-link" data-section="github"><i class="fab fa-github"></i> GitHub</a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="docs-main">
+      <div class="docs-content" id="docsContent">
+        <!-- Content will be rendered by JavaScript -->
+      </div>
+    </main>
+
+    <!-- Right TOC -->
+    <aside class="docs-toc" id="docsToc">
+      <div class="toc-header">On This Page</div>
+      <nav class="toc-nav" id="tocNav"></nav>
+    </aside>
+  </div>
+
+  <script src="docs.js"></script>
+</body>
+</html>
