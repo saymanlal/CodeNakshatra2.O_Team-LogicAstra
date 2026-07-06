@@ -9,338 +9,210 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js"></script>
 </head>
 <body>
-  <!-- Loading Overlay -->
-  <div id="loading-overlay">
-    <div>Loading SAYMAN Blockchain...</div>
-  </div>
+<div class="container">
 
-  <!-- Network Banner -->
-  <div class="network-banner testnet" id="network-banner">
-    <i class="fas fa-globe"></i> SAYMAN Testnet · Public Network
-  </div>
-
-  <!-- Navigation -->
-  <nav>
-    <div class="container">
-      <div class="nav-brand">
-        <!-- Logo placeholder – replace src with your actual logo PNG -->
-        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%23667eea'/%3E%3Ctext x='8' y='28' font-family='Arial' font-size='20' font-weight='bold' fill='white'%3ES%3C/text%3E%3C/svg%3E" alt="SAYMAN" class="logo" id="header-logo">
-        <h1>SAYMAN</h1>
-        <span class="version">v2.0</span>
-      </div>
-      <div class="nav-links">
-        <button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')"><i class="fas fa-th-large"></i> Dashboard</button>
-        <button class="nav-btn" data-page="explorer" onclick="showPage('explorer')"><i class="fas fa-search"></i> Explorer</button>
-        <button class="nav-btn" data-page="validators" onclick="showPage('validators')"><i class="fas fa-user-check"></i> Validators</button>
-        <button class="nav-btn" data-page="contracts" onclick="showPage('contracts')"><i class="fas fa-file-contract"></i> Contracts</button>
-        <button class="nav-btn" data-page="network" onclick="showPage('network')"><i class="fas fa-network-wired"></i> Network</button>
-        <button class="nav-btn" data-page="wallet" onclick="showPage('wallet')"><i class="fas fa-wallet"></i> Wallet</button>
+  <!-- ── Header ── -->
+  <header class="header">
+    <div class="header-left">
+      <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%231a1a1a'/%3E%3Ctext x='8' y='32' font-family='Arial' font-size='24' fill='white'%3ES%3C/text%3E%3C/svg%3E" alt="SAYMAN Logo" class="logo">
+      <div>
+        <h1>SAYMAN BLOCKCHAIN</h1>
+        <p class="header-subtitle">Decentralized Network Infrastructure · Public Testnet</p>
       </div>
     </div>
+    <div class="header-meta">
+      <div class="meta-item"><span class="meta-label">Network</span><span class="meta-value" id="header-network">—</span></div>
+      <div class="meta-item"><span class="meta-label">Chain ID</span><span class="meta-value mono" id="header-chain">—</span></div>
+      <div class="meta-item"><span class="meta-label">Node ID</span><span class="meta-value mono" id="header-node">—</span></div>
+      <div class="meta-item"><span class="meta-label">Mode</span><span class="meta-value" id="header-mode">—</span></div>
+    </div>
+  </header>
+
+  <!-- ── Nav ── -->
+  <nav class="nav">
+    <ul class="nav-list">
+      <li class="nav-item"><button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')"><i class="fas fa-th-large"></i> Dashboard</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="explorer" onclick="showPage('explorer')"><i class="fas fa-search"></i> Explorer</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="validators" onclick="showPage('validators')"><i class="fas fa-user-check"></i> Validators</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="contracts" onclick="showPage('contracts')"><i class="fas fa-file-contract"></i> Contracts</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="network" onclick="showPage('network')"><i class="fas fa-network-wired"></i> Network</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="docs" onclick="showPage('docs')"><i class="fas fa-book"></i> Docs</button></li>
+    </ul>
   </nav>
 
-  <!-- Main Content -->
-  <main>
-    <div class="container">
-      
-      <!-- ═══ DASHBOARD ═══ -->
-      <div id="dashboard" class="page active">
-        <h2>Dashboard</h2>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-cubes"></i></div>
-            <div class="stat-content">
-              <div class="stat-value" id="stat-blocks">—</div>
-              <div class="stat-label">Total Blocks</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-users"></i></div>
-            <div class="stat-content">
-              <div class="stat-value" id="stat-validators">—</div>
-              <div class="stat-label">Validators</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-coins"></i></div>
-            <div class="stat-content">
-              <div class="stat-value"><span id="stat-stake">—</span> <span style="font-size:0.8rem;color:var(--text-muted)">SAYN</span></div>
-              <div class="stat-label">Total Stake</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-inbox"></i></div>
-            <div class="stat-content">
-              <div class="stat-value" id="stat-mempool">—</div>
-              <div class="stat-label">Mempool</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-file-signature"></i></div>
-            <div class="stat-content">
-              <div class="stat-value" id="stat-contracts">—</div>
-              <div class="stat-label">Contracts</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-gift"></i></div>
-            <div class="stat-content">
-              <div class="stat-value"><span id="stat-reward">—</span> <span style="font-size:0.8rem;color:var(--text-muted)">SAYN</span></div>
-              <div class="stat-label">Block Reward</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-clock"></i></div>
-            <div class="stat-content">
-              <div class="stat-value"><span id="stat-blocktime">5</span><span style="font-size:0.8rem;color:var(--text-muted)">s</span></div>
-              <div class="stat-label">Block Time</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
-            <div class="stat-content">
-              <div class="stat-value"><span id="stat-apr">—</span><span style="font-size:0.8rem;color:var(--text-muted)">%</span></div>
-              <div class="stat-label">Est. APR</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section">
-          <h3>Live Block Feed</h3>
-          <div class="live-blocks" id="block-feed">
-            <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading blocks...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══ EXPLORER ═══ -->
-      <div id="explorer" class="page">
-        <h2>Block Explorer</h2>
-        
-        <div class="search-box">
-          <div class="search-wrapper">
-            <i class="fas fa-search search-icon"></i>
-            <input type="text" id="explorer-search" placeholder="Search by block number or hash prefix…" onkeydown="if(event.key==='Enter')searchExplorer()">
-          </div>
-          <button class="btn-primary" onclick="searchExplorer()"><i class="fas fa-search"></i> Search</button>
-          <button class="btn-secondary" onclick="clearSearch()"><i class="fas fa-times"></i> Clear</button>
-        </div>
-
-        <div class="explorer-tabs">
-          <button class="tab-btn active" onclick="switchExplorerTab('blocks')"><i class="fas fa-cubes"></i> Blocks</button>
-          <button class="tab-btn" onclick="switchExplorerTab('transactions')"><i class="fas fa-exchange-alt"></i> Transactions</button>
-        </div>
-
-        <div id="blocks-tab" class="explorer-tab active">
-          <table>
-            <thead>
-              <tr><th>Block</th><th>Hash</th><th>Validator</th><th>Txs</th><th>Gas Used</th><th>Time</th></tr>
-            </thead>
-            <tbody id="explorer-blocks"><tr><td colspan="6" style="padding:2rem;color:var(--text-muted);text-align:center;">Loading blocks…</td></tr></tbody>
-          </table>
-          <div id="pagination-controls"></div>
-        </div>
-
-        <div id="transactions-tab" class="explorer-tab">
-          <table>
-            <thead>
-              <tr><th>ID</th><th>Type</th><th>From</th><th>To</th><th>Amount</th><th>Gas</th><th>Time</th></tr>
-            </thead>
-            <tbody id="explorer-transactions"><tr><td colspan="7" style="padding:2rem;color:var(--text-muted);text-align:center;">Loading transactions…</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ═══ VALIDATORS ═══ -->
-      <div id="validators" class="page">
-        <h2>Active Validators</h2>
-        
-        <!-- NEW: Validator Search Bar -->
-        <div class="search-box">
-          <div class="search-wrapper">
-            <i class="fas fa-search search-icon"></i>
-            <input type="text" id="validator-search" placeholder="Search validator by wallet address…" oninput="filterValidators()">
-          </div>
-        </div>
-
-        <div class="validator-stats">
-          <div class="stat-box">
-            <h4><i class="fas fa-users"></i> Count</h4>
-            <p id="val-count">—</p>
-          </div>
-          <div class="stat-box">
-            <h4><i class="fas fa-coins"></i> Total Stake</h4>
-            <p id="val-total-stake">—</p>
-          </div>
-          <div class="stat-box">
-            <h4><i class="fas fa-percentage"></i> Est. APR</h4>
-            <p id="val-apr">—</p>
-          </div>
-        </div>
-
-        <table>
-          <thead>
-            <tr><th>Address</th><th>Stake (SAYN)</th><th>Share</th><th>Missed Blocks</th><th>Status</th></tr>
-          </thead>
-          <tbody id="validator-list"><tr><td colspan="5" style="padding:2rem;color:var(--text-muted);text-align:center;">Loading validators…</td></tr></tbody>
-        </table>
-        <p style="font-size:0.9rem;color:var(--text-muted);margin-top:0.5rem;"><i class="fas fa-info-circle"></i> Click any row to see blocks validated by that address.</p>
-      </div>
-
-      <!-- ═══ CONTRACTS ═══ -->
-      <div id="contracts" class="page">
-        <h2>Smart Contracts</h2>
-        
-        <!-- NEW: Contract Search Bar -->
-        <div class="search-box">
-          <div class="search-wrapper">
-            <i class="fas fa-search search-icon"></i>
-            <input type="text" id="contract-search" placeholder="Search contract by address or creator…" oninput="filterContracts()">
-          </div>
-        </div>
-
-        <table>
-          <thead><tr><th>Address</th><th>Creator</th><th>Code Size</th></tr></thead>
-          <tbody id="contract-list"><tr><td colspan="3" style="padding:2rem;color:var(--text-muted);text-align:center;">Loading contracts…</td></tr></tbody>
-        </table>
-      </div>
-
-      <!-- ═══ NETWORK ═══ -->
-      <div id="network" class="page">
-        <h2>Network</h2>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-server"></i></div>
-            <div class="stat-content">
-              <div class="stat-value" id="net-peers">—</div>
-              <div class="stat-label">Connected Peers</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-layer-group"></i></div>
-            <div class="stat-content">
-              <div class="stat-value" id="net-height">—</div>
-              <div class="stat-label">Block Height</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-stopwatch"></i></div>
-            <div class="stat-content">
-              <div class="stat-value"><span id="net-blocktime">—</span><span style="font-size:0.8rem;color:var(--text-muted)">ms</span></div>
-              <div class="stat-label">Avg Block Time</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-inbox"></i></div>
-            <div class="stat-content">
-              <div class="stat-value" id="net-mempool">—</div>
-              <div class="stat-label">Mempool</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section">
-          <h3>Node Info</h3>
-          <div class="info-box">
-            <p><i class="fas fa-id-card"></i> <strong>Node ID:</strong> <span class="mono" id="net-node-id">—</span></p>
-            <p><i class="fas fa-microchip"></i> <strong>Mode:</strong> <span id="net-mode">—</span></p>
-            <p><i class="fas fa-globe"></i> <strong>Network:</strong> <span id="net-network">—</span></p>
-            <p><i class="fas fa-link"></i> <strong>Chain ID:</strong> <span class="mono" id="net-chain">—</span></p>
-            <p><i class="fas fa-clock"></i> <strong>Uptime:</strong> <span id="net-uptime">—</span></p>
-          </div>
-        </div>
-
-        <div class="section">
-          <h3>Connected Peers</h3>
-          <!-- NEW: Peer search bar -->
-          <div class="search-box">
-            <div class="search-wrapper">
-              <i class="fas fa-search search-icon"></i>
-              <input type="text" id="peer-search" placeholder="Search peers by node ID…" oninput="filterPeers()">
-            </div>
-          </div>
-          <div id="peer-list"><p style="color:var(--text-muted);padding:1rem;">No peers connected</p></div>
-        </div>
-      </div>
-
-      <!-- ═══ WALLET ═══ -->
-      <div id="wallet" class="page">
-        <h2>Wallet</h2>
-        
-        <div class="wallet-actions">
-          <button class="btn-primary" onclick="createWallet()"><i class="fas fa-plus-circle"></i> Create New Wallet</button>
-          <button class="btn-secondary" onclick="importWallet()"><i class="fas fa-upload"></i> Import Wallet</button>
-        </div>
-
-        <div id="wallet-info" class="wallet-info">
-          <div class="info-group">
-            <label><i class="fas fa-user"></i> Address</label>
-            <div class="input-with-btn">
-              <input type="text" id="wallet-address" readonly placeholder="No wallet loaded" style="background:var(--darker);">
-              <button class="btn-secondary btn-copy" onclick="copyAddress()"><i class="fas fa-copy"></i> Copy</button>
-            </div>
-          </div>
-          <div class="info-group">
-            <label><i class="fas fa-key"></i> Public Key</label>
-            <div class="input-with-btn">
-              <input type="text" id="wallet-public" readonly placeholder="No wallet loaded" style="background:var(--darker);">
-              <button class="btn-secondary btn-copy" onclick="copyPublicKey()"><i class="fas fa-copy"></i> Copy</button>
-            </div>
-          </div>
-          <div class="info-group">
-            <label><i class="fas fa-lock"></i> Private Key (Keep Safe!)</label>
-            <div class="input-with-btn">
-              <input type="password" id="wallet-private" readonly placeholder="No wallet loaded" style="background:var(--darker);">
-              <button class="btn-secondary btn-toggle" onclick="togglePrivateKey()"><i class="fas fa-eye"></i> Show</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="balance-grid">
-          <div class="balance-card">
-            <h4><i class="fas fa-coins"></i> SAYN Balance</h4>
-            <p id="wallet-balance">0.0000</p>
-          </div>
-          <div class="balance-card">
-            <h4><i class="fas fa-gas-pump"></i> Gas Balance</h4>
-            <p id="wallet-gas">0.0000</p>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <h3><i class="fas fa-paper-plane"></i> Send Transaction</h3>
-          <input type="text" id="send-to" placeholder="Recipient Address">
-          <input type="number" id="send-amount" placeholder="Amount (SAYN)" step="0.0001">
-          <input type="number" id="send-gas" placeholder="Gas Limit" value="21000">
-          <button class="btn-primary" onclick="sendTransaction()"><i class="fas fa-paper-plane"></i> Send</button>
-          <div id="send-result"></div>
-        </div>
-
-        <div class="form-section">
-          <h3><i class="fas fa-file-contract"></i> Deploy Contract</h3>
-          <textarea id="contract-code" placeholder="Contract Code (bytecode)" rows="5"></textarea>
-          <input type="number" id="contract-gas" placeholder="Gas Limit" value="100000">
-          <button class="btn-primary" onclick="deployContract()"><i class="fas fa-rocket"></i> Deploy</button>
-          <div id="deploy-result"></div>
-        </div>
-      </div>
-
+  <!-- ═══ DASHBOARD ═══ -->
+  <div id="dashboard" class="page active">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Total Blocks</div><div class="stat-value" id="stat-blocks">—</div></div>
+      <div class="stat-card"><div class="stat-label">Validators</div><div class="stat-value" id="stat-validators">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Stake</div><div class="stat-value"><span id="stat-stake">—</span><span class="stat-unit">SAYN</span></div></div>
+      <div class="stat-card"><div class="stat-label">Mempool</div><div class="stat-value" id="stat-mempool">—</div></div>
+      <div class="stat-card"><div class="stat-label">Contracts</div><div class="stat-value" id="stat-contracts">—</div></div>
+      <div class="stat-card"><div class="stat-label">Block Reward</div><div class="stat-value"><span id="stat-reward">—</span><span class="stat-unit">SAYN</span></div></div>
+      <div class="stat-card"><div class="stat-label">Block Time</div><div class="stat-value"><span id="stat-blocktime">5</span><span class="stat-unit">s</span></div></div>
+      <div class="stat-card"><div class="stat-label">Est. APR</div><div class="stat-value"><span id="stat-apr">—</span><span class="stat-unit">%</span></div></div>
     </div>
-  </main>
+    <div class="section">
+      <div class="section-header"><h2>Live Block Feed</h2></div>
+      <div class="block-feed" id="block-feed"></div>
+    </div>
+  </div>
 
-  <!-- Footer -->
+  <!-- ═══ EXPLORER ═══ -->
+  <div id="explorer" class="page">
+    <div class="section">
+      <div class="section-header"><h2>Block Explorer</h2></div>
+
+      <div class="search-bar">
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="explorer-search" placeholder="Search by block number or hash prefix…" onkeydown="if(event.key==='Enter')searchExplorer()">
+        </div>
+        <button onclick="searchExplorer()">Search</button>
+        <button class="secondary" onclick="clearSearch()">Clear</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Block</th><th>Hash</th><th>Validator</th><th>Txs</th><th>Gas Used</th><th>Time</th></tr>
+        </thead>
+        <tbody id="explorer-blocks"><tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading blocks…</td></tr></tbody>
+      </table>
+
+      <div id="pagination-controls"></div>
+    </div>
+  </div>
+
+  <!-- ═══ VALIDATORS ═══ -->
+  <div id="validators" class="page">
+    <div class="section">
+      <div class="section-header"><h2>Active Validators</h2></div>
+
+      <!-- Validator Search -->
+      <div class="search-bar">
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="validator-search" placeholder="Search validator by wallet address…" oninput="filterValidators()">
+        </div>
+      </div>
+
+      <div class="val-summary">
+        <div class="val-summary-item"><span class="val-summary-label">Count</span><span class="val-summary-val" id="val-count">—</span></div>
+        <div class="val-summary-item"><span class="val-summary-label">Total Stake</span><span class="val-summary-val" id="val-total-stake">—</span></div>
+        <div class="val-summary-item"><span class="val-summary-label">Est. APR</span><span class="val-summary-val" id="val-apr">—</span></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Address</th><th>Stake (SAYN)</th><th>Share</th><th>Missed Blocks</th><th>Status</th></tr>
+        </thead>
+        <tbody id="validator-list"><tr><td colspan="5" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading validators…</td></tr></tbody>
+      </table>
+      <p style="font-size:11px;color:var(--mono-400);margin-top:calc(var(--grid)*1)">Click any row to see blocks validated by that address.</p>
+    </div>
+  </div>
+
+  <!-- ═══ CONTRACTS ═══ -->
+  <div id="contracts" class="page">
+    <div class="section">
+      <div class="section-header"><h2>Smart Contracts</h2></div>
+
+      <!-- Contract Search -->
+      <div class="search-bar">
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="contract-search" placeholder="Search contract by address or creator…" oninput="filterContracts()">
+        </div>
+      </div>
+
+      <table>
+        <thead><tr><th>Address</th><th>Creator</th><th>Code Size</th></tr></thead>
+        <tbody id="contract-list"><tr><td colspan="3" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading contracts…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ NETWORK ═══ -->
+  <div id="network" class="page">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Connected Peers</div><div class="stat-value" id="net-peers">—</div></div>
+      <div class="stat-card"><div class="stat-label">Block Height</div><div class="stat-value" id="net-height">—</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Block Time</div><div class="stat-value"><span id="net-blocktime">—</span><span class="stat-unit">ms</span></div></div>
+      <div class="stat-card"><div class="stat-label">Mempool</div><div class="stat-value" id="net-mempool">—</div></div>
+    </div>
+    <div class="section">
+      <div class="section-header"><h2>Node Info</h2></div>
+      <table>
+        <tbody>
+          <tr><td style="color:var(--mono-400);width:140px;font-size:12px;">Node ID</td><td class="mono" id="net-node-id">—</td></tr>
+          <tr><td style="color:var(--mono-400);font-size:12px;">Mode</td><td id="net-mode">—</td></tr>
+          <tr><td style="color:var(--mono-400);font-size:12px;">Network</td><td id="net-network">—</td></tr>
+          <tr><td style="color:var(--mono-400);font-size:12px;">Chain ID</td><td class="mono" id="net-chain">—</td></tr>
+          <tr><td style="color:var(--mono-400);font-size:12px;">Uptime</td><td id="net-uptime">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="section">
+      <div class="section-header"><h2>Connected Peers</h2></div>
+      <!-- Peer Search -->
+      <div class="search-bar">
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="peer-search" placeholder="Search peers by node ID…" oninput="filterPeers()">
+        </div>
+      </div>
+      <div id="peer-list"><p style="color:var(--mono-400);padding:calc(var(--grid)*2);font-size:12px;">No peers connected</p></div>
+    </div>
+  </div>
+
+  <!-- ═══ DOCS ═══ -->
+  <div id="docs" class="page">
+    <div class="section">
+      <div class="section-header"><h2>Documentation</h2></div>
+      <div style="border:var(--border);padding:calc(var(--grid)*4);">
+        <h3 style="font-weight:500;margin-bottom:calc(var(--grid)*3);">SAYMAN Blockchain Explorer</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:calc(var(--grid)*3);">
+          <div style="border:var(--border);padding:calc(var(--grid)*3);">
+            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-cubes"></i> Dashboard</h4>
+            <p style="font-size:13px;color:var(--mono-400);">View real-time network statistics including total blocks, validators, stake, mempool, contracts, and estimated APR.</p>
+          </div>
+          <div style="border:var(--border);padding:calc(var(--grid)*3);">
+            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-search"></i> Explorer</h4>
+            <p style="font-size:13px;color:var(--mono-400);">Search and browse blocks by number or hash prefix. View detailed block information including transactions.</p>
+          </div>
+          <div style="border:var(--border);padding:calc(var(--grid)*3);">
+            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-user-check"></i> Validators</h4>
+            <p style="font-size:13px;color:var(--mono-400);">View active validators with their stake, share, missed blocks, and status. Search by wallet address.</p>
+          </div>
+          <div style="border:var(--border);padding:calc(var(--grid)*3);">
+            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-file-contract"></i> Contracts</h4>
+            <p style="font-size:13px;color:var(--mono-400);">Browse deployed smart contracts with their addresses, creators, and code sizes. Search by address or creator.</p>
+          </div>
+          <div style="border:var(--border);padding:calc(var(--grid)*3);">
+            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-network-wired"></i> Network</h4>
+            <p style="font-size:13px;color:var(--mono-400);">Monitor network health with connected peers, block height, average block time, and node information.</p>
+          </div>
+          <div style="border:var(--border);padding:calc(var(--grid)*3);">
+            <h4 style="font-weight:500;margin-bottom:calc(var(--grid)*2);"><i class="fas fa-code"></i> API</h4>
+            <p style="font-size:13px;color:var(--mono-400);">REST API endpoints available at <span class="mono" style="font-size:12px;">/api/*</span> for programmatic access to blockchain data.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Footer ── -->
   <footer>
-    <div class="container">
-      <p>&copy; 2026 SAYMAN Blockchain</p>
-      <p>
-        <a href="https://github.com/saymanlal/SAYMAN" target="_blank" rel="noopener"><i class="fab fa-github"></i> GitHub</a>
-        <a href="/wallet"><i class="fas fa-wallet"></i> Wallet</a>
-        <a href="/faucet"><i class="fas fa-tint"></i> Faucet</a>
-      </p>
-    </div>
+    <span>© 2026 SAYMAN Blockchain</span>
+    <span class="footer-links">
+      <a href="https://github.com/saymanlal/SAYMAN" target="_blank" rel="noopener"><i class="fab fa-github"></i> GitHub</a>
+      <a href="/docs"><i class="fas fa-book"></i> Docs</a>
+      <a href="/faucet"><i class="fas fa-tint"></i> Faucet</a>
+    </span>
   </footer>
 
-  <script src="crypto-client.js"></script>
-  <script src="app.js"></script>
+</div>
+<script src="crypto-client.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

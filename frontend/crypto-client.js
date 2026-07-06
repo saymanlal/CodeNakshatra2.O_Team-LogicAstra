@@ -40,7 +40,6 @@ class SaymanWallet {
   }
 
   async signTransaction(txData) {
-    // CRITICAL: Must match Transaction.calculateHash() exactly
     const dataToHash = JSON.stringify({
       type: txData.type,
       timestamp: txData.timestamp,
@@ -57,8 +56,6 @@ class SaymanWallet {
     const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
     const signature = this.keyPair.sign(hash);
-    
-    // Return DER format hex string
     return signature.toDER('hex');
   }
 
