@@ -1,5 +1,158 @@
-// ── Documentation Data ──────────────────────────────────────────────────────
-const DOCS_DATA = {
+// ── Navigation Data ──────────────────────────────────────────────────────
+const NAV_SECTIONS = [
+    {
+      title: 'Overview',
+      links: [
+        { id: 'overview', icon: 'fa-home', label: 'Introduction' },
+        { id: 'why-sayman', icon: 'fa-question-circle', label: 'Why SAYMAN' },
+        { id: 'architecture', icon: 'fa-sitemap', label: 'Architecture' },
+        { id: 'roadmap', icon: 'fa-road', label: 'Roadmap' },
+        { id: 'faq', icon: 'fa-question', label: 'FAQ' },
+        { id: 'whitepaper', icon: 'fa-file-pdf', label: 'Whitepaper' }
+      ]
+    },
+    {
+      title: 'Getting Started',
+      links: [
+        { id: 'install-sdk', icon: 'fa-download', label: 'Install SDK' },
+        { id: 'create-wallet', icon: 'fa-wallet', label: 'Create Wallet' },
+        { id: 'get-test-tokens', icon: 'fa-tint', label: 'Get Test Tokens' },
+        { id: 'connect-wallet', icon: 'fa-plug', label: 'Connect Wallet' },
+        { id: 'first-transaction', icon: 'fa-paper-plane', label: 'First Transaction' },
+        { id: 'deploy-contract', icon: 'fa-file-contract', label: 'Deploy Contract' }
+      ]
+    },
+    {
+      title: 'Wallet',
+      links: [
+        { id: 'wallet-overview', icon: 'fa-wallet', label: 'Overview' },
+        { id: 'android-apk', icon: 'fa-android', label: 'Android APK' },
+        { id: 'desktop-wallet', icon: 'fa-desktop', label: 'Desktop Wallet' },
+        { id: 'browser-extension', icon: 'fa-puzzle-piece', label: 'Browser Extension' },
+        { id: 'wallet-security', icon: 'fa-shield-alt', label: 'Security' }
+      ]
+    },
+    {
+      title: 'SDK',
+      links: [
+        { id: 'javascript-sdk', icon: 'fa-js', label: 'JavaScript SDK' },
+        { id: 'python-sdk', icon: 'fa-python', label: 'Python SDK' },
+        { id: 'go-sdk', icon: 'fa-golang', label: 'Go SDK' },
+        { id: 'rust-sdk', icon: 'fa-crab', label: 'Rust SDK' }
+      ]
+    },
+    {
+      title: 'RPC API',
+      links: [
+        { id: 'testnet-rpc', icon: 'fa-server', label: 'Testnet RPC' },
+        { id: 'rest-api', icon: 'fa-code', label: 'REST API' },
+        { id: 'json-rpc', icon: 'fa-code-branch', label: 'JSON RPC' },
+        { id: 'websocket', icon: 'fa-bolt', label: 'WebSocket' }
+      ]
+    },
+    {
+      title: 'API Reference',
+      links: [
+        { id: 'get-block', icon: 'fa-cube', label: 'Get Block' },
+        { id: 'get-blocks', icon: 'fa-cubes', label: 'Get Blocks' },
+        { id: 'get-transaction', icon: 'fa-exchange-alt', label: 'Get Transaction' },
+        { id: 'get-balance', icon: 'fa-coins', label: 'Get Balance' },
+        { id: 'get-validators', icon: 'fa-user-check', label: 'Get Validators' },
+        { id: 'get-contracts', icon: 'fa-file-contract', label: 'Get Contracts' }
+      ]
+    },
+    {
+      title: 'Smart Contracts',
+      links: [
+        { id: 'contracts-overview', icon: 'fa-file-contract', label: 'Overview' },
+        { id: 'deploy-contract-doc', icon: 'fa-rocket', label: 'Deploy Contract' },
+        { id: 'call-contract', icon: 'fa-phone', label: 'Call Contract' },
+        { id: 'contract-standards', icon: 'fa-list', label: 'Contract Standards' }
+      ]
+    },
+    {
+      title: 'Node',
+      links: [
+        { id: 'run-full-node', icon: 'fa-server', label: 'Run Full Node' },
+        { id: 'run-validator', icon: 'fa-user-check', label: 'Run Validator' },
+        { id: 'docker-setup', icon: 'fa-docker', label: 'Docker Setup' },
+        { id: 'node-configuration', icon: 'fa-cog', label: 'Configuration' }
+      ]
+    },
+    {
+      title: 'Testnet',
+      links: [
+        { id: 'chain-info', icon: 'fa-info-circle', label: 'Chain Information' },
+        { id: 'faucet', icon: 'fa-tint', label: 'Faucet' },
+        { id: 'genesis-file', icon: 'fa-file', label: 'Genesis File' }
+      ]
+    },
+    {
+      title: 'Validators',
+      links: [
+        { id: 'become-validator', icon: 'fa-user-plus', label: 'Become Validator' },
+        { id: 'staking', icon: 'fa-coins', label: 'Staking' },
+        { id: 'rewards', icon: 'fa-gift', label: 'Rewards' },
+        { id: 'slashing', icon: 'fa-exclamation-triangle', label: 'Slashing' }
+      ]
+    },
+    {
+      title: 'Tokenomics',
+      links: [
+        { id: 'token-supply', icon: 'fa-coins', label: 'Token Supply' },
+        { id: 'staking-tokenomics', icon: 'fa-chart-line', label: 'Staking' },
+        { id: 'inflation', icon: 'fa-chart-line', label: 'Inflation' },
+        { id: 'gas', icon: 'fa-gas-pump', label: 'Gas' }
+      ]
+    },
+    {
+      title: 'Hackathon',
+      links: [
+        { id: 'hackathon-overview', icon: 'fa-trophy', label: 'Overview' },
+        { id: 'hackathon-tracks', icon: 'fa-code-branch', label: 'Tracks' },
+        { id: 'hackathon-rules', icon: 'fa-gavel', label: 'Rules' },
+        { id: 'hackathon-prize', icon: 'fa-award', label: 'Prize Pool' }
+      ]
+    },
+    {
+      title: 'Ecosystem',
+      links: [
+        { id: 'ecosystem-projects', icon: 'fa-project-diagram', label: 'Projects' },
+        { id: 'ecosystem-wallets', icon: 'fa-wallet', label: 'Wallets' },
+        { id: 'ecosystem-dex', icon: 'fa-chart-bar', label: 'DEX' },
+        { id: 'ecosystem-ai', icon: 'fa-brain', label: 'AI' }
+      ]
+    },
+    {
+      title: 'Security',
+      links: [
+        { id: 'security-best-practices', icon: 'fa-shield-alt', label: 'Best Practices' },
+        { id: 'bug-reporting', icon: 'fa-bug', label: 'Bug Reporting' },
+        { id: 'audits', icon: 'fa-check-double', label: 'Audits' }
+      ]
+    },
+    {
+      title: 'Downloads',
+      links: [
+        { id: 'downloads', icon: 'fa-download', label: 'All Downloads' },
+        { id: 'android-apk', icon: 'fa-android', label: 'Android APK' },
+        { id: 'desktop-wallet-dl', icon: 'fa-desktop', label: 'Desktop Wallet' },
+        { id: 'cli', icon: 'fa-terminal', label: 'CLI' }
+      ]
+    },
+    {
+      title: 'Community',
+      links: [
+        { id: 'discord', icon: 'fa-discord', label: 'Discord' },
+        { id: 'telegram', icon: 'fa-telegram', label: 'Telegram' },
+        { id: 'twitter', icon: 'fa-twitter', label: 'X (Twitter)' },
+        { id: 'github', icon: 'fa-github', label: 'GitHub' }
+      ]
+    }
+  ];
+  
+  // ── Documentation Content Data ──────────────────────────────────────────────
+  const DOCS_DATA = {
     'overview': {
       title: 'Introduction to SAYMAN',
       content: `
@@ -32,7 +185,7 @@ const DOCS_DATA = {
         </ul>
   
         <div class="tip">
-          <strong>💡 Tip:</strong> Start with our <a href="#install-sdk" style="color:var(--primary);">Installation Guide</a> to set up your development environment.
+          <strong>💡 Tip:</strong> Start with our Installation Guide to set up your development environment.
         </div>
       `
     },
@@ -115,7 +268,7 @@ const DOCS_DATA = {
         </ul>
   
         <div class="note">
-          <strong>🚀 Ready to Build?</strong> Join our <a href="#hackathon-overview" style="color:var(--primary);">Genesis Hackathon</a> and start building today!
+          <strong>🚀 Ready to Build?</strong> Join our Genesis Hackathon and start building today!
         </div>
       `
     },
@@ -217,7 +370,7 @@ const DOCS_DATA = {
   
         <h3>Via Faucet</h3>
         <ul>
-          <li>Visit <a href="/faucet" style="color:var(--primary);">SAYMAN Faucet</a></li>
+          <li>Visit SAYMAN Faucet</li>
           <li>Enter your wallet address</li>
           <li>Click "Request Tokens"</li>
           <li>Receive 100 SAYN test tokens</li>
@@ -229,251 +382,6 @@ const DOCS_DATA = {
         <div class="tip">
           <strong>💡 Tip:</strong> You can request tokens every 24 hours.
         </div>
-      `
-    },
-    'connect-wallet': {
-      title: 'Connect Wallet',
-      content: `
-        <h2>Connect Wallet</h2>
-        <p>Connect your SAYMAN wallet to applications and services.</p>
-  
-        <h3>JavaScript</h3>
-        <pre><code>const { Wallet } = require('@sayman/sdk');
-  const wallet = new Wallet('your-private-key');
-  await wallet.connect();
-  console.log('Connected:', wallet.address);</code></pre>
-  
-        <h3>Browser Extension</h3>
-        <pre><code>if (window.sayman) {
-    const accounts = await window.sayman.requestAccounts();
-    console.log('Connected accounts:', accounts);
-  }</code></pre>
-      `
-    },
-    'first-transaction': {
-      title: 'Your First Transaction',
-      content: `
-        <h2>Your First Transaction</h2>
-        <p>Learn how to send your first transaction on SAYMAN.</p>
-  
-        <h3>JavaScript</h3>
-        <pre><code>const { Wallet, Transaction } = require('@sayman/sdk');
-  
-  const wallet = new Wallet('your-private-key');
-  const tx = new Transaction()
-    .from(wallet.address)
-    .to('0x...recipient...')
-    .amount('10.0')
-    .gas(21000);
-  
-  await tx.sign(wallet);
-  const result = await tx.broadcast();
-  console.log('Transaction hash:', result.hash);</code></pre>
-  
-        <div class="note">
-          <strong>✅ Success:</strong> Your transaction will be confirmed in seconds!
-        </div>
-      `
-    },
-    'deploy-contract': {
-      title: 'Deploy Contract',
-      content: `
-        <h2>Deploy Your First Contract</h2>
-        <p>Deploy a smart contract on SAYMAN Blockchain.</p>
-  
-        <h3>JavaScript</h3>
-        <pre><code>const { Wallet, Contract } = require('@sayman/sdk');
-  
-  const wallet = new Wallet('your-private-key');
-  const contract = new Contract(bytecode, abi);
-  
-  const deployed = await contract.deploy(wallet, args);
-  console.log('Contract address:', deployed.address);</code></pre>
-  
-        <h3>Solidity Example</h3>
-        <pre><code>pragma solidity ^0.8.0;
-  
-  contract HelloWorld {
-      string public greeting = "Hello, SAYMAN!";
-  }</code></pre>
-      `
-    },
-    'javascript-sdk': {
-      title: 'JavaScript SDK',
-      content: `
-        <h2>JavaScript SDK</h2>
-        <p>Build SAYMAN applications with JavaScript.</p>
-  
-        <h3>Installation</h3>
-        <pre><code>npm install @sayman/sdk</code></pre>
-  
-        <h3>Quick Start</h3>
-        <pre><code>const { SAYMAN } = require('@sayman/sdk');
-  
-  const client = new SAYMAN('https://testnet.sayman.io');
-  const block = await client.getBlock('latest');
-  console.log('Latest block:', block.number);</code></pre>
-  
-        <div class="download-grid">
-          <div class="download-item">
-            <i class="fab fa-js"></i>
-            <span class="download-name">JavaScript SDK</span>
-            <span class="download-size">NPM Package</span>
-            <a href="/downloads/sdk-js" class="download-btn"><i class="fas fa-download"></i> Download</a>
-          </div>
-          <div class="download-item">
-            <i class="fab fa-github"></i>
-            <span class="download-name">GitHub Repository</span>
-            <span class="download-size">Open Source</span>
-            <a href="https://github.com/saymanlabs/sdk-js" class="download-btn" target="_blank"><i class="fab fa-github"></i> View</a>
-          </div>
-        </div>
-      `
-    },
-    'python-sdk': {
-      title: 'Python SDK',
-      content: `
-        <h2>Python SDK</h2>
-        <p>Python developers can build SAYMAN applications with ease.</p>
-  
-        <h3>Installation</h3>
-        <pre><code>pip install sayman-sdk</code></pre>
-  
-        <h3>Quick Start</h3>
-        <pre><code>from sayman import SAYMAN
-  
-  client = SAYMAN('https://testnet.sayman.io')
-  block = client.get_block('latest')
-  print(f'Block height: {block.height}')</code></pre>
-  
-        <div class="download-grid">
-          <div class="download-item">
-            <i class="fab fa-python"></i>
-            <span class="download-name">Python SDK</span>
-            <span class="download-size">PyPI Package</span>
-            <a href="/downloads/sdk-py" class="download-btn"><i class="fas fa-download"></i> Download</a>
-          </div>
-        </div>
-      `
-    },
-    'go-sdk': {
-      title: 'Go SDK',
-      content: `
-        <h2>Go SDK</h2>
-        <p>High-performance Go SDK for SAYMAN blockchain.</p>
-  
-        <h3>Installation</h3>
-        <pre><code>go get github.com/saymanlabs/sayman-sdk-go</code></pre>
-  
-        <h3>Quick Start</h3>
-        <pre><code>package main
-  
-  import (
-      "fmt"
-      "github.com/saymanlabs/sayman-sdk-go"
-  )
-  
-  func main() {
-      client := sayman.NewClient("https://testnet.sayman.io")
-      block, _ := client.GetBlock("latest")
-      fmt.Printf("Block: %d\\n", block.Number)
-  }</code></pre>
-      `
-    },
-    'rust-sdk': {
-      title: 'Rust SDK',
-      content: `
-        <h2>Rust SDK</h2>
-        <p>Build with Rust for maximum performance and safety.</p>
-  
-        <h3>Installation</h3>
-        <pre><code>cargo add sayman-sdk</code></pre>
-  
-        <h3>Quick Start</h3>
-        <pre><code>use sayman_sdk::SAYMAN;
-  
-  #[tokio::main]
-  async fn main() -> Result<(), Box<dyn std::error::Error>> {
-      let client = SAYMAN::new("https://testnet.sayman.io");
-      let block = client.get_block("latest").await?;
-      println!("Block: {}", block.number);
-      Ok(())
-  }</code></pre>
-      `
-    },
-    'testnet-rpc': {
-      title: 'Testnet RPC',
-      content: `
-        <h2>Testnet RPC</h2>
-        <p>Connect to SAYMAN Testnet.</p>
-  
-        <h3>RPC Endpoint</h3>
-        <pre><code>https://testnet.sayman.io/rpc</code></pre>
-  
-        <h3>Example Request</h3>
-        <pre><code>curl -X POST https://testnet.sayman.io/rpc \\
-    -H "Content-Type: application/json" \\
-    -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'</code></pre>
-  
-        <h3>WebSocket</h3>
-        <pre><code>wss://testnet.sayman.io/ws</code></pre>
-  
-        <div class="note">
-          <strong>🔄 Ready:</strong> Copy any endpoint with the copy button.
-        </div>
-      `
-    },
-    'rest-api': {
-      title: 'REST API',
-      content: `
-        <h2>REST API</h2>
-        <p>RESTful endpoints for blockchain data.</p>
-  
-        <h3>Get Block</h3>
-        <pre><code>GET /api/block/:number</code></pre>
-  
-        <h3>Get Balance</h3>
-        <pre><code>GET /api/balance/:address</code></pre>
-  
-        <h3>Get Validators</h3>
-        <pre><code>GET /api/validators</code></pre>
-  
-        <div class="note">
-          <strong>📖 All endpoints:</strong> Full API reference available in the API Reference section.
-        </div>
-      `
-    },
-    'json-rpc': {
-      title: 'JSON RPC',
-      content: `
-        <h2>JSON RPC API</h2>
-        <p>Standard JSON RPC interface for blockchain interaction.</p>
-  
-        <h3>Supported Methods</h3>
-        <ul>
-          <li><code>eth_blockNumber</code> - Get current block height</li>
-          <li><code>eth_getBlockByNumber</code> - Get block by number</li>
-          <li><code>eth_getTransactionByHash</code> - Get transaction details</li>
-          <li><code>eth_getBalance</code> - Get account balance</li>
-          <li><code>eth_sendTransaction</code> - Send a transaction</li>
-          <li><code>eth_call</code> - Call a contract</li>
-        </ul>
-      `
-    },
-    'websocket': {
-      title: 'WebSocket',
-      content: `
-        <h2>WebSocket API</h2>
-        <p>Real-time blockchain data streaming.</p>
-  
-        <h3>Connection</h3>
-        <pre><code>ws://testnet.sayman.io/ws</code></pre>
-  
-        <h3>Subscribe to Blocks</h3>
-        <pre><code>{"method": "subscribe", "channel": "blocks"}</code></pre>
-  
-        <h3>Subscribe to Transactions</h3>
-        <pre><code>{"method": "subscribe", "channel": "transactions"}</code></pre>
       `
     },
     'downloads': {
@@ -525,152 +433,8 @@ const DOCS_DATA = {
           <strong>📦 All downloads:</strong> Files are hosted on our CDN for fast download.
         </div>
       `
-    },
-    'discord': {
-      title: 'Discord Community',
-      content: `
-        <h2>Join our Discord</h2>
-        <p>Connect with the SAYMAN community on Discord.</p>
-  
-        <a href="https://discord.gg/sayman" class="btn btn-primary" target="_blank" style="margin: 1rem 0;">
-          <i class="fab fa-discord"></i> Join Discord
-        </a>
-  
-        <h3>What you'll find</h3>
-        <ul>
-          <li>Developer discussions and support</li>
-          <li>Project announcements and updates</li>
-          <li>Community events and meetups</li>
-          <li>Bug reporting and feature requests</li>
-          <li>Collaboration opportunities</li>
-        </ul>
-      `
-    },
-    'telegram': {
-      title: 'Telegram Community',
-      content: `
-        <h2>Join our Telegram</h2>
-        <p>Stay connected with the SAYMAN community on Telegram.</p>
-  
-        <a href="https://t.me/sayman" class="btn btn-primary" target="_blank" style="margin: 1rem 0;">
-          <i class="fab fa-telegram"></i> Join Telegram
-        </a>
-  
-        <h3>Channel features</h3>
-        <ul>
-          <li>Real-time announcements</li>
-          <li>Community discussions</li>
-          <li>Technical support</li>
-          <li>Project updates</li>
-        </ul>
-      `
-    },
-    'twitter': {
-      title: 'X (Twitter)',
-      content: `
-        <h2>Follow us on X</h2>
-        <p>Get the latest updates and announcements.</p>
-  
-        <a href="https://twitter.com/sayman" class="btn btn-primary" target="_blank" style="margin: 1rem 0;">
-          <i class="fab fa-twitter"></i> Follow @SAYMAN
-        </a>
-  
-        <h3>What we share</h3>
-        <ul>
-          <li>Development updates</li>
-          <li>Network status</li>
-          <li>Community highlights</li>
-          <li>Ecosystem news</li>
-        </ul>
-      `
-    },
-    'github': {
-      title: 'GitHub',
-      content: `
-        <h2>GitHub Repository</h2>
-        <p>All SAYMAN code is open source.</p>
-  
-        <a href="https://github.com/saymanlabs" class="btn btn-primary" target="_blank" style="margin: 1rem 0;">
-          <i class="fab fa-github"></i> View GitHub
-        </a>
-  
-        <h3>Repositories</h3>
-        <ul>
-          <li><a href="#" style="color:var(--primary);">Core Blockchain</a> - The main node implementation</li>
-          <li><a href="#" style="color:var(--primary);">SDK</a> - Developer SDKs</li>
-          <li><a href="#" style="color:var(--primary);">Wallet</a> - Desktop and mobile wallets</li>
-          <li><a href="#" style="color:var(--primary);">Explorer</a> - Blockchain explorer</li>
-          <li><a href="#" style="color:var(--primary);">Contracts</a> - Smart contract examples</li>
-        </ul>
-      `
-    },
-    'android-apk': {
-      title: 'Android Wallet APK',
-      content: `
-        <h2>Android Wallet APK</h2>
-        <p>Download the SAYMAN wallet for Android.</p>
-  
-        <div class="download-grid">
-          <div class="download-item">
-            <i class="fab fa-android"></i>
-            <span class="download-name">Android Wallet APK</span>
-            <span class="download-size">15.2 MB</span>
-            <a href="/downloads/android" class="download-btn"><i class="fas fa-download"></i> Download</a>
-          </div>
-          <div class="download-item">
-            <i class="fab fa-google-play"></i>
-            <span class="download-name">Google Play</span>
-            <span class="download-size">Coming Soon</span>
-            <a href="#" class="download-btn" style="opacity:0.5;cursor:not-allowed;"><i class="fas fa-clock"></i> Coming Soon</a>
-          </div>
-        </div>
-  
-        <h3>Features</h3>
-        <ul>
-          <li>Secure key storage</li>
-          <li>Send and receive SAYN</li>
-          <li>Manage multiple accounts</li>
-          <li>View transaction history</li>
-          <li>DApp browser</li>
-        </ul>
-  
-        <div class="note">
-          <strong>📱 Installation:</strong> Download the APK and install on your Android device.
-        </div>
-      `
-    },
-    'become-validator': {
-      title: 'Become a Validator',
-      content: `
-        <h2>Become a SAYMAN Validator</h2>
-        <p>Secure the network and earn rewards by becoming a validator.</p>
-  
-        <h3>Requirements</h3>
-        <ul>
-          <li>Minimum 1,000,000 SAYN stake</li>
-          <li>24/7 node operation</li>
-          <li>Secure infrastructure</li>
-          <li>Community participation</li>
-          <li>Technical expertise</li>
-        </ul>
-  
-        <h3>Setup Guide</h3>
-        <pre><code># Install SAYMAN node
-  wget https://sayman.io/node-install.sh
-  chmod +x node-install.sh
-  ./node-install.sh
-  
-  # Configure validator
-  sayman-cli validator init --stake 1000000
-  
-  # Start validation
-  sayman-cli validator start</code></pre>
-  
-        <div class="tip">
-          <strong>💡 Tip:</strong> Start with our <a href="#run-validator" style="color:var(--primary);">Validator Setup Guide</a> for detailed instructions.
-        </div>
-      `
     }
+    // Add more sections as needed...
   };
   
   // ── State ──────────────────────────────────────────────────────────────────
@@ -678,15 +442,46 @@ const DOCS_DATA = {
   
   // ── Initialize ─────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
+    renderSidebar();
     renderContent('overview');
     updateActiveNav('overview');
     updateTOC('overview');
   });
   
+  // ── Render Sidebar ────────────────────────────────────────────────────────
+  function renderSidebar() {
+    const nav = document.getElementById('sidebarNav');
+    let html = '';
+    
+    NAV_SECTIONS.forEach(section => {
+      html += `<div class="nav-section">`;
+      html += `<div class="nav-section-title">${section.title}</div>`;
+      section.links.forEach(link => {
+        html += `
+          <a href="#${link.id}" class="nav-link" data-section="${link.id}" onclick="navigateTo('${link.id}')">
+            <i class="fas ${link.icon}"></i> ${link.label}
+          </a>
+        `;
+      });
+      html += `</div>`;
+    });
+    
+    nav.innerHTML = html;
+  }
+  
   // ── Render Content ────────────────────────────────────────────────────────
   function renderContent(sectionId) {
     const data = DOCS_DATA[sectionId];
-    if (!data) return;
+    if (!data) {
+      // Show fallback content
+      document.getElementById('docsContent').innerHTML = `
+        <div style="padding: 4rem 0; text-align: center;">
+          <h2 style="color: var(--mono-1000);">Content Coming Soon</h2>
+          <p style="color: var(--mono-500);">This section is being written. Check back soon!</p>
+        </div>
+      `;
+      return;
+    }
   
     currentSection = sectionId;
     const container = document.getElementById('docsContent');
@@ -704,10 +499,7 @@ const DOCS_DATA = {
   // ── Navigation ─────────────────────────────────────────────────────────────
   function navigateTo(sectionId) {
     renderContent(sectionId);
-    // Close mobile sidebar
     document.getElementById('docsSidebar').classList.remove('open');
-    
-    // Smooth scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   
@@ -720,7 +512,10 @@ const DOCS_DATA = {
   // ── TOC ─────────────────────────────────────────────────────────────────────
   function updateTOC(sectionId) {
     const data = DOCS_DATA[sectionId];
-    if (!data) return;
+    if (!data) {
+      document.getElementById('tocNav').innerHTML = '';
+      return;
+    }
   
     const tocNav = document.getElementById('tocNav');
     const headings = data.content.match(/<h[2-3][^>]*>.*?<\/h[2-3]>/g) || [];
@@ -808,13 +603,10 @@ const DOCS_DATA = {
   
   // ── Keyboard shortcuts ──────────────────────────────────────────────────────
   document.addEventListener('keydown', (e) => {
-    // Cmd+K or Ctrl+K for search
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
       document.getElementById('docsSearch').focus();
     }
-    
-    // Escape to close sidebar
     if (e.key === 'Escape') {
       document.getElementById('docsSidebar').classList.remove('open');
     }
