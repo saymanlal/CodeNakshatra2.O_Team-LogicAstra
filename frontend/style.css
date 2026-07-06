@@ -190,13 +190,14 @@ h1 {
 }
 
 .stat-value { 
-  font-size: 24px; 
-  font-weight: 400; 
+  font-size: 22px; 
+  font-weight: 500; 
   font-variant-numeric: tabular-nums;
   overflow: hidden;
   text-overflow: ellipsis;
   word-break: break-word;
   max-width: 100%;
+  white-space: nowrap;
 }
 
 .stat-unit { 
@@ -624,6 +625,9 @@ footer a i {
   .logo { 
     height: 36px; 
   }
+  .stat-value {
+    font-size: 18px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -635,5 +639,8 @@ footer a i {
   }
   .search-wrapper { 
     min-width: 160px; 
+  }
+  .stat-value {
+    font-size: 16px;
   }
 }

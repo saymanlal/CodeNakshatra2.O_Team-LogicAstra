@@ -1,0 +1,4 @@
+# .htaccess
+RewriteEngine On
+RewriteRule ^docs$ docs.html [L]
+RewriteRule ^docs/$ docs.html [L]
