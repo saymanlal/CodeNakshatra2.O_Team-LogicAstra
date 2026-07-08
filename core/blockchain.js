@@ -51,7 +51,7 @@ class Blockchain {
     this.db = new Level(finalDbPath, { valueEncoding: 'json' });
 
     this.snapshotInterval = 100;
-    this.snapshotDir      = `./data/snapshots/${config.chainId}`;
+    this.snapshotDir      = path.join(finalDbPath, 'snapshots');
     this.ensureSnapshotDir();
 
     this.isProducing    = false;
@@ -64,7 +64,6 @@ class Blockchain {
   }
 
   ensureSnapshotDir() {
-    fs.mkdirSync('./data/snapshots', { recursive: true });
     fs.mkdirSync(this.snapshotDir,   { recursive: true });
   }
 
@@ -81,15 +80,25 @@ class Blockchain {
         this.state.importState(snapshot.state);
 
         const savedChain = await this.db.get('chain').catch(() => null);
-        if (savedChain?.length > snapshot.blockHeight) {
-          for (let i = 0; i <= snapshot.blockHeight; i++) {
+        if (savedChain?.length > 0) {
+          const loadLimit = Math.min(savedChain.length, snapshot.blockHeight + 1);
+          for (let i = 0; i < loadLimit; i++) {
             this.chain.push(await Block.fromJSON(savedChain[i]));
           }
-          for (let i = snapshot.blockHeight + 1; i < savedChain.length; i++) {
+          for (let i = loadLimit; i < savedChain.length; i++) {
             const block = await Block.fromJSON(savedChain[i]);
             this.chain.push(block);
             this.applyBlock(block);
           }
+
+          if (savedChain.length < snapshot.blockHeight + 1) {
+            console.log(`⚠️ Database height is behind snapshot (${savedChain.length} < ${snapshot.blockHeight + 1}). Rolling back state to match database...`);
+            await this._rollbackToHeight(savedChain.length - 1);
+          }
+        } else {
+          console.log('⚠️ Snapshot exists but saved chain is missing. Starting from genesis...');
+          this.state.clear();
+          this.createGenesisBlock();
         }
 
       } else {
@@ -117,8 +126,7 @@ class Blockchain {
 
   // ─── Genesis ────────────────────────────────────────────────────────────────
 
-  createGenesisBlock() {
-    console.log('🌱 Creating genesis block...');
+  applyGenesisAllocations() {
     const alloc = this.config.genesis.allocations || {};
 
     const faucetKP  = ec.keyFromPrivate(
@@ -156,6 +164,11 @@ class Blockchain {
         console.log(`  ✓ ${key.padEnd(10)} ${address.slice(0, 10)}... ${this._fmt(amount)}`);
       }
     }
+  }
+
+  createGenesisBlock() {
+    console.log('🌱 Creating genesis block...');
+    this.applyGenesisAllocations();
 
     const genesis     = new Block(0, this.config.genesis.timestamp, [], '0', 'genesis', 0);
     genesis.chainId   = this.chainId;
@@ -739,6 +752,7 @@ class Blockchain {
 
   async replayState() {
     this.state.clear();
+    this.applyGenesisAllocations();
     for (const block of this.chain) {
       this.applyBlock(block);
     }
