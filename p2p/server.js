@@ -397,9 +397,14 @@ export class P2PServer {
       if (blockData.index < ourHeight) {
         const localBlock = this.blockchain.chain[blockData.index];
         if (localBlock && localBlock.hash !== blockData.hash) {
-          console.warn(`⚠️ Fork at block ${blockData.index}. Requesting full sync...`);
+          console.warn(`⚠️ Fork at block ${blockData.index}. Requesting sync from common ancestor...`);
           const peer = this.peers.get(peerId);
-          if (peer) this._requestBlocks(peer.ws);
+          if (peer) {
+            this._send(peer.ws, {
+              type: 'get_blocks',
+              fromIndex: Math.max(0, blockData.index - 1),
+            });
+          }
         }
         return;
       }
@@ -501,10 +506,15 @@ export class P2PServer {
         if (blockData.index < ourHeight) {
           const localBlock = this.blockchain.chain[blockData.index];
           if (localBlock && localBlock.hash !== blockData.hash) {
-            console.warn(`⚠️ Fork at block ${blockData.index}`);
+            console.warn(`⚠️ Fork detected at block #${blockData.index}`);
             if (peer && peer.chainHeight > ourHeight) {
-              console.log('🔄 Peer has longer chain. Syncing...');
-              this._requestBlocks(peer.ws);
+              console.log(`🔄 Peer has longer chain (${peer.chainHeight} > ${ourHeight}). Rolling back local chain to #${blockData.index - 1} and syncing...`);
+              await this.blockchain._rollbackToHeight(blockData.index - 1);
+              this._send(peer.ws, {
+                type: 'get_blocks',
+                fromIndex: Math.max(0, blockData.index - 1),
+              });
+              break;
             }
           }
           continue;
