@@ -31,7 +31,7 @@
  * At current token value this provides meaningful validator income.
  */
 
-export const DECIMALS     = 10000;
+export const DECIMALS     = 100_000_000;
 export const TICKER       = 'SAYN';
 export const DISPLAY_NAME = 'SAYMAN';
 
@@ -40,11 +40,11 @@ export const DISPLAY_NAME = 'SAYMAN';
 const HALVING_INTERVAL = 12_614_400;
 
 export function getBlockReward(blockHeight) {
-  // Base reward: 2000 base units = 0.2 SAYN
+  // Base reward: 20,000,000 base units = 0.2 SAYN
   // Halves every HALVING_INTERVAL blocks
   const halvings = Math.floor(blockHeight / HALVING_INTERVAL);
   if (halvings >= 20) return 0;                    // effectively zero after 40 years
-  return Math.floor(2000 / Math.pow(2, halvings)); // integer base units
+  return Math.floor(20_000_000 / Math.pow(2, halvings)); // integer base units
 }
 
 export default {
@@ -61,21 +61,23 @@ export default {
 
   // blockReward is dynamic via getBlockReward(height) — this is the Year 1 value.
   // blockchain.js should call getBlockReward(block.index) when minting reward tx.
-  blockReward:  2000,                            // 0.2 SAYN in base units
+  blockReward:  20_000_000,                      // 0.2 SAYN in base units
 
   halvingInterval: HALVING_INTERVAL,
   getBlockReward,                                // expose function for blockchain.js
 
   // ─── Staking ─────────────────────────────────────────────────────────────
-  // 500 SAYN minimum stake mainnet (= 5,000,000 base units)
-  minStake:        5_000_000,
+  // 500 SAYN minimum stake mainnet (= 50,000,000,000 base units)
+  minStake:        50_000_000_000,
   unstakeDelay:    100,                          // ~8 minutes at 5s blocks
   slashPercentage: 0.15,                         // 15% slash for downtime
   maxMissedBlocks: 5,
 
   // ─── Network ─────────────────────────────────────────────────────────────
   maxPeers:        100,
-  bootstrapPeers:  [],
+  bootstrapPeers:  process.env.BOOTSTRAP_PEERS
+    ? process.env.BOOTSTRAP_PEERS.split(',').map(s => s.trim()).filter(Boolean)
+    : [],
 
   // ─── Faucet ──────────────────────────────────────────────────────────────
   faucetEnabled:   false,
@@ -93,19 +95,17 @@ export default {
   genesis: {
     timestamp: 1704067200000,
     allocations: {
-      treasury:   300_000_000_000,               // 30,000,000 SAYN
-      team:        80_000_000_000,               // 8,000,000 SAYN
-      validator1:  20_000_000_000,               // 2,000,000 SAYN
-      reserve:    100_000_000_000,               // 10,000,000 SAYN
+      treasury:   3_000_000_000_000_000,         // 30,000,000 SAYN
+      team:        800_000_000_000_000,          // 8,000,000 SAYN
+      validator1:  200_000_000_000_000,          // 2,000,000 SAYN
+      reserve:    1_000_000_000_000_000,         // 10,000,000 SAYN
     }
   },
 
   // ─── Gas model ───────────────────────────────────────────────────────────
-  // gasPrice: 5 base units per gas unit
-  // 5× more expensive than testnet but still very cheap in SAYN terms.
-  // Validators earn meaningful fee income at high tx volume.
-  defaultGasPrice:  5,
-  minGasPrice:      5,
+  // gasPrice: 1 base unit per gas unit (extremely cheap, competitive with Monad/Solana)
+  defaultGasPrice:  1,
+  minGasPrice:      1,
 
   // Gas units (identical to testnet — only price changes between networks)
   gasCosts: {
@@ -134,6 +134,6 @@ export default {
   maxStateSize:     512_000,
 
   // ─── Supply ──────────────────────────────────────────────────────────────
-  // 100,000,000 SAYN hard cap = 1,000,000,000,000 base units
-  maxSupply:        1_000_000_000_000,
+  // 100,000,000 SAYN hard cap = 10,000,000,000,000,000 base units
+  maxSupply:        10_000_000_000_000_000,
 };

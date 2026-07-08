@@ -14,6 +14,32 @@ import { SaymanWalletCLI } from './wallet-cli.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Try loading .env from current directory
+const loadCliEnv = () => {
+  try {
+    const envPath = path.join(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      const lines = content.split('\n');
+      for (let line of lines) {
+        line = line.trim();
+        if (!line || line.startsWith('#')) continue;
+        const idx = line.indexOf('=');
+        if (idx === -1) continue;
+        const key = line.substring(0, idx).trim();
+        let val = line.substring(idx + 1).trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.substring(1, val.length - 1);
+        }
+        if (process.env[key] === undefined) {
+          process.env[key] = val;
+        }
+      }
+    }
+  } catch {}
+};
+loadCliEnv();
+
 const program = new Command();
 
 const CONFIG_PATH = path.join(
@@ -250,10 +276,10 @@ program
     console.log(stats.validators);
 
     console.log(chalk.bold('\nTotal Stake:'));
-    console.log(`${stats.totalStake} SAYM`);
+    console.log(`${stats.totalStake} SAYN`);
 
     console.log(chalk.bold('\nMin Stake:'));
-    console.log(`${network.minStake} SAYM`);
+    console.log(`${network.minStake} SAYN`);
 
     console.log(chalk.bold('\nAPI Endpoint:'));
     console.log(API_BASE);
@@ -279,10 +305,10 @@ program
     console.log(address);
 
     console.log(chalk.bold('\nBalance:'));
-    console.log(chalk.green(`${data.balance} SAYM`));
+    console.log(chalk.green(`${data.balance} SAYN`));
 
     console.log(chalk.bold('\nStake:'));
-    console.log(chalk.yellow(`${data.stake} SAYM`));
+    console.log(chalk.yellow(`${data.stake} SAYN`));
 
     console.log(chalk.bold('\nNonce:'));
     console.log(data.nonce);
@@ -292,7 +318,7 @@ program
 
 program
   .command('send <to> <amount>')
-  .description('Send SAYM')
+  .description('Send SAYN')
   .option('-g, --gas-limit <limit>', 'Gas limit', '50000')
   .option('-p, --gas-price <price>', 'Gas price', '1')
   .action(async (to, amount, options) => {
@@ -337,7 +363,7 @@ program
 
 program
   .command('stake <amount>')
-  .description('Stake SAYM')
+  .description('Stake SAYN')
   .option('-g, --gas-limit <limit>', 'Gas limit', '100000')
   .option('-p, --gas-price <price>', 'Gas price', '1')
   .action(async (amount, options) => {
@@ -379,7 +405,7 @@ program
 
 program
   .command('unstake')
-  .description('Unstake SAYM')
+  .description('Unstake SAYN')
   .option('-g, --gas-limit <limit>', 'Gas limit', '100000')
   .option('-p, --gas-price <price>', 'Gas price', '1')
   .action(async (options) => {
@@ -431,7 +457,7 @@ program
     data.validators.forEach((v) => {
       table.push([
         `${v.address.substring(0, 16)}...`,
-        `${v.stake} SAYM`,
+        `${v.stake} SAYN`,
         `${v.percentage}%`,
         v.missedBlocks
       ]);

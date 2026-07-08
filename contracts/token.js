@@ -1,6 +1,6 @@
 // contracts/token.js
 // Simple Token Contract — Phase 9 style
-// Deploy: Transaction.createContractDeploy(from, { name: 'SAYMToken', version: '1.0.0', code: <this file> })
+// Deploy: Transaction.createContractDeploy(from, { name: 'SAYNToken', version: '1.0.0', code: <this file> })
 //
 // FIX: the VM sandbox in core/contracts.js does not inject a bare global
 // `state` object — persistent storage is only reachable through

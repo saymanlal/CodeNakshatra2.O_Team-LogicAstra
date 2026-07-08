@@ -447,7 +447,7 @@ export class P2PServer {
       );
       if (chainDuplicate) return;
 
-      this.blockchain.mempool.push(tx);
+      this.blockchain.addTransaction(tx, tx.publicKey);
       this._broadcastExcept({
         type: 'new_transaction',
         transaction: msg.transaction

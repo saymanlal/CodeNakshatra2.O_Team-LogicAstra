@@ -38,7 +38,8 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       minStake: config.minStake,
       gasLimits: stats.gasLimits,
       gasCosts: stats.gasCosts,
-      stateRoot: stats.stateRoot
+      stateRoot: stats.stateRoot,
+      decimals: config.decimals || 10000
     });
   });
 
@@ -342,6 +343,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       tx.gasLimit = gasLimit;
       tx.gasPrice = gasPrice;
       tx.nonce = nonce;
+      tx.publicKey = publicKey;
 
       const derivedAddress = crypto
         .createHash('sha256')
@@ -438,12 +440,12 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       const tx = Transaction.createTransfer('faucet', address, config.faucetAmount);
       blockchain.mempool.push(tx);
 
-      console.log(`🚰 Faucet: ${config.faucetAmount} SAYM → ${address.substring(0, 8)}...`);
+      console.log(`🚰 Faucet: ${config.faucetAmount} SAYN → ${address.substring(0, 8)}...`);
 
       res.json({
         success: true,
         amount: config.faucetAmount,
-        message: `${config.faucetAmount} SAYM credited (pending in mempool)`
+        message: `${config.faucetAmount} SAYN credited (pending in mempool)`
       });
     } catch (error) {
       res.status(400).json({ error: error.message });

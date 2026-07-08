@@ -13,7 +13,7 @@
  * Transfer cost: 21,000 gas × 1 = 21,000 base units = 0.0021 SAYN
  */
 
-export const DECIMALS     = 10000;           // 1 SAYN = 10,000 base units
+export const DECIMALS     = 100_000_000;           // 1 SAYN = 100,000,000 base units
 export const TICKER       = 'SAYN';
 export const DISPLAY_NAME = 'SAYMAN';
 
@@ -29,24 +29,26 @@ export default {
   // ─── Block production ────────────────────────────────────────────────────
   blockTime:    5000,                        // 5 seconds
 
-  // 0.5 SAYN per block = 5000 base units
+  // 0.5 SAYN per block = 50,000,000 base units
   // Testnet is intentionally generous so developers get tokens fast.
-  blockReward:  5000,
+  blockReward:  50_000_000,
 
   // ─── Staking ─────────────────────────────────────────────────────────────
-  // 10 SAYN minimum stake on testnet (= 100,000 base units)
-  minStake:         100_000,
+  // 10 SAYN minimum stake on testnet (= 1,000,000,000 base units)
+  minStake:         1_000_000_000,
   unstakeDelay:     10,                      // blocks (fast on testnet)
   slashPercentage:  0.10,
   maxMissedBlocks:  3,
 
   // ─── Network ─────────────────────────────────────────────────────────────
   maxPeers:         50,
-  bootstrapPeers:   [],
+  bootstrapPeers:   process.env.BOOTSTRAP_PEERS
+    ? process.env.BOOTSTRAP_PEERS.split(',').map(s => s.trim()).filter(Boolean)
+    : [],
 
   // ─── Faucet ──────────────────────────────────────────────────────────────
   faucetEnabled:    true,
-  faucetAmount:     10_000_000,              // 1000 SAYN per drip
+  faucetAmount:     100_000_000_000,         // 1000 SAYN per drip
   faucetCooldown:   60_000,                  // 1 minute
 
   // ─── Genesis allocations (all in base units) ─────────────────────────────
@@ -57,10 +59,10 @@ export default {
   genesis: {
     timestamp: 1704067200000,
     allocations: {
-      faucet1:    1_000_000_000,             // 100,000 SAYN
-      genesis1:     100_000_000,             // 10,000 SAYN
-      genesis2:      50_000_000,             // 5,000 SAYN
-      validator1:    10_000_000,             // 1,000 SAYN (staked in genesis)
+      faucet1:    10_000_000_000_000,        // 100,000 SAYN
+      genesis1:    1_000_000_000_000,        // 10,000 SAYN
+      genesis2:      500_000_000_000,        // 5,000 SAYN
+      validator1:    100_000_000_000,        // 1,000 SAYN (staked in genesis)
     }
   },
 

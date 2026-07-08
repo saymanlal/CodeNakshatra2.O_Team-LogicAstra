@@ -28,8 +28,8 @@ console.log(`Network: ${config.network.toUpperCase()}`);
 console.log(`API Port: ${config.port}`);
 console.log(`P2P Port: ${config.p2pPort}`);
 console.log(`Block Time: ${config.blockTime}ms`);
-console.log(`Block Reward: ${config.blockReward} SAYM`);
-console.log(`Min Stake: ${config.minimumStake} SAYM`);
+console.log(`Block Reward: ${config.blockReward} SAYN`);
+console.log(`Min Stake: ${config.minimumStake} SAYN`);
 console.log(`Unstake Delay: ${config.unstakeDelay} blocks`);
 console.log(`Slash Percentage: ${config.slashPercentage * 100}%`);
 console.log(`Faucet: ${config.faucetEnabled ? 'Enabled' : 'Disabled'}`);
@@ -52,7 +52,7 @@ app.use('/api', createRouter(blockchain, p2pServer));
 app.get('/', (req, res) => {
   res.json({
     name: 'Sayman Blockchain',
-    coin: 'SAYM',
+    coin: 'SAYN',
     network: config.network,
     version: '2.0.0',
     phase: 2,
@@ -68,7 +68,7 @@ if (config.autoMine !== false) {
     if (block) {
       console.log(`✓ Block #${block.index} created by ${block.validator.substring(0, 8)}...`);
       console.log(`  Transactions: ${block.transactions.length}`);
-      console.log(`  Reward: ${config.blockReward} SAYM`);
+      console.log(`  Reward: ${config.blockReward} SAYN`);
       console.log(`  Hash: ${block.hash.substring(0, 16)}...`);
       
       // Broadcast to peers
@@ -86,7 +86,7 @@ app.listen(config.port, () => {
   
   const genesisValidator = blockchain.stakeManager.getValidator(config.genesisValidator);
   if (genesisValidator) {
-    console.log(`✓ Genesis validator has ${genesisValidator.stake} SAYM staked\n`);
+    console.log(`✓ Genesis validator has ${genesisValidator.stake} SAYN staked\n`);
   }
   
   console.log('Available endpoints:');

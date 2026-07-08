@@ -64,6 +64,7 @@ class Transaction {
     this.gasPrice  = 0;
     this.nonce     = 0;
     this.gasUsed   = 0;
+    this.publicKey = null;
   }
 
   calculateHash() {
@@ -91,9 +92,9 @@ class Transaction {
     }
 
     if (!this.signature) return false;
-    if (!this.gasLimit || !this.gasPrice) return false;
+    if (this.gasLimit === undefined || this.gasPrice === undefined) return false;
 
-    const publicKey = publicKeys.get(this.data.from);
+    const publicKey = (publicKeys && publicKeys.get(this.data.from)) || this.publicKey;
     if (!publicKey) return false;
 
     try {
@@ -119,7 +120,8 @@ class Transaction {
       gasLimit:  this.gasLimit,
       gasPrice:  this.gasPrice,
       nonce:     this.nonce,
-      gasUsed:   this.gasUsed
+      gasUsed:   this.gasUsed,
+      publicKey: this.publicKey
     };
   }
 
@@ -132,6 +134,7 @@ class Transaction {
     tx.gasPrice    = json.gasPrice  || 0;
     tx.nonce       = json.nonce     || 0;
     tx.gasUsed     = json.gasUsed   || 0;
+    tx.publicKey   = json.publicKey || null;
     return tx;
   }
 

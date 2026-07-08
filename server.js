@@ -1,3 +1,4 @@
+import './core/env.js';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -91,15 +92,30 @@ async function startServer() {
     const args = process.argv.slice(2);
     let networkFlag = 'public-testnet';
     let modeFlag = 'validator';
-
+    let bootstrapFlag = null;
     for (let i = 0; i < args.length; i++) {
       if (args[i] === '--network' && args[i + 1]) networkFlag = args[i + 1];
       if (args[i] === '--mode' && args[i + 1]) modeFlag = args[i + 1];
+      if (args[i] === '--bootstrap' && args[i + 1]) bootstrapFlag = args[i + 1];
     }
 
     const config = loadConfig(networkFlag);
     const mode = modeFlag;
-    const dbPath = process.env.DB_PATH || '/tmp/sayman-data';
+    const dbPath = process.env.DB_PATH || `./data/node-${config.apiPort}`;
+
+    if (bootstrapFlag) {
+      const parsedPeers = bootstrapFlag.split(',').map(s => s.trim()).filter(Boolean);
+      config.bootstrapPeers = parsedPeers.map(peer => {
+        let url = peer;
+        if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
+          url = 'ws://' + url;
+        }
+        if (!url.endsWith('/p2p')) {
+          url = url + '/p2p';
+        }
+        return url;
+      });
+    }
 
     console.log('\n╔════════════════════════════════════════╗');
     console.log('║   SAYMAN BLOCKCHAIN - PHASE 7          ║');
@@ -111,7 +127,8 @@ async function startServer() {
     console.log(`🔗 Chain ID: ${config.chainId}`);
     console.log(`🌐 API Port: ${config.apiPort}`);
     console.log(`⏱️  Block Time: ${config.blockTime}ms`);
-    console.log(`💰 Block Reward: ${(config.blockReward / (config.decimals || 10000)).toFixed(4)} SAYN`);
+    const blockRewardDec = config.decimals === 100_000_000 ? 8 : 4;
+    console.log(`💰 Block Reward: ${(config.blockReward / (config.decimals || 10000)).toFixed(blockRewardDec)} SAYN`);
     console.log(`👥 Max Peers: ${config.maxPeers}`);
     console.log(`🔗 Bootstrap Peers: ${config.bootstrapPeers?.length > 0 ? config.bootstrapPeers.join(', ') : 'None'}`);
     console.log(`📁 Database path: ${dbPath}\n`);
@@ -148,7 +165,7 @@ async function startServer() {
       console.log(`📚 Docs: http://localhost:${PORT}/docs`);
       console.log(`🔗 Mode: ${mode.toUpperCase()}`);
 
-      if (mode === 'validator' || mode === 'full') {
+      if (mode === 'validator' || mode === 'full' || mode === 'fullnode' || mode === 'observer') {
         try {
           p2pServer.listen(server);
         } catch (err) {

@@ -1,511 +1,144 @@
-# ⛓️ SAYMAN BLOCKCHAIN — PHASE 9: SMART CONTRACT PLATFORM
+# ⛓️ SAYMAN BLOCKCHAIN — PHASE 13: DECENTRALIZED RESILIENCY & ENTERPRISE TOKENOMICS
 
-**JavaScript-native Smart Contracts · Proof-of-Report · Civic Intelligence Layer**
+**JavaScript-native Smart Contracts · Proof-of-Report · Civic Intelligence Layer · Robust Failover Mesh**
 
 ---
 
-## 🎯 What's New in Phase 9
+## 🎯 What's New in Phase 13
 
-Phase 9 transforms SAYMAN from a Merkle-verified coin chain (Phase 8) into a **full JavaScript smart contract platform** with a purpose-built civic intelligence layer for dApps like CrowdPulse.
+Phase 13 advances SAYMAN from a single-node smart contract prototype into a **resilient, decentralized, multi-validator network** ready for public hackathons and developer buildathons.
 
-| Feature | Phase 8 | Phase 9 |
+| Feature | Phase 9 | Phase 13 |
 |---|---|---|
-| Smart contracts | Basic (broken sandbox) | ✅ Full JS sandbox, events, returns |
-| `msg.sender` | ❌ Crashed | ✅ Available in all contracts |
-| Return values | ❌ Discarded | ✅ Captured and returned |
-| Event system | ❌ Missing | ✅ `emit()` + queryable log |
-| Contract metadata | ❌ None | ✅ Name, version, ABI stored |
-| External dApp repos | ❌ Not possible | ✅ SDK + deploy scripts |
-| Reputation engine | ❌ Missing | ✅ Built into StateEngine |
-| Native report txs | ❌ Missing | ✅ `REPORT_CREATE/VERIFY/RESOLVE` |
-| Contract registry | ❌ None | ✅ `GET /api/contracts` |
+| **Decimal Precision** | 4 Decimals (`10,000` base units) | ✅ **8 Decimals** (`100,000,000` base units) for enterprise precision |
+| **P2P Peer Sync** | Fragmented | ✅ **Cryptographically aligned serialization** (`publicKey: null` sync fix) |
+| **RPC Resiliency** | Single host (crashes wallet if down) | ✅ **Multi-Node Failover Mesh** (Railway, Render, Local endpoints) |
+| **Database Locks** | Single folder (conflicts on local run) | ✅ **Isolated Database Paths** (`./data/node-{port}`) |
+| **P2P Server Modes** | Only validator node listened | ✅ **Validators, Fullnodes, & Observers** listen and sync |
+| **Mobile App Updates**| Manual re-download | ✅ **Real-Time GitHub APK Update Notification & Download** |
 
 ---
 
-## 📁 Repository Structure After Phase 9
+## 📁 Repository Structure After Phase 13
 
 ```
 sayman-chain/                ← This repo (blockchain node)
 ├── core/
-│   ├── blockchain.js        ← ✅ Updated: new tx types, event API, report index
-│   ├── contracts.js         ← ✅ Updated: events, returns, msg.sender, ABI
-│   ├── state.js             ← ✅ Updated: reputation, event log, fixed crypto import
-│   ├── transaction.js       ← ✅ Updated: REPORT_CREATE/VERIFY/RESOLVE, REPUTATION_UPDATE
+│   ├── env.js               ← 🆕 Environment Loader (.env reader)
+│   ├── blockchain.js        ← State verification, event APIs, report index
+│   ├── contracts.js         ← JS sandboxing, msg.sender, event emitting
+│   ├── state.js             ← Reputation ledger, event logs, snapshots
+│   ├── transaction.js       ← Cryptographic fields (publicKey: null fix)
 │   ├── block.js             (unchanged)
 │   ├── gas.js               (unchanged)
 │   ├── merkle.js            (unchanged)
 │   ├── pos.js               (unchanged)
 │   └── stateTree.js         (unchanged)
-├── contracts/
-│   ├── example.js           ← ✅ Rewritten: new contract = { methods: {} } style
-│   └── token.js             ← ✅ Rewritten: msg.sender fixed
+├── wallet-manager/          ← 📱 Web Wallet & Capacitor Android App
+│   ├── app.js               ← RPC Failover client + Real-Time APK Update Checker
+│   ├── index.html           ← Update Notification UI
+│   └── .env                 ← Editable endpoint configurations
+├── config/
+│   ├── mainnet.js           ← Scaled 8-decimal mainnet parameters
+│   ├── testnet.js           ← Scaled 8-decimal local testnet parameters
+│   └── public-testnet.js    ← Scaled 8-decimal public testnet parameters
 ├── sdk/
-│   ├── client.js            ← 🆕 SaymanClient SDK
-│   └── index.js             ← 🆕 SDK entry point
-└── api/
-    └── routes.js            ← Add new Phase 9 routes (see section below)
-
-crowdpulse/                  ← Separate dApp repo
-├── contracts/
-│   ├── ReportRegistry.js    ← 🆕 Civic report storage contract
-│   ├── ReputationManager.js ← 🆕 Trust score contract
-│   └── RewardManager.js     ← 🆕 Points and badges contract
-├── scripts/
-│   └── deploy.js            ← 🆕 Deploy all contracts to SAYMAN
-├── backend/
-│   └── index.js             ← 🆕 Express API bridge + AI verification
-├── frontend/
-│   └── index.html           ← 🆕 Working demo UI
-└── deployed.json            ← Auto-generated after deployment
+│   └── client.js            ← Failover SaymanClient SDK
+├── faucet/
+│   └── server.js            ← Failover faucet backend
+├── server.js                ← Multi-mode P2P listen, bootstrap parsing
+└── .env                     ← Node-level configuration file
 ```
 
 ---
 
-## 🔧 Critical Bug Fixes in Phase 9
+## 🔧 Critical Core Enhancements in Phase 13
 
-### 1. `msg.sender` was undefined → crash
-**Before:**
-```javascript
-// token.js — BROKEN
-const from = msg.sender;  // ReferenceError: msg is not defined
-```
-**After:** `msg.sender` is now fully exposed in the sandbox:
-```javascript
-const sandbox = {
-  msg: { sender: from, caller: from },
-  caller: from,
-  // ...
-};
-```
+### 1. 8-Decimals Precision Scaling
+All token math throughout core configs, block rewards, genesis allocations, faucets, and CLI utilities has been scaled up to 8 decimal places:
+* **`1 SAYN`** = `100,000,000 base units` (sprinkles).
+* **Validator Block Reward (Mainnet)**: `0.2 SAYN` (`20,000,000 base units`).
+* **Validator Block Reward (Testnet)**: `0.5 SAYN` (`50,000,000 base units`).
+* **Minimum Validator Stake (Mainnet)**: `500 SAYN` (`50,000,000,000 base units`).
+* **Minimum Validator Stake (Testnet)**: `10 SAYN` (`1,000,000,000 base units`).
 
-### 2. Return values were silently discarded
-**Before:** `getCount()` returned a value that was thrown away.
-**After:**
-```javascript
-sandbox.__returnValue = undefined;
-// script executes: __returnValue = contract.methods.getCount(args)
-returnValue = sandbox.__returnValue;  // ✅ captured
-```
+### 2. Robust RPC Failover Mesh
+To ensure the wallet app and explorer remain fully operational if a cloud hosting provider crashes:
+* The core API calls (balance checks, transaction broadcasting, staking, contract calls) now run through a failover client wrapper (`apiFetch`).
+* The client accepts an array of API nodes (e.g. `https://sayman.up.railway.app`, `https://sayman.onrender.com`, `http://localhost:3000`). If the primary node times out or errors, the wallet instantly rotates to the next active peer in the background.
 
-### 3. `require('crypto')` crashed in ES module context
-**Before** (state.js):
-```javascript
-const contractCodeHash = require('crypto')  // ❌ crashes in ESM
-  .createHash('sha256').update(code).digest('hex');
-```
-**After:**
-```javascript
-import crypto from 'crypto';  // ✅ at top of file, used everywhere
-```
+### 3. Block-Sync Cryptographic Mismatch Fix
+* **The Bug**: During transaction serialization, Node 1 omitted the `publicKey` field if it was `undefined` (common for system/reward transactions). Node 2 deserialized the transaction, explicitly setting `publicKey` to `null`. This difference in serialization caused block hash mismatches during peer sync, halting the P2P network.
+* **The Fix**: The `Transaction` constructor now explicitly initializes `this.publicKey = null;` to ensure 100% byte-for-byte serialization matches across all nodes.
 
-### 4. Contract state was accessed wrong
-**Before:** Contracts used `state.count` but sandbox exposed `contract.state`.
-**After:** Sandbox directly exposes `state: contract.state`, so `state.count` works.
-
-### 5. Old flat-function contracts broken by new style
-Phase 9 supports **both** contract styles simultaneously:
-```javascript
-// Style A (Phase 9 — preferred):
-const contract = {
-  methods: {
-    createReport(args) { ... }
-  }
-};
-
-// Style B (backward compatible — old style still works):
-function createReport(args) { ... }
-```
+### 4. Automated Node-Level DB Isolation
+* To prevent LevelDB lock crashes when simulating multiple nodes locally, the database path automatically falls back to `./data/node-${config.apiPort}` if `DB_PATH` is not explicitly declared.
 
 ---
 
-## 📝 Writing Smart Contracts (Phase 9)
+## 📱 Real-Time GitHub APK Update Checker
 
-Contracts are plain JavaScript files. Drop them anywhere — no compiler, no Solidity.
+The PUKY Mobile Wallet app features a built-in checking utility:
+* **Periodic Check**: The wallet polls the GitHub Contents API for the repo's compiled APK (`apk/base.apk`) on startup and every 60 seconds.
+* **Update Notification**: If the file hash (SHA) on GitHub does not match the local installed version, the app prompts the user with a modal containing the new version hash.
+* **Direct Download**: Clicking "Download & Install" triggers a background download of the latest APK from the raw repository link.
 
-### Sandbox globals available inside every contract:
+---
 
-| Global | Type | Description |
-|---|---|---|
-| `state` | object | Contract's persistent state (read/write directly) |
-| `msg.sender` | string | Address of the caller |
-| `caller` | string | Same as `msg.sender` |
-| `args` | object | Arguments passed to this method call |
-| `blockTimestamp` | number | Current block timestamp (ms) |
-| `getState(key)` | function | Read a state key (metered) |
-| `setState(key, value)` | function | Write a state key (metered) |
-| `emit(event, data)` | function | Emit a named event (stored permanently) |
-| `transfer(to, amount)` | function | Transfer SAYM from contract balance |
-| `getBalance(address)` | function | Read any address balance |
-| `require(condition, msg)` | function | Assert, throw on failure |
-| `hash(data)` | function | SHA256 hash of any value |
-| `console.log(...)` | function | Debug logging |
+## 📝 Writing Smart Contracts
 
-### Full contract example:
+Smart contracts are written in vanilla JavaScript and deployed directly.
 
+### Sandbox Globals Available:
+* `state`: Persistent key-value storage object.
+* `msg.sender` / `caller`: Address of the transaction sender.
+* `args`: Arguments passed to the method.
+* `emit(event, data)`: Emits queryable blockchain events.
+* `transfer(to, amount)`: Moves SAYN tokens from the contract balance.
+
+### Example Contract:
 ```javascript
-// contracts/MyContract.js
-
 const contract = {
   methods: {
-
-    // Create an item
-    create(args) {
-      require(args.id,    'ID is required');
-      require(args.name,  'Name is required');
-
-      const items = getState('items') || {};
-      require(!items[args.id], 'Item already exists');
-
-      items[args.id] = {
-        id:        args.id,
-        name:      args.name,
-        owner:     msg.sender,
-        createdAt: blockTimestamp
-      };
-
-      setState('items', items);
-      emit('ITEM_CREATED', { id: args.id, owner: msg.sender });
-
-      return items[args.id];
+    deposit(args) {
+      const balances = getState('balances') || {};
+      balances[msg.sender] = (balances[msg.sender] || 0) + args.amount;
+      setState('balances', balances);
+      emit('DEPOSIT', { user: msg.sender, amount: args.amount });
     },
-
-    // Transfer ownership
-    transfer(args) {
-      const items = getState('items') || {};
-      require(items[args.id],              'Item not found');
-      require(items[args.id].owner === msg.sender, 'Not your item');
-
-      items[args.id].owner = args.to;
-      setState('items', items);
-      emit('ITEM_TRANSFERRED', { id: args.id, from: msg.sender, to: args.to });
-    },
-
-    // Read (no gas for pure reads via SDK)
-    getItem(args) {
-      return (getState('items') || {})[args.id] || null;
+    getBalance(args) {
+      return (getState('balances') || {})[args.address] || 0;
     }
-
   }
 };
 ```
 
 ---
 
-## 🚀 Deploying Contracts from an External Repo
+## 🚀 Running the Testnet locally (Quick Start)
 
-This is the key Phase 9 improvement: **your dApp lives in its own repo** and deploys contracts to SAYMAN exactly like a real blockchain.
+### 1. Configure the node environment
+Create a local `.env` file:
+```env
+NODE_ENV=testnet
+PORT=3000
+P2P_PORT=6001
+BOOTSTRAP_PEERS=
+```
 
-### Step 1 — Install the SAYMAN SDK
-
+### 2. Start Node 1 (Validator / Bootstrap)
 ```bash
-# Option A: npm link (local development)
-cd sayman-chain/sdk
-npm link
-
-cd my-dapp
-npm link @sayman/sdk
-
-# Option B: direct install
-npm install /path/to/sayman-chain/sdk
+node server.js --network testnet --mode validator
 ```
 
-### Step 2 — Write your deploy script
-
-```javascript
-// my-dapp/scripts/deploy.js
-import fs from 'fs';
-import { SaymanClient } from '@sayman/sdk';
-
-const client = new SaymanClient({ rpcUrl: 'http://localhost:10000' });
-
-const wallet = {
-  address:   process.env.DEPLOYER_ADDRESS,
-  publicKey: process.env.DEPLOYER_PUBLIC_KEY,
-  sign: (hash) => myWallet.sign(hash)
-};
-
-const code = fs.readFileSync('./contracts/MyContract.js', 'utf8');
-
-const contractAddress = await client.deployContract({
-  name:    'MyContract',
-  version: '1.0.0',
-  code,
-  wallet,
-  gasLimit: 200000,
-  gasPrice: 1
-});
-
-console.log('Deployed at:', contractAddress);
-```
-
-### Step 3 — Call your contract
-
-```javascript
-// State-changing call
-await client.callContract({
-  contractAddress,
-  method: 'create',
-  args:   { id: 'item-1', name: 'My Item' },
-  wallet,
-  gasLimit: 50000
-});
-
-// Read-only state
-const item = await client.readState(contractAddress, 'items');
-```
-
-### Step 4 — Listen to events
-
-```javascript
-const events = await client.getEvents({
-  contractAddress,
-  eventName: 'ITEM_CREATED',
-  limit: 50
-});
-```
-
----
-
-## 🏙️ CrowdPulse — Full Demo Walkthrough
-
-CrowdPulse is the first dApp built on SAYMAN. It's in a **completely separate repo** and demonstrates the full contract lifecycle.
-
-### Architecture
-
-```
-Citizen App (frontend/index.html)
-        ↓
-CrowdPulse Backend (backend/index.js)  ← AI verify, REST API, CORS
-        ↓
-SAYMAN Blockchain (RPC)
-        ↓  ↑
-  Smart Contracts (on-chain)
-   ├── ReportRegistry
-   ├── ReputationManager
-   └── RewardManager
-        ↓
-  IPFS (off-chain evidence storage)
-```
-
-### Quick Start
-
-#### 1. Start the SAYMAN node
-
+### 3. Start Node 2 (Syncing Peer)
 ```bash
-cd sayman-chain
-node server.js --network public-testnet --mode validator
+PORT=3001 P2P_PORT=6002 BOOTSTRAP_PEERS="http://localhost:3000" node server.js --network testnet --mode validator
 ```
 
-Verify it's running:
+### 4. Access the Explorer
+Start a server for the web explorer:
 ```bash
-curl http://localhost:10000/api/stats
-# → { "blocks": 12, "contracts": 0, "stateRoot": "abc..." }
+npx http-server ./frontend -p 8080
 ```
-
-#### 2. Deploy CrowdPulse contracts
-
-```bash
-cd crowdpulse
-
-# Set your deployer key (or use the dev default)
-export DEPLOYER_PRIVATE_KEY=your_private_key_hex
-
-node scripts/deploy.js --network local
-```
-
-Expected output:
-```
-╔══════════════════════════════════════╗
-║  CrowdPulse Contract Deployer v1.0   ║
-╚══════════════════════════════════════╝
-
-Network:   local
-RPC:       http://localhost:10000
-Deployer:  1a2b3c4d5e6f...
-Balance:   50000 SAYM
-
-Deploying ReportRegistry...    ✅ 7f3a1b2c9d8e...
-Deploying ReputationManager... ✅ 4e2b1c0a8f7d...
-Deploying RewardManager...     ✅ 9d8c7b6a5e4f...
-
-📄 Manifest saved → crowdpulse/deployed.json
-```
-
-#### 3. Start the CrowdPulse backend
-
-```bash
-cd crowdpulse/backend
-npm install
-SAYMAN_RPC=http://localhost:10000 node index.js
-# → API: http://localhost:3001
-```
-
-#### 4. Open the frontend
-
-```bash
-# Just open in browser — no build step needed
-open crowdpulse/frontend/index.html
-```
-
-### Full Demo Flow (for judges)
-
-**Scenario: Pothole reported on Main Street**
-
-1. **Open frontend** → see live block height ticking
-2. **Fill in form**: Category = Road Damage, Severity = High, description
-3. **Click "Run AI Verification"** → confidence score appears (e.g. 91%)
-4. **Click "Submit to SAYMAN Chain"** → transaction sent
-5. **Report appears** in live feed with `OPEN` status
-6. **Check Events tab** → `REPORT_CREATED` event visible on-chain
-7. **Check SAYMAN explorer** → `GET /api/contracts/{address}/state` shows the report
-8. **Authority resolves** (via API) → status changes to `RESOLVED` on-chain
-9. **Reporter gains reputation** → `REPUTATION_INCREASED` event appears
-10. **State root changes** → every state change is cryptographically committed
-
-### What this proves to judges:
-
-- Smart contracts deployed from a **separate repo** to a **live chain**
-- Events emitted by contracts, **queryable via API**
-- State changes **permanently recorded** with Merkle proof
-- AI + blockchain working together — AI result stored on-chain
-- Full lifecycle: submit → verify → resolve → reward
-
----
-
-## 🌐 New API Routes for Phase 9
-
-Add these to `api/routes.js`:
-
-```javascript
-// Contract registry
-GET  /api/contracts
-GET  /api/contracts/:address
-GET  /api/contracts/:address/state
-GET  /api/contracts/:address/state/:key
-GET  /api/contracts/:address/events
-
-// Events
-GET  /api/events?contract=&event=&limit=
-
-// Reputation
-GET  /api/reputation/:address
-
-// Native reports
-GET  /api/reports?category=&status=&limit=
-GET  /api/reports/:id
-
-// Account (needed by SDK)
-GET  /api/account/:address   → { balance, nonce, stake, reputation }
-```
-
----
-
-## 🔐 Security Notes
-
-### VM Sandbox
-Contracts run inside Node.js `vm.Script` with:
-- 5-second execution timeout
-- Isolated context — no access to `require`, `process`, `fs`
-- Gas metering on every `getState` / `setState` call
-- Memory constrained by V8 context isolation
-
-When asked by mentors:
-> *"How do you prevent infinite loops?"*
-
-Answer: **Execution timeout (5000ms) + gas limit per transaction. A contract that exceeds either is rejected and its state changes rolled back.**
-
-> *"What if a contract calls `require('fs')`?"*
-
-Answer: **The VM sandbox has no `require`. It throws `ReferenceError: require is not defined`. Only the explicitly injected sandbox globals are available.**
-
----
-
-## 📦 Transaction Types (Complete List)
-
-| Type | Who sends | Gas | Signature |
-|---|---|---|---|
-| `GENESIS` | Chain | No | No |
-| `REWARD` | Chain | No | No |
-| `REWARD_FEE` | Chain | No | No |
-| `SLASH` | Chain | No | No |
-| `REPUTATION_UPDATE` | Chain | No | No |
-| `TRANSFER` | User | Yes | Yes |
-| `STAKE` | User | Yes | Yes |
-| `UNSTAKE` | User | Yes | Yes |
-| `CONTRACT_DEPLOY` | User | Yes | Yes |
-| `CONTRACT_CALL` | User | Yes | Yes |
-| `CONTRACT_UPGRADE` | User | Yes | Yes |
-| `REPORT_CREATE` | User | Yes | Yes |
-| `REPORT_VERIFY` | User | Yes | Yes |
-| `REPORT_RESOLVE` | User | Yes | Yes |
-
----
-
-## 🏆 Hackathon Pitch Points
-
-### Why your own blockchain?
-> "Ethereum charges $5–50 per transaction for civic reports — unviable for mass adoption. SAYMAN has near-zero fees, native Proof-of-Report transaction types, and a reputation layer built into consensus. This isn't a Solidity port; this is a chain redesigned around civic intelligence."
-
-### Why JavaScript contracts?
-> "JavaScript has 20 million developers globally. Solidity has under 50,000. We reduce the barrier for civic developers from 6 months of learning a new language to 0 days. Any JS developer can deploy a dApp on SAYMAN today."
-
-### Why blockchain for reporting?
-> "Citizens don't trust authorities. Authorities don't trust citizen data. NGOs don't trust either. Blockchain provides a single, tamper-proof source of truth that no single actor controls. Once a report is submitted, nobody — not even the chain operator — can delete it."
-
-### One-liner:
-> "CrowdPulse transforms millions of citizens into a real-time decentralized sensor network, powered by AI verification and secured by the SAYMAN Blockchain — the first chain purpose-built for civic intelligence."
-
----
-
-## 📸 Snapshot System (Phase 8, still active)
-
-- Saved every 100 blocks to `data/snapshots/`
-- Restores in seconds instead of replaying full chain
-- Phase 9 adds `reputation` and `eventLog` to snapshot exports
-
----
-
-## 🔬 State Root (Phase 8+)
-
-Every block includes a `stateRoot` — a Merkle hash of all accounts, contract storage, and reputation scores. This makes every state transition cryptographically provable.
-
-```
-Block #1234
-  stateRoot: "7f8e9d1234..." ← hash of entire world state
-  hash:      "2a3b4c5d..."   ← block hash (includes stateRoot)
-```
-
----
-
-## 🚀 Phase 10 Ideas
-
-- Cross-contract calls (`callContract(address, method, args)` from within a contract)
-- Contract upgrade mechanism (proxy pattern)
-- ZK proof of report existence (without revealing location)
-- Multi-sig authority wallets
-- On-chain governance voting for report priorities
-- IPFS integration built into node (auto-pin evidence)
-
----
-
-## ✅ Phase 9 Achievements
-
-- ✅ `msg.sender` fixed — contracts no longer crash
-- ✅ Return values captured from contract methods
-- ✅ `emit()` event system — permanent, queryable log
-- ✅ Contract metadata (name, version, ABI) on-chain
-- ✅ Both contract styles supported (new + backward compat)
-- ✅ Reputation engine in StateEngine
-- ✅ `REPORT_CREATE / VERIFY / RESOLVE` native tx types
-- ✅ `REPUTATION_UPDATE` system transaction
-- ✅ External dApp SDK (`@sayman/sdk`)
-- ✅ CrowdPulse contracts deployable from separate repo
-- ✅ Full demo: frontend + backend + contracts + chain
-- ✅ `require('crypto')` ESM crash fixed
-- ✅ `exportState()` includes reputation + events (snapshots work)
-- ✅ `getContractRegistry()` API
-- ✅ Backward compatible — all Phase 8 features intact
-
----
-
-**Phase 9 Complete. SAYMAN is now a full JavaScript smart contract platform. 🎉**
+Open `http://localhost:8080` in your web browser.

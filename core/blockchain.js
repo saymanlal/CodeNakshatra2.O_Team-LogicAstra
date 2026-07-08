@@ -366,10 +366,17 @@ class Blockchain {
         return false;
       }
 
+      // ── Proof of Stake Validator Check ──────────────────────────────────────
+      const expectedValidator = this.pos.selectValidator(lastBlock.hash);
+      if (expectedValidator && block.validator !== expectedValidator) {
+        console.warn(`⚠️  addBlock rejected #${block.index}: validator mismatch. Expected: ${expectedValidator}, Got: ${block.validator}`);
+        return false;
+      }
+
       // ── Hash integrity ─────────────────────────────────────────────────────
       const recomputed = block.calculateHash();
       if (recomputed !== block.hash) {
-        console.warn(`⚠️  addBlock rejected #${block.index}: hash mismatch`);
+        console.warn(`⚠️  addBlock rejected #${block.index}: hash mismatch. Block hash: ${block.hash}, Recomputed: ${recomputed}`);
         return false;
       }
 
@@ -461,7 +468,14 @@ class Blockchain {
         TX_TYPES.CONTRACT_DEPLOY, TX_TYPES.CONTRACT_CALL, TX_TYPES.CONTRACT_UPGRADE,
         TX_TYPES.REPORT_CREATE, TX_TYPES.REPORT_VERIFY, TX_TYPES.REPORT_RESOLVE,
       ]);
+      
       if (userTypes.has(tx.type)) {
+        if (tx.publicKey && tx.data.from) {
+          this.state.setPublicKey(tx.data.from, tx.publicKey);
+        }
+        if (!tx.isValid(this.state.publicKeys)) {
+          throw new Error(`Invalid signature for transaction ${tx.id}`);
+        }
         this.state.incrementNonce(tx.data.from);
       }
 
@@ -497,11 +511,48 @@ class Blockchain {
           this.state.addBalance(tx.data.to, tx.data.amount);
           break;
 
-        case TX_TYPES.CONTRACT_DEPLOY:
+        case TX_TYPES.CONTRACT_DEPLOY: {
+          const payload = {
+            name:      tx.data.name,
+            version:   tx.data.version,
+            abi:       tx.data.abi,
+            code:      tx.data.code,
+            feePolicy: tx.data.feePolicy || 'user',
+          };
+          const gasTracker = this.gas.trackExecution();
+          this.contracts.deploy(tx.data.from, payload, tx.timestamp, gasTracker);
           this.state.subtractBalance(tx.data.from, gasCost);
           break;
+        }
 
-        case TX_TYPES.CONTRACT_CALL:
+        case TX_TYPES.CONTRACT_CALL: {
+          const gasTracker = this.gas.trackExecution();
+          this.contracts.call(
+            tx.data.from,
+            tx.data.contractAddress,
+            tx.data.method,
+            tx.data.args,
+            gasTracker,
+            tx.gasLimit
+          );
+
+          const feePolicy = tx.feePolicy || 'user';
+          if (feePolicy === 'free') {
+            // no-op
+          } else if (feePolicy === 'sponsor') {
+            const contract = this.contracts.getContract(tx.data.contractAddress);
+            if (contract && (contract.sponsorBalance || 0) >= gasCost) {
+              contract.sponsorBalance -= gasCost;
+              this.state.setContractMeta?.(tx.data.contractAddress, 'sponsorBalance', contract.sponsorBalance);
+            } else {
+              this.state.subtractBalance(tx.data.from, gasCost);
+            }
+          } else {
+            this.state.subtractBalance(tx.data.from, gasCost);
+          }
+          break;
+        }
+
         case TX_TYPES.CONTRACT_UPGRADE: {
           const feePolicy = tx.feePolicy || 'user';
           if (feePolicy === 'free') {
