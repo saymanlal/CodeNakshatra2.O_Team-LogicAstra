@@ -10,6 +10,7 @@ export class P2PServer {
     this.wss = null;
     this.nodeId = crypto.randomBytes(16).toString('hex');
     this.isSyncing = false;
+    this.syncQueue = [];
 
     this.outboundUrls = new Set();
     this.reconnectTimers = new Map();
@@ -491,9 +492,23 @@ export class P2PServer {
   async _handleBlocks(msg, peerId) {
     const blocks = msg.blocks;
     if (!Array.isArray(blocks) || !blocks.length) return;
+
+    this.syncQueue.push({ blocks, peerId });
     if (this.isSyncing) return;
 
     this.isSyncing = true;
+
+    try {
+      while (this.syncQueue.length > 0) {
+        const item = this.syncQueue.shift();
+        await this._processBlocksBatch(item.blocks, item.peerId);
+      }
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  async _processBlocksBatch(blocks, peerId) {
     console.log(`📚 Received ${blocks.length} blocks from peer ${peerId}`);
 
     try {
@@ -514,6 +529,7 @@ export class P2PServer {
                 type: 'get_blocks',
                 fromIndex: Math.max(0, blockData.index - 1),
               });
+              this.syncQueue = []; // Clear queue since we're starting a new sync request
               break;
             }
           }
@@ -527,6 +543,7 @@ export class P2PServer {
             imported++;
           } else {
             console.warn(`⚠️ addBlock rejected #${blockData.index}`);
+            this.syncQueue = []; // Clear queue on rejection
             break;
           }
           continue;
@@ -534,6 +551,7 @@ export class P2PServer {
 
         console.log(`⚠️ Gap: have ${ourHeight}, next is ${blockData.index}`);
         if (peer) this._requestBlocks(peer.ws);
+        this.syncQueue = []; // Clear queue on gap, since we requested a fresh start
         break;
       }
 
@@ -542,9 +560,7 @@ export class P2PServer {
         this._broadcastHandshake();
       }
     } catch (err) {
-      console.error('❌ _handleBlocks error:', err.message);
-    } finally {
-      this.isSyncing = false;
+      console.error('❌ _processBlocksBatch error:', err.message);
     }
   }
 
