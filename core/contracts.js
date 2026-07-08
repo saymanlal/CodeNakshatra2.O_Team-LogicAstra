@@ -144,25 +144,11 @@ class ContractEngine {
     // Merge with in-memory (persistent is authoritative)
     const stateSnapshot  = { ...contract.state, ...persistedState };
 
-    const sandbox = {
-      // msg — standard across all contract calls
+    const bridge = {
       msg: { sender: from, caller: from },
-
-      // args passed to this method call
-      args: args || {},
-
-      // blockTimestamp — available for contracts that need it
-      blockTimestamp: Date.now(),
-
-      // Safe console inside contract VM
-      console: {
-        log:   (...a) => console.log(`  [${contract.name}]`, ...a),
-        error: (...a) => console.error(`  [${contract.name}]`, ...a),
-      },
-
-      // ── State access ──────────────────────────────────────────────────────
-      // getState / setState persist through both in-memory AND state store.
-      // This is the core fix: mutations inside the VM are not lost.
+      argsJSON: JSON.stringify(args || {}),
+      log: (...a) => console.log(`  [${contract.name}]`, ...a),
+      error: (...a) => console.error(`  [${contract.name}]`, ...a),
       getState: (key) => {
         gasTracker.gasUsed += this.gas.costs.storageRead;
         gasTracker.stateReads++;
@@ -170,7 +156,6 @@ class ContractEngine {
                    ?? stateSnapshot[key];
         return value;
       },
-
       setState: (key, value) => {
         gasTracker.gasUsed += this.gas.costs.storageWrite;
         gasTracker.stateWrites++;
@@ -180,8 +165,6 @@ class ContractEngine {
         contract.state[key]    = value;
         stateSnapshot[key]     = value;
       },
-
-      // ── Token transfers from contract ────────────────────────────────────
       transfer: (to, amount) => {
         gasTracker.gasUsed += this.gas.costs.transfer;
         const bal = this.state.getBalance(contractAddress);
@@ -189,13 +172,10 @@ class ContractEngine {
         this.state.subtractBalance(contractAddress, amount);
         this.state.addBalance(to, amount);
       },
-
       getBalance: (address) => {
         gasTracker.gasUsed += this.gas.costs.storageRead;
         return this.state.getBalance(address);
       },
-
-      // ── Events ───────────────────────────────────────────────────────────
       emit: (eventName, data) => {
         const event = {
           contract:     contractAddress,
@@ -208,20 +188,14 @@ class ContractEngine {
         this.events.push(event);
         this.state.addEvent(event);
       },
-
-      // ── Utility ──────────────────────────────────────────────────────────
-      require: (condition, message) => {
-        if (!condition) throw new Error(message || 'Requirement failed');
-      },
-
       hash: (data) =>
         crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex'),
-
-      // For contracts that need to generate addresses (e.g. sub-contracts)
       generateAddress: (seed) =>
         crypto.createHash('sha256').update(seed + Date.now()).digest('hex').slice(0, 40),
+    };
 
-      // Internal — captured return value
+    const sandbox = {
+      __bridge: bridge,
       __returnValue: undefined,
     };
 
@@ -229,6 +203,48 @@ class ContractEngine {
 
     // ─── Execution ──────────────────────────────────────────────────────────
     try {
+      // First setup the sandbox inside the VM context
+      const setupScript = new vm.Script(`
+        (function() {
+          globalThis.msg = Object.create(null);
+          globalThis.msg.sender = __bridge.msg.sender;
+          globalThis.msg.caller = __bridge.msg.caller;
+
+          globalThis.args = JSON.parse(__bridge.argsJSON);
+          globalThis.blockTimestamp = Date.now();
+
+          globalThis.console = {
+            log:   (...a) => __bridge.log(...a),
+            error: (...a) => __bridge.error(...a),
+          };
+
+          globalThis.getState = function(key) { return __bridge.getState(key); };
+          globalThis.setState = function(key, val) { return __bridge.setState(key, val); };
+          globalThis.transfer = function(to, amt) { return __bridge.transfer(to, amt); };
+          globalThis.getBalance = function(addr) { return __bridge.getBalance(addr); };
+          globalThis.emit = function(evt, data) { return __bridge.emit(evt, data); };
+          globalThis.hash = function(data) { return __bridge.hash(data); };
+          globalThis.generateAddress = function(seed) { return __bridge.generateAddress(seed); };
+          globalThis.require = function(cond, msg) { if (!cond) throw new Error(msg || 'Requirement failed'); };
+
+          // Clean standard prototypes to prevent sandbox escape via constructor traversal
+          const safeGlobals = ['Object', 'Function', 'Array', 'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Error', 'Map', 'Set', 'JSON', 'Math', 'Promise'];
+          for (const name of safeGlobals) {
+            const ctor = globalThis[name];
+            if (ctor && ctor.prototype) {
+              Object.defineProperty(ctor.prototype, 'constructor', {
+                get: function() { return undefined; },
+                set: function() {},
+                configurable: false
+              });
+            }
+          }
+
+          delete globalThis.__bridge;
+        })();
+      `);
+      setupScript.runInContext(context);
+
       const script = new vm.Script(`
         (function() {
           ${contract.code}
@@ -242,7 +258,7 @@ class ContractEngine {
             try {
               const _inst = new globalThis[_cls]();
               if (typeof _inst['${method}'] === 'function') {
-                // Give instance access to state helpers via 'this.state'
+                // Give instance access to state helpers via 'this'
                 _inst.getState  = getState;
                 _inst.setState  = setState;
                 _inst.emit      = emit;
@@ -313,54 +329,97 @@ class ContractEngine {
     const persistedState = this.state.getContractFullState(contractAddress) || {};
     const stateSnapshot  = { ...contract.state, ...persistedState };
 
-    const sandbox = {
-      msg:            { sender: '0x0', caller: '0x0' },
-      args:           args || {},
-      blockTimestamp: Date.now(),
-      console:        { log: () => {}, error: () => {} },
+    const bridge = {
+      msg: { sender: '0x0', caller: '0x0' },
+      argsJSON: JSON.stringify(args || {}),
+      getState: (key) => stateSnapshot[key] ?? this.state.getContractState(contractAddress, key),
+      setState: () => {},
+      emit: () => {},
+      transfer: () => { throw new Error('transfer not allowed in query'); },
+      getBalance: (address) => this.state.getBalance(address),
+      hash: (data) => crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex')
+    };
 
-      getState:       (key) => stateSnapshot[key] ?? this.state.getContractState(contractAddress, key),
-      setState:       () => {},   // no-op in query mode
-      emit:           () => {},
-      transfer:       () => { throw new Error('transfer not allowed in query'); },
-      getBalance:     (address) => this.state.getBalance(address),
-      require:        (cond, msg) => { if (!cond) throw new Error(msg || 'Requirement failed'); },
-      hash:           (data) => crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex'),
-      __returnValue:  undefined,
+    const sandbox = {
+      __bridge: bridge,
+      __returnValue: undefined,
     };
 
     const context = vm.createContext(sandbox);
 
-    new vm.Script(`
-      (function() {
-        ${contract.code}
+    try {
+      const setupScript = new vm.Script(`
+        (function() {
+          globalThis.msg = Object.create(null);
+          globalThis.msg.sender = __bridge.msg.sender;
+          globalThis.msg.caller = __bridge.msg.caller;
 
-        const _classes = Object.keys(globalThis).filter(k => {
-          try { return typeof globalThis[k] === 'function' && /^[A-Z]/.test(k); } catch { return false; }
-        });
-        for (const _cls of _classes) {
-          try {
-            const _inst = new globalThis[_cls]();
-            if (typeof _inst['${method}'] === 'function') {
-              _inst.getState = getState; _inst.setState = setState;
-              _inst.emit = emit; _inst.require = require;
-              _inst.msg = msg;
-              __returnValue = _inst['${method}'](args);
-              return;
+          globalThis.args = JSON.parse(__bridge.argsJSON);
+          globalThis.blockTimestamp = Date.now();
+
+          globalThis.console = {
+            log:   () => {},
+            error: () => {},
+          };
+
+          globalThis.getState = function(key) { return __bridge.getState(key); };
+          globalThis.setState = function() { return __bridge.setState(); };
+          globalThis.transfer = function() { return __bridge.transfer(); };
+          globalThis.getBalance = function(addr) { return __bridge.getBalance(addr); };
+          globalThis.emit = function() { return __bridge.emit(); };
+          globalThis.hash = function(data) { return __bridge.hash(data); };
+          globalThis.require = function(cond, msg) { if (!cond) throw new Error(msg || 'Requirement failed'); };
+
+          const safeGlobals = ['Object', 'Function', 'Array', 'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Error', 'Map', 'Set', 'JSON', 'Math', 'Promise'];
+          for (const name of safeGlobals) {
+            const ctor = globalThis[name];
+            if (ctor && ctor.prototype) {
+              Object.defineProperty(ctor.prototype, 'constructor', {
+                get: function() { return undefined; },
+                set: function() {},
+                configurable: false
+              });
             }
-          } catch {}
-        }
-        if (typeof contract !== 'undefined' && contract?.methods?.['${method}']) {
-          __returnValue = contract.methods['${method}'](args); return;
-        }
-        if (typeof ${method} === 'function') {
-          __returnValue = ${method}(args); return;
-        }
-        throw new Error('Method not found: ${method}');
-      })();
-    `).runInContext(context, { timeout: 2000 });
+          }
 
-    return sandbox.__returnValue;
+          delete globalThis.__bridge;
+        })();
+      `);
+      setupScript.runInContext(context);
+
+      new vm.Script(`
+        (function() {
+          ${contract.code}
+
+          const _classes = Object.keys(globalThis).filter(k => {
+            try { return typeof globalThis[k] === 'function' && /^[A-Z]/.test(k); } catch { return false; }
+          });
+          for (const _cls of _classes) {
+            try {
+              const _inst = new globalThis[_cls]();
+              if (typeof _inst['${method}'] === 'function') {
+                _inst.getState = getState; _inst.setState = setState;
+                _inst.emit = emit; _inst.require = require;
+                _inst.msg = msg;
+                __returnValue = _inst['${method}'](args);
+                return;
+              }
+            } catch {}
+          }
+          if (typeof contract !== 'undefined' && contract?.methods?.['${method}']) {
+            __returnValue = contract.methods['${method}'](args); return;
+          }
+          if (typeof ${method} === 'function') {
+            __returnValue = ${method}(args); return;
+          }
+          throw new Error('Method not found: ${method}');
+        })();
+      `).runInContext(context, { timeout: 2000 });
+
+      return sandbox.__returnValue;
+    } catch (err) {
+      throw new Error(`${contract.name}::${method} query failed — ${err.message}`);
+    }
   }
 
   // ─── Sponsor balance management ───────────────────────────────────────────

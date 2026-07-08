@@ -170,9 +170,9 @@ Who has the most "skin in the game"? → You win!
 ```
 
 **Example:**
-- Alice stakes 500 SAYM → 50% chance to create next block
-- Bob stakes 300 SAYM → 30% chance
-- Carol stakes 200 SAYM → 20% chance
+- Alice stakes 500 SAYN → 50% chance to create next block
+- Bob stakes 300 SAYN → 30% chance
+- Carol stakes 200 SAYN → 20% chance
 
 More stake = more responsibility = more rewards.
 
@@ -300,7 +300,7 @@ Faucet → Sends tokens to your address
 1. Select validator (weighted by stake)
 2. Take transactions from mempool
 3. Create block
-4. Add REWARD transaction (10 SAYM to validator)
+4. Add REWARD transaction (10 SAYN to validator)
 5. Broadcast to all nodes
 6. Apply transactions to state
 ```
@@ -308,21 +308,21 @@ Faucet → Sends tokens to your address
 ### 5. You're Now a Validator
 ```
 Next block selection:
-- Total stake: 1000 SAYM
-- Your stake: 500 SAYM
+- Total stake: 1000 SAYN
+- Your stake: 500 SAYN
 - Your chance: 50%
 
 If selected:
 - You create the block
-- You earn 10 SAYM reward
+- You earn 10 SAYN reward
 - Your responsibility: Don't go offline!
 ```
 
 ### 6. Slashing Keeps You Honest
 ```
 If you miss 3 blocks:
-- 10% of your stake slashed (50 SAYM penalty)
-- If below 100 SAYM minimum → Kicked out
+- 10% of your stake slashed (50 SAYN penalty)
+- If below 100 SAYN minimum → Kicked out
 ```
 
 ### 7. State Replay on Restart
@@ -462,7 +462,7 @@ We've verified all critical features work:
 **Result:** All 4 create blocks proportionally ✅
 
 ### ✅ Weighted Selection
-**Test:** 500 SAYM vs 300 SAYM vs 200 SAYM  
+**Test:** 500 SAYN vs 300 SAYN vs 200 SAYN  
 **Result:** 50% vs 30% vs 20% block distribution ✅
 
 ### ✅ Validator Rotation
@@ -600,7 +600,7 @@ We've verified all critical features work:
 **A:** No. It's for learning only.
 
 ### Q: What's the token supply?
-**A:** 1,000,000 SAYM on testnet (configurable)
+**A:** 1,000,000 SAYN on testnet (configurable)
 
 ### Q: Who controls Sayman?
 **A:** No one! It's decentralized:

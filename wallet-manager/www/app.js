@@ -21,12 +21,17 @@
     let qrPayScannerInstance = null;
     let isQrPayScanning = false;
     let unstakeCountdownInterval = null;
+    let githubRepo = 'saymanlal/SAYMAN';
+    let githubBranch = 'main';
+    let latestApkDownloadUrl = '';
+    let latestApkSha = '';
+    let updateCheckInterval = null;
 
     const chainConfigs = {
         'sayman': {
             name: 'Sayman',
-            symbol: 'SAYM',
-            decimals: 18,
+            symbol: 'SAYN',
+            decimals: 8,
             icon: 'fa-wallet',
             color: '#4f6ef7',
             rpc: 'https://sayman.up.railway.app/api',
@@ -100,9 +105,9 @@
     };
 
     const networkEndpoints = {
-        'testnet': 'https://sayman.up.railway.app/api',
-        'public-testnet': 'https://sayman.up.railway.app/api',
-        'mainnet': 'https://sayman.up.railway.app/api'
+        'testnet': ['https://sayman.up.railway.app/api', 'https://sayman.onrender.com/api'],
+        'public-testnet': ['https://sayman.up.railway.app/api', 'https://sayman.onrender.com/api'],
+        'mainnet': ['https://sayman.up.railway.app/api', 'https://sayman.onrender.com/api']
     };
 
     const networkNames = {
@@ -118,9 +123,9 @@
     };
 
     const faucetEndpoints = {
-        'testnet': 'https://sayman.up.railway.app/api/faucet',
-        'public-testnet': 'https://sayman.up.railway.app/api/faucet',
-        'mainnet': null
+        'testnet': ['https://sayman.up.railway.app/api/faucet', 'https://sayman.onrender.com/api/faucet'],
+        'public-testnet': ['https://sayman.up.railway.app/api/faucet', 'https://sayman.onrender.com/api/faucet'],
+        'mainnet': []
     };
 
     const $ = (sel) => document.querySelector(sel);
@@ -232,11 +237,90 @@
         qrScanner: $('#qrScanner'),
     };
 
-    function getApiBase() { return networkEndpoints[currentNetwork]; }
+    let activeEndpointIndex = 0;
+    let networkDecimals = 10000;
+
+    function getApiBase() { 
+        const eps = networkEndpoints[currentNetwork];
+        return Array.isArray(eps) ? eps[activeEndpointIndex] : eps;
+    }
     function getNetworkType() { return networkTypes[currentNetwork]; }
     function getNetworkName() { return networkNames[currentNetwork]; }
-    function getFaucetUrl() { return faucetEndpoints[currentNetwork]; }
-    function getExplorerUrl() { return 'https://sayman.up.railway.app'; }
+    function getFaucetUrl() { 
+        const eps = faucetEndpoints[currentNetwork];
+        if (!eps || (Array.isArray(eps) && eps.length === 0)) return null;
+        return Array.isArray(eps) ? eps[activeEndpointIndex] : eps;
+    }
+    function getExplorerUrl() {
+        const base = getApiBase() || 'https://sayman.up.railway.app/api';
+        return base.replace('/api', '');
+    }
+
+    async function apiFetch(pathOrUrl, options = {}) {
+        let lastError = new Error('No working peers');
+        
+        let endpoints = [];
+        let isFaucet = false;
+        
+        if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+            if (pathOrUrl.includes('/faucet')) {
+                isFaucet = true;
+                const baseFaucets = faucetEndpoints[currentNetwork];
+                endpoints = Array.isArray(baseFaucets) ? baseFaucets : [baseFaucets].filter(Boolean);
+            } else {
+                endpoints = [pathOrUrl];
+            }
+        } else {
+            const baseEndpoints = networkEndpoints[currentNetwork];
+            endpoints = Array.isArray(baseEndpoints) ? baseEndpoints : [baseEndpoints].filter(Boolean);
+        }
+        
+        for (let i = 0; i < endpoints.length; i++) {
+            const idx = (activeEndpointIndex + i) % endpoints.length;
+            const base = endpoints[idx];
+            
+            let url = base;
+            if (!pathOrUrl.startsWith('http://') && !pathOrUrl.startsWith('https://')) {
+                url = `${base}${pathOrUrl}`;
+            } else if (isFaucet) {
+                url = base;
+            }
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                
+                const res = await window.fetch(url, {
+                    ...options,
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                
+                if (res.ok || res.status < 500) {
+                    activeEndpointIndex = idx;
+                    return res;
+                }
+                console.warn(`⚠️ Peer ${base} returned status ${res.status}. Trying next...`);
+            } catch (err) {
+                lastError = err;
+                console.warn(`⚠️ Failed to connect to peer ${base}: ${err.message}. Trying next...`);
+            }
+        }
+        throw lastError;
+    }
+
+    async function fetchNetworkConfig() {
+        try {
+            const res = await apiFetch('/network');
+            const data = await res.json();
+            if (data && data.decimals) {
+                networkDecimals = data.decimals;
+                console.log(`🌐 Loaded network config. Decimals: ${networkDecimals}`);
+            }
+        } catch (e) {
+            console.error('Error fetching network config:', e);
+        }
+    }
 
     function shortAddr(addr, chain) {
         if (!addr) return '0x...';
@@ -250,7 +334,10 @@
 
     function formatBalance(b) {
         if (b === undefined || b === null || isNaN(b)) return '0.00';
-        return Number(b).toFixed(2);
+        const dec = networkDecimals || 10000;
+        const v = Number(b) / dec;
+        const fixed = dec === 100000000 ? 8 : 4;
+        return Number.isFinite(v) ? v.toFixed(fixed) : '0.00';
     }
 
     function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -541,7 +628,7 @@
 
     async function fetchBlockInfo() {
         try {
-            const res = await fetch(`${getApiBase()}/blocks?limit=1`);
+            const res = await apiFetch('/blocks?limit=1');
             if (res.ok) {
                 const data = await res.json();
                 currentBlock = (data.blocks && data.blocks[0] && data.blocks[0].index) || data.blockNumber || data.height || 0;
@@ -578,9 +665,9 @@
 
     async function loadTransactionHistory() {
         if (!activeWallet) return;
-
+ 
         try {
-            const res = await fetch(`${getApiBase()}/address/${activeWallet.address}`);
+            const res = await apiFetch(`/address/${activeWallet.address}`);
             if (!res.ok) return;
 
             const data = await res.json();
@@ -1057,7 +1144,180 @@
         isQrPayScanning = false;
     }
 
-    dom.qrPaySendBtn.addEventListener('click', () => {
+    function validateAddress(address, chain) {
+        if (!address) return false;
+        if (chain === 'sayman') {
+            return address.length === 40 || address.length === 42;
+        }
+        if (chain === 'ethereum' || chain === 'arbitrum') {
+            return address.startsWith('0x') && address.length === 42;
+        }
+        if (chain === 'bitcoin') {
+            return address.length >= 26 && address.length <= 44;
+        }
+        if (chain === 'solana') {
+            return address.length >= 32 && address.length <= 44;
+        }
+        return true;
+    }
+
+    async function executeTransfer(to, amount, gasPrice = null, gasLimit = null, resultContainer = null) {
+        if (!activeWallet) {
+            showToast('Please select a wallet first', 'error');
+            return false;
+        }
+
+        try {
+            if (!to || !amount) {
+                showToast('Please fill all fields', 'error');
+                return false;
+            }
+
+            if (!validateAddress(to, activeWallet.chain)) {
+                showToast(`Invalid address format for ${activeWallet.chain}`, 'error');
+                return false;
+            }
+
+            if (amount <= 0) {
+                showToast('Amount must be greater than 0', 'error');
+                return false;
+            }
+
+            // Simulating other chains transaction broadcasting
+            if (activeWallet.chain !== 'sayman') {
+                showLoading('Preparing transaction...');
+                await new Promise(resolve => setTimeout(resolve, 600));
+                hideLoading();
+                showLoading('Signing transaction...');
+                await new Promise(resolve => setTimeout(resolve, 600));
+                hideLoading();
+                showLoading(`Broadcasting to ${activeWallet.chain} network...`);
+                await new Promise(resolve => setTimeout(resolve, 800));
+                hideLoading();
+
+                const txHash = '0x' + generateId().padStart(64, '0');
+                if (resultContainer) {
+                    resultContainer.innerHTML = `
+                        <div class="success-message">
+                            <i class="fas fa-check-circle"></i>
+                            <strong>Simulated transaction broadcasted on ${activeWallet.chain}!</strong><br>
+                            <small>TX ID: ${txHash.substring(0, 16)}...</small>
+                        </div>
+                    `;
+                }
+                showToast(`Transaction broadcasted on ${activeWallet.chain}!`, 'success');
+
+                activeWallet.balance = (activeWallet.balance || 0) - amount;
+                activeWallet.transactions.push({
+                    type: 'TRANSFER',
+                    amount: -amount,
+                    time: Date.now(),
+                    txId: txHash,
+                    blockNumber: currentBlock || 1,
+                    data: { from: activeWallet.address, to, amount }
+                });
+                saveState();
+                render();
+                return true;
+            }
+
+            showLoading('Preparing transaction...');
+
+            const wallet = new SaymanWallet(activeWallet.privateKey, activeWallet.chain);
+            await wallet.initialize();
+
+            const addressRes = await apiFetch(`/address/${wallet.address}`);
+            const addressData = await addressRes.json();
+            const nonce = addressData.nonce || 0;
+
+            const gasEstimate = await apiFetch(`/estimate-gas`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'TRANSFER',
+                    data: { from: wallet.address, to, amount }
+                })
+            });
+            const gas = await gasEstimate.json();
+
+            hideLoading();
+            showLoading('Signing transaction...');
+
+            const txData = {
+                type: 'TRANSFER',
+                data: { from: wallet.address, to, amount },
+                timestamp: Date.now(),
+                gasLimit: gasLimit || gas.recommendedGasLimit || 21000,
+                gasPrice: gasPrice || gas.minGasPrice || 1,
+                nonce: nonce
+            };
+
+            const signature = await wallet.signTransaction(txData);
+
+            const signedTx = {
+                ...txData,
+                signature: signature,
+                publicKey: wallet.publicKey
+            };
+
+            hideLoading();
+            showLoading('Broadcasting...');
+
+            const res = await apiFetch(`/broadcast`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(signedTx)
+            });
+
+            const result = await res.json();
+
+            hideLoading();
+
+            if (result.success) {
+                const txHash = result.txId || '0x' + generateId().padStart(64, '0');
+                if (resultContainer) {
+                    resultContainer.innerHTML = `
+                        <div class="success-message">
+                            <i class="fas fa-check-circle"></i>
+                            <strong>Transaction Sent!</strong><br>
+                            <small>TX ID: ${txHash.substring(0, 16)}...</small>
+                        </div>
+                    `;
+                }
+                showToast(`Transaction sent!`, 'success');
+
+                activeWallet.balance = (activeWallet.balance || 0) - amount - ((txData.gasLimit * txData.gasPrice) / 100_000_000);
+                activeWallet.transactions.push({
+                    type: 'TRANSFER',
+                    amount: -amount,
+                    time: Date.now(),
+                    txId: txHash,
+                    blockNumber: currentBlock,
+                    gasPrice: txData.gasPrice,
+                    gasLimit: txData.gasLimit,
+                    data: { from: activeWallet.address, to, amount }
+                });
+                saveState();
+
+                setTimeout(() => {
+                    loadTransactionHistory();
+                    fetchBlockInfo();
+                    render();
+                }, 800);
+                return true;
+            } else {
+                showToast(result.error || 'Transaction failed', 'error');
+                return false;
+            }
+        } catch (error) {
+            hideLoading();
+            showToast(error.message, 'error');
+            console.error('Transfer error:', error);
+            return false;
+        }
+    }
+
+    dom.qrPaySendBtn.addEventListener('click', async () => {
         const to = dom.qrPayAddress.value.trim();
         const amount = parseFloat(dom.qrPayAmount.value);
 
@@ -1071,19 +1331,15 @@
             return;
         }
 
-        if (!activeWallet) {
-            dom.qrPayResult.innerHTML = `<div class="error-message">Please select a wallet first</div>`;
-            return;
+        const success = await executeTransfer(to, amount, null, null, dom.qrPayResult);
+        if (success) {
+            setTimeout(() => {
+                closeModal('qrPayModal');
+                dom.qrPayAddress.value = '';
+                dom.qrPayAmount.value = '';
+                dom.qrPayResult.innerHTML = '';
+            }, 2500);
         }
-
-        closeModal('qrPayModal');
-        dom.sendTo.value = to;
-        dom.sendAmount.value = amount;
-
-        document.querySelector('[data-tab="send"]')?.classList.add('active');
-        document.getElementById('tab-send')?.classList.add('active');
-
-        showToast(`Ready to send ${formatBalance(amount)} ${getChainSymbol(activeWallet.chain)}`, 'success');
     });
 
     dom.qrPayCancelBtn.addEventListener('click', () => {
@@ -1120,123 +1376,17 @@
     });
 
     dom.sendBtn.addEventListener('click', async () => {
-        if (!activeWallet) {
-            showToast('Please select a wallet first', 'error');
-            return;
-        }
+        const to = dom.sendTo.value.trim();
+        const amount = parseFloat(dom.sendAmount.value);
+        const gasPrice = parseInt(dom.sendGasPrice.value) || null;
+        const gasLimit = parseInt(dom.sendGasLimit.value) || null;
 
-        try {
-            const to = dom.sendTo.value.trim();
-            const amount = parseFloat(dom.sendAmount.value);
-            const gasPrice = parseInt(dom.sendGasPrice.value) || undefined;
-            const gasLimit = parseInt(dom.sendGasLimit.value) || undefined;
-
-            if (!to || !amount) {
-                showToast('Please fill all fields', 'error');
-                return;
-            }
-
-            if (to.length !== 40) {
-                showToast('Invalid address format', 'error');
-                return;
-            }
-
-            if (amount <= 0) {
-                showToast('Amount must be greater than 0', 'error');
-                return;
-            }
-
-            showLoading('Preparing transaction...');
-
-            const wallet = new SaymanWallet(activeWallet.privateKey);
-            await wallet.initialize();
-
-            const addressRes = await fetch(`${getApiBase()}/address/${wallet.address}`);
-            const addressData = await addressRes.json();
-            const nonce = addressData.nonce || 0;
-
-            const gasEstimate = await fetch(`${getApiBase()}/estimate-gas`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: 'TRANSFER',
-                    data: { from: wallet.address, to, amount }
-                })
-            });
-            const gas = await gasEstimate.json();
-
-            hideLoading();
-            showLoading('Signing transaction...');
-
-            const txData = {
-                type: 'TRANSFER',
-                data: { from: wallet.address, to, amount },
-                timestamp: Date.now(),
-                gasLimit: gasLimit || gas.recommendedGasLimit || 21000,
-                gasPrice: gasPrice || gas.minGasPrice || 1,
-                nonce: nonce
-            };
-
-            const signature = await wallet.signTransaction(txData);
-
-            const signedTx = {
-                ...txData,
-                signature: signature,
-                publicKey: wallet.publicKey
-            };
-
-            hideLoading();
-            showLoading('Broadcasting...');
-
-            const res = await fetch(`${getApiBase()}/broadcast`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(signedTx)
-            });
-
-            const result = await res.json();
-
-            hideLoading();
-
-            if (result.success) {
-                const txHash = result.txId || '0x' + generateId().padStart(64, '0');
-                dom.sendResult.innerHTML = `
-                    <div class="success-message">
-                        <i class="fas fa-check-circle"></i>
-                        <strong>Transaction Sent!</strong><br>
-                        <small>TX ID: ${txHash.substring(0, 16)}...</small>
-                    </div>
-                `;
-                dom.sendTo.value = '';
-                dom.sendAmount.value = '';
-                dom.sendGasPrice.value = '';
-                dom.sendGasLimit.value = '';
-                showToast(`Transaction sent!`, 'success');
-
-                activeWallet.transactions.push({
-                    type: 'TRANSFER',
-                    amount: -amount,
-                    time: Date.now(),
-                    txId: txHash,
-                    blockNumber: currentBlock,
-                    gasPrice: txData.gasPrice,
-                    gasLimit: txData.gasLimit,
-                    data: { from: activeWallet.address, to, amount }
-                });
-                saveState();
-
-                setTimeout(() => {
-                    loadTransactionHistory();
-                    fetchBlockInfo();
-                    render();
-                }, 800);
-            } else {
-                showToast(result.error || 'Transaction failed', 'error');
-            }
-        } catch (error) {
-            hideLoading();
-            showToast(error.message, 'error');
-            console.error('Send transaction error:', error);
+        const success = await executeTransfer(to, amount, gasPrice, gasLimit, dom.sendResult);
+        if (success) {
+            dom.sendTo.value = '';
+            dom.sendAmount.value = '';
+            dom.sendGasPrice.value = '';
+            dom.sendGasLimit.value = '';
         }
     });
 
@@ -1255,7 +1405,7 @@
             }
 
             if (amount < 100) {
-                showToast('Minimum stake is 100 SAYM', 'error');
+                showToast('Minimum stake is 100 SAYN', 'error');
                 return;
             }
 
@@ -1264,11 +1414,11 @@
             const wallet = new SaymanWallet(activeWallet.privateKey);
             await wallet.initialize();
 
-            const addressRes = await fetch(`${getApiBase()}/address/${wallet.address}`);
+            const addressRes = await apiFetch(`/address/${wallet.address}`);
             const addressData = await addressRes.json();
             const nonce = addressData.nonce || 0;
 
-            const gasEstimate = await fetch(`${getApiBase()}/estimate-gas`, {
+            const gasEstimate = await apiFetch(`/estimate-gas`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1285,7 +1435,7 @@
             const totalNeeded = amount + gasFeeInSAY;
             if (totalNeeded > (activeWallet.balance || 0)) {
                 hideLoading();
-                showToast(`Insufficient balance. Need ${formatBalance(totalNeeded)} SAYM (${formatBalance(amount)} + ${formatBalance(gasFeeInSAY)} gas)`, 'error');
+                showToast(`Insufficient balance. Need ${formatBalance(totalNeeded)} SAYN (${formatBalance(amount)} + ${formatBalance(gasFeeInSAY)} gas)`, 'error');
                 return;
             }
 
@@ -1312,7 +1462,7 @@
             hideLoading();
             showLoading('Broadcasting...');
 
-            const res = await fetch(`${getApiBase()}/broadcast`, {
+            const res = await apiFetch(`/broadcast`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(signedTx)
@@ -1329,7 +1479,7 @@
                         <i class="fas fa-check-circle"></i>
                         <strong>Stake Transaction Broadcast!</strong><br>
                         <small>TX ID: ${txHash.substring(0, 16)}...</small>
-                        <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAYM</small>
+                        <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAYN</small>
                     </div>
                 `;
 
@@ -1349,7 +1499,7 @@
                 saveState();
 
                 dom.stakeAmount.value = '';
-                showToast(`Staked ${formatBalance(amount)} SAYM (gas: ${formatBalance(gasFeeInSAY)} SAYM)`, 'success');
+                showToast(`Staked ${formatBalance(amount)} SAYN (gas: ${formatBalance(gasFeeInSAY)} SAYN)`, 'success');
 
                 setTimeout(() => {
                     loadTransactionHistory();
@@ -1381,7 +1531,7 @@
         const lockBlocks = UNSTAKE_LOCK_BLOCKS;
         const lockTimeMinutes = Math.round((lockBlocks * blockTime) / 60);
 
-        if (!confirm(`Unstake ${formatBalance(unstakeAmount)} SAYM?\n\n⏳ Tokens will be locked for ${lockBlocks} blocks (~${lockTimeMinutes} minutes)`)) {
+        if (!confirm(`Unstake ${formatBalance(unstakeAmount)} SAYN?\n\n⏳ Tokens will be locked for ${lockBlocks} blocks (~${lockTimeMinutes} minutes)`)) {
             return;
         }
 
@@ -1391,11 +1541,11 @@
             const wallet = new SaymanWallet(activeWallet.privateKey);
             await wallet.initialize();
 
-            const addressRes = await fetch(`${getApiBase()}/address/${wallet.address}`);
+            const addressRes = await apiFetch(`/address/${wallet.address}`);
             const addressData = await addressRes.json();
             const nonce = addressData.nonce || 0;
 
-            const gasEstimate = await fetch(`${getApiBase()}/estimate-gas`, {
+            const gasEstimate = await apiFetch(`/estimate-gas`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1432,7 +1582,7 @@
             hideLoading();
             showLoading('Broadcasting...');
 
-            const res = await fetch(`${getApiBase()}/broadcast`, {
+            const res = await apiFetch(`/broadcast`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(signedTx)
@@ -1471,11 +1621,11 @@
                         <i class="fas fa-check-circle"></i>
                         <strong>Unstake Transaction Broadcast!</strong><br>
                         <small>🔒 Tokens locked for ${lockBlocks} blocks (~${lockTimeMinutes} minutes)</small>
-                        <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAYM</small>
+                        <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAYN</small>
                     </div>
                 `;
 
-                showToast(`Unstaked ${formatBalance(unstakeAmount)} SAYM (locked ${lockTimeMinutes} min)`, 'success');
+                showToast(`Unstaked ${formatBalance(unstakeAmount)} SAYN (locked ${lockTimeMinutes} min)`, 'success');
 
                 setTimeout(() => {
                     loadTransactionHistory();
@@ -1516,7 +1666,7 @@
         try {
             dom.faucetResult.innerHTML = '<div style="padding:8px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Requesting faucet...</div>';
 
-            const res = await fetch(faucetUrl, {
+            const res = await apiFetch(faucetUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ address: activeWallet.address })
@@ -2751,7 +2901,78 @@
         }
     });
 
+    async function loadWalletEnv() {
+        const paths = ['.env', 'wallet.env'];
+        for (const p of paths) {
+            try {
+                const res = await window.fetch(p);
+                if (res.ok) {
+                    const text = await res.text();
+                    applyEnv(text);
+                    console.log(`✅ Loaded wallet env from: ${p}`);
+                    break;
+                }
+            } catch (err) {
+                console.log(`Could not fetch env from ${p}:`, err);
+            }
+        }
+    }
+
+    function applyEnv(text) {
+        const env = {};
+        const lines = text.split('\n');
+        for (let line of lines) {
+            line = line.trim();
+            if (!line || line.startsWith('#')) continue;
+            const idx = line.indexOf('=');
+            if (idx === -1) continue;
+            const key = line.substring(0, idx).trim();
+            let val = line.substring(idx + 1).trim();
+            if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                val = val.substring(1, val.length - 1);
+            }
+            env[key] = val;
+        }
+
+        if (env.API_PEERS_TESTNET) {
+            networkEndpoints['testnet'] = env.API_PEERS_TESTNET.split(',').map(s => s.trim()).filter(Boolean);
+        }
+        if (env.API_PEERS_PUBLIC_TESTNET) {
+            networkEndpoints['public-testnet'] = env.API_PEERS_PUBLIC_TESTNET.split(',').map(s => s.trim()).filter(Boolean);
+        }
+        if (env.API_PEERS_MAINNET) {
+            networkEndpoints['mainnet'] = env.API_PEERS_MAINNET.split(',').map(s => s.trim()).filter(Boolean);
+        }
+
+        if (env.FAUCET_PEERS_TESTNET) {
+            faucetEndpoints['testnet'] = env.FAUCET_PEERS_TESTNET.split(',').map(s => s.trim()).filter(Boolean);
+        }
+        if (env.FAUCET_PEERS_PUBLIC_TESTNET) {
+            faucetEndpoints['public-testnet'] = env.FAUCET_PEERS_PUBLIC_TESTNET.split(',').map(s => s.trim()).filter(Boolean);
+        }
+        if (env.FAUCET_PEERS_MAINNET) {
+            faucetEndpoints['mainnet'] = env.FAUCET_PEERS_MAINNET.split(',').map(s => s.trim()).filter(Boolean);
+        }
+
+        if (env.RPC_URL) {
+            const list = env.RPC_URL.split(',').map(s => s.trim()).filter(Boolean);
+            if (list.length > 0) {
+                networkEndpoints[currentNetwork] = list;
+            }
+        }
+        if (env.EXPLORER_URL) {
+            chainConfigs['sayman'].explorer = env.EXPLORER_URL;
+        }
+        if (env.GITHUB_REPO) {
+            githubRepo = env.GITHUB_REPO;
+        }
+        if (env.GITHUB_BRANCH) {
+            githubBranch = env.GITHUB_BRANCH;
+        }
+    }
+
     async function init() {
+        await loadWalletEnv();
         let progress = 0;
         const interval = setInterval(() => {
             progress += Math.random() * 8 + 2;
@@ -2789,6 +3010,59 @@
             }
 
             startAutoRefresh();
+
+            // APK Update check
+            async function checkForUpdates() {
+                if (!githubRepo) return;
+                try {
+                    const url = `https://api.github.com/repos/${githubRepo}/contents/apk/base.apk?ref=${githubBranch}`;
+                    const res = await window.fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                    if (res.ok) {
+                        const data = await res.json();
+                        const latestSha = data.sha;
+                        const downloadUrl = data.download_url;
+                        
+                        // Get installed SHA from localStorage
+                        const installedSha = localStorage.getItem('installed_apk_sha');
+                        
+                        if (!installedSha) {
+                            // On first run, record the latest version to prevent annoying prompt
+                            localStorage.setItem('installed_apk_sha', latestSha);
+                            return;
+                        }
+                        
+                        if (installedSha !== latestSha) {
+                            latestApkDownloadUrl = downloadUrl;
+                            latestApkSha = latestSha;
+                            document.getElementById('updateShaDisplay').textContent = `SHA: ${latestSha.substring(0, 10)}`;
+                            document.getElementById('updateModal').classList.add('open');
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error checking for APK updates:', err);
+                }
+            }
+
+            // Check immediately on startup
+            setTimeout(checkForUpdates, 3000);
+
+            // Periodically check every 60 seconds (feel real-time)
+            if (updateCheckInterval) clearInterval(updateCheckInterval);
+            updateCheckInterval = setInterval(checkForUpdates, 60000);
+
+            // Bind update buttons
+            document.getElementById('downloadUpdateBtn').addEventListener('click', () => {
+                if (latestApkDownloadUrl) {
+                    window.open(latestApkDownloadUrl, '_blank');
+                    localStorage.setItem('installed_apk_sha', latestApkSha);
+                    document.getElementById('updateModal').classList.remove('open');
+                    showToast('Download started! Installing the updated APK completes the update.', 'success');
+                }
+            });
+
+            document.getElementById('skipUpdateBtn').addEventListener('click', () => {
+                document.getElementById('updateModal').classList.remove('open');
+            });
 
             console.log('🚀 PUKY Wallet Pro v3.0 initialized');
             console.log(`📊 ${wallets.length} wallets loaded on ${getNetworkName()}`);

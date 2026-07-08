@@ -8,3 +8,9 @@ logs/
 *.pem
 .render/
 dist/
+
+# Internal documentation and pitch files
+pitch.md
+summary.md
+PULL_REQUEST.md
+pull_request.md

@@ -741,7 +741,7 @@ console.log(result.txId);</code></pre>
       <h3>Stake</h3>
       <pre><code>const result = await client._broadcast === undefined ? null : null;
 // via a STAKE-type broadcast (add a stake() helper to the SDK, or use the CLI):
-sayman stake 100000   // testnet: 100,000 base units = 10 SAYN minimum</code></pre>
+sayman stake 1000000000   // testnet: 1,000,000,000 base units = 10 SAYN minimum</code></pre>
 
       <h3>Unstake</h3>
       <p>Unstaking is delayed — testnet: 10 blocks, mainnet: 100 blocks — before funds become withdrawable, and mainnet applies a 15% slash penalty for early/faulty unstaking scenarios defined in <code>config/mainnet.js</code>.</p>
@@ -800,14 +800,13 @@ sayman stake 100000   // testnet: 100,000 base units = 10 SAYN minimum</code></p
   'token-supply': {
     title: 'Token Supply & Gas',
     content: `
-      <h2>SAYN Tokenomics</h2>
-      <p>1 SAYN = 10,000 base units (4 decimal places). All amounts are stored as integer base units on-chain.</p>
+      <p>1 SAYN = 100,000,000 base units (8 decimal places). All amounts are stored as integer base units on-chain.</p>
 
       <h3>Testnet</h3>
       <ul>
-        <li>Block time: 5s, block reward: 5,000 base units (0.5 SAYN) — intentionally generous for developers</li>
-        <li>Gas price: 1 base unit/gas — transfer ≈ 21,000 base units (0.0021 SAYN)</li>
-        <li>Min stake: 100,000 base units (10 SAYN), unstake delay: 10 blocks</li>
+        <li>Block time: 5s, block reward: 50,000,000 base units (0.5 SAYN) — intentionally generous for developers</li>
+        <li>Gas price: 1 base unit/gas — transfer ≈ 21,000 base units (0.00021 SAYN)</li>
+        <li>Min stake: 1,000,000,000 base units (10 SAYN), unstake delay: 10 blocks</li>
         <li>Max supply: unlimited (testnet only)</li>
       </ul>
 
@@ -815,8 +814,8 @@ sayman stake 100000   // testnet: 100,000 base units = 10 SAYN minimum</code></p
       <ul>
         <li>Max supply: 100,000,000 SAYN, hard-capped</li>
         <li>Block reward halves every ~2 years (12,614,400 blocks), starting at 0.2 SAYN/block</li>
-        <li>Gas price: 5 base units/gas — transfer ≈ 0.0105 SAYN</li>
-        <li>Min stake: 5,000,000 base units (500 SAYN), unstake delay: 100 blocks, slash: 15%</li>
+        <li>Gas price: 1 base unit/gas — transfer ≈ 0.00021 SAYN</li>
+        <li>Min stake: 50,000,000,000 base units (500 SAYN), unstake delay: 100 blocks, slash: 15%</li>
         <li>Genesis allocation: 50M SAYN (30M treasury, 8M team, 2M validator, 10M reserve); remaining ~50M emitted via block rewards over ~15 years</li>
       </ul>
     `

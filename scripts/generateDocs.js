@@ -38,8 +38,8 @@ async function generateDocs() {
 | **Chain ID** | \`${network.chainId}\` |
 | **Current Block Height** | ${stats.blocks.toLocaleString()} |
 | **Block Time** | ${(network.blockTime / 1000).toFixed(1)}s |
-| **Block Reward** | ${network.blockReward} SAYM |
-| **Minimum Stake** | ${network.minStake} SAYM |
+| **Block Reward** | ${network.blockReward} SAYN |
+| **Minimum Stake** | ${network.minStake} SAYN |
 | **Faucet Status** | ${network.faucetEnabled ? '✅ Enabled (Testnet)' : '❌ Disabled (Mainnet)'} |
 
 ---
@@ -74,7 +74,7 @@ async function generateDocs() {
 ## 👥 Validators
 
 **Total Active Validators:** ${validators.totalValidators}  
-**Total Network Stake:** ${validators.totalStake.toLocaleString()} SAYM  
+**Total Network Stake:** ${validators.totalStake.toLocaleString()} SAYN  
 **Estimated APR:** ${validators.estimatedAPR}%
 
 ### Top Validators
@@ -82,7 +82,7 @@ async function generateDocs() {
 | Address | Stake | Network % | Missed Blocks |
 |---------|-------|-----------|---------------|
 ${validators.validators.slice(0, 10).map(v => 
-  `| \`${v.address.substring(0, 16)}...\` | ${v.stake.toLocaleString()} SAYM | ${v.percentage}% | ${v.missedBlocks} |`
+  `| \`${v.address.substring(0, 16)}...\` | ${v.stake.toLocaleString()} SAYN | ${v.percentage}% | ${v.missedBlocks} |`
 ).join('\n')}
 
 ---
@@ -112,7 +112,7 @@ Contracts are executed in a sandboxed JavaScript VM with the following restricti
 ### Consensus Security
 
 - ✅ **Proof of Stake**: ${validators.totalValidators} active validators
-- ✅ **Minimum Stake**: ${network.minStake} SAYM required
+- ✅ **Minimum Stake**: ${network.minStake} SAYN required
 - ✅ **Slashing**: Validators penalized for missed blocks
 - ✅ **Chain ID Validation**: Prevents cross-network attacks
 
@@ -122,15 +122,15 @@ Contracts are executed in a sandboxed JavaScript VM with the following restricti
 
 ### Token Supply
 
-- **Max Supply**: 21,000,000 SAYM
-- **Block Reward**: ${network.blockReward} SAYM per block
+- **Max Supply**: 21,000,000 SAYN
+- **Block Reward**: ${network.blockReward} SAYN per block
 - **Blocks Per Day**: ${(86400000 / network.blockTime).toFixed(0)}
-- **Daily Emission**: ${((86400000 / network.blockTime) * network.blockReward).toFixed(0)} SAYM
+- **Daily Emission**: ${((86400000 / network.blockTime) * network.blockReward).toFixed(0)} SAYN
 
 ### Staking
 
-- **Minimum Stake**: ${network.minStake} SAYM
-- **Total Staked**: ${validators.totalStake.toLocaleString()} SAYM
+- **Minimum Stake**: ${network.minStake} SAYN
+- **Total Staked**: ${validators.totalStake.toLocaleString()} SAYN
 - **Estimated APR**: ${validators.estimatedAPR}%
 - **Unstake Delay**: Variable (configured per network)
 
@@ -233,7 +233,7 @@ sayman stake ${network.minStake}
 - **Network Health**: ✅ Operational
 - **Block Height**: ${stats.blocks.toLocaleString()}
 - **Active Validators**: ${validators.totalValidators}
-- **Network Stake**: ${validators.totalStake.toLocaleString()} SAYM
+- **Network Stake**: ${validators.totalStake.toLocaleString()} SAYN
 - **Mempool Size**: ${stats.mempool}
 
 ---

@@ -1,7 +1,7 @@
 // ── SAYMAN Blockchain — app.js ────────────────────────────────────────────────
 // Pages: Dashboard · Explorer (search + jump-to-page) · Validators (with block history) · Contracts · Network · Docs
 
-const API   = '/api';
+let API   = '/api';
 const POLL  = 5000;
 const PG_SZ = 20;
 
@@ -13,8 +13,42 @@ let allValidators  = [];
 let allContracts   = [];
 let allPeers       = [];
 
+async function loadExplorerEnv() {
+  const paths = ['.env', 'explorer.env'];
+  for (const p of paths) {
+    try {
+      const res = await fetch(p);
+      if (res.ok) {
+        const text = await res.text();
+        const env = {};
+        const lines = text.split('\n');
+        for (let line of lines) {
+          line = line.trim();
+          if (!line || line.startsWith('#')) continue;
+          const idx = line.indexOf('=');
+          if (idx === -1) continue;
+          const key = line.substring(0, idx).trim();
+          let val = line.substring(idx + 1).trim();
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.substring(1, val.length - 1);
+          }
+          env[key] = val;
+        }
+        if (env.API_BASE) {
+          API = env.API_BASE;
+          console.log(`✅ Loaded explorer API base from ${p}: ${API}`);
+        }
+        break;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  await loadExplorerEnv();
   await loadNetworkConfig();
   updateHeaderInfo();
   showPage('dashboard');
@@ -575,8 +609,10 @@ function fmtUptime(s) {
 
 function sayn(baseUnits, withUnit = true) {
   if (baseUnits === null || baseUnits === undefined) return '—';
-  const v = Number(baseUnits) / 10000;
-  return Number.isFinite(v) ? v.toFixed(4) + (withUnit ? ' SAYN' : '') : '—';
+  const dec = (typeof networkConfig !== 'undefined' && networkConfig && networkConfig.decimals) || 10000;
+  const v = Number(baseUnits) / dec;
+  const fixed = dec === 100000000 ? 8 : 4;
+  return Number.isFinite(v) ? v.toFixed(fixed) + (withUnit ? ' SAYN' : '') : '—';
 }
 
 function showNotification(msg) {

@@ -191,7 +191,7 @@ curl -X POST http://localhost:3000/api/faucet \
 - Open http://localhost:3000
 - Click "Faucet"
 - Paste your address
-- Click "Claim 1000 SAYM"
+- Click "Claim 1000 SAYN"
 
 ### Check Balance
 ```bash
@@ -200,8 +200,8 @@ sayman balance
 # Output:
 # ━━━ Account Balance ━━━
 # Address:  abc123...
-# Balance:  1000 SAYM
-# Staked:   0 SAYM
+# Balance:  1000 SAYN
+# Staked:   0 SAYN
 # Nonce:    0
 # ━━━━━━━━━━━━━━━━━━━━━━
 ```
@@ -217,10 +217,10 @@ sayman send 0xRECIPIENT_ADDRESS 100 --gas-limit 50000 --gas-price 2
 # ━━━ Transaction Details ━━━
 # From:      abc123...
 # To:        def456...
-# Amount:    100 SAYM
+# Amount:    100 SAYN
 # Gas Limit: 50000
 # Gas Price: 2
-# Max Cost:  100.0001 SAYM
+# Max Cost:  100.0001 SAYN
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ✅ Transaction broadcast successfully!
 # TX ID: 550e8400-e29b-41d4-a716-446655440000
@@ -233,7 +233,7 @@ sayman stake 500
 # Output:
 # ━━━ Staking Transaction ━━━
 # Address:   abc123...
-# Amount:    500 SAYM
+# Amount:    500 SAYN
 # Gas Limit: 100000
 # Gas Price: 1
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -251,10 +251,10 @@ sayman network
 # Chain ID:    sayman-testnet-1
 # Block Height:150
 # Validators:  4
-# Total Stake: 2000 SAYM
+# Total Stake: 2000 SAYN
 # Block Time:  5s
-# Block Reward:10 SAYM
-# Min Stake:   100 SAYM
+# Block Reward:10 SAYN
+# Min Stake:   100 SAYN
 # Faucet:      ✓ Enabled
 ```
 
@@ -267,9 +267,9 @@ sayman validators
 # ┌────────────────┬───────────┬──────┬────────┐
 # │ Address        │ Stake     │ %    │ Missed │
 # ├────────────────┼───────────┼──────┼────────┤
-# │ abc123...      │ 500 SAYM  │ 25%  │ 0      │
-# │ def456...      │ 300 SAYM  │ 15%  │ 1      │
-# │ ghi789...      │ 1200 SAYM │ 60%  │ 0      │
+# │ abc123...      │ 500 SAYN  │ 25%  │ 0      │
+# │ def456...      │ 300 SAYN  │ 15%  │ 1      │
+# │ ghi789...      │ 1200 SAYN │ 60%  │ 0      │
 # └────────────────┴───────────┴──────┴────────┘
 ```
 
@@ -298,13 +298,13 @@ Features:
 
 1. Click "Faucet" tab
 2. Paste your address
-3. Click "Claim 1000 SAYM"
+3. Click "Claim 1000 SAYN"
 4. Wait ~6 seconds for block
 
 ### Send Transaction
 
 1. Click "Wallet" tab
-2. Scroll to "Send SAYM"
+2. Scroll to "Send SAYN"
 3. Enter recipient address
 4. Enter amount
 5. Enter your private key
@@ -315,8 +315,8 @@ Features:
 ### Stake
 
 1. Click "Wallet" tab
-2. Scroll to "Stake SAYM"
-3. Enter amount (min: 100 SAYM)
+2. Scroll to "Stake SAYN"
+3. Enter amount (min: 100 SAYN)
 4. Enter your private key
 5. Click "Stake"
 
@@ -453,10 +453,10 @@ export default {
   networkName: 'My Custom Network',
   chainId: 'custom-1',
   blockTime: 3000,      // 3 seconds
-  blockReward: 20,      // 20 SAYM
-  minStake: 50,         // 50 SAYM minimum
+  blockReward: 20,      // 20 SAYN
+  minStake: 50,         // 50 SAYN minimum
   faucetEnabled: true,
-  faucetAmount: 2000,   // 2000 SAYM per request
+  faucetAmount: 2000,   // 2000 SAYN per request
   
   // Gas configuration
   gasLimits: {

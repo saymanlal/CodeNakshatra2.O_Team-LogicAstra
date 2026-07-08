@@ -15,7 +15,7 @@
  * Example: BOOTSTRAP_PEERS=wss://sayman.onrender.com/p2p,wss://sayman.up.railway.app/p2p
  */
 
-export const DECIMALS     = 10_000;
+export const DECIMALS     = 100_000_000;
 export const TICKER       = 'SAYN';
 export const DISPLAY_NAME = 'SAYMAN';
 
@@ -38,12 +38,12 @@ export default {
   // ─── Block production ────────────────────────────────────────────────────
   blockTime:    5000,
 
-  // 0.5 SAYN/block = 5000 base units
-  blockReward:  5000,
+  // 0.5 SAYN/block = 50,000,000 base units
+  blockReward:  50_000_000,
 
   // ─── Staking ─────────────────────────────────────────────────────────────
-  // 10 SAYN minimum stake = 100,000 base units
-  minStake:         100_000,
+  // 10 SAYN minimum stake = 1,000,000,000 base units
+  minStake:         1_000_000_000,
   unstakeDelay:     50,
   slashPercentage:  0.10,
   maxMissedBlocks:  3,
@@ -58,16 +58,16 @@ export default {
 
   // ─── Faucet ──────────────────────────────────────────────────────────────
   faucetEnabled:    true,
-  faucetAmount:     10_000_000,   // 1000 SAYN per drip
+  faucetAmount:     100_000_000_000,   // 1000 SAYN per drip
   faucetCooldown:   60_000,
 
   // ─── Genesis (all in base units) ─────────────────────────────────────────
   genesis: {
     timestamp: 1704067200000,
     allocations: {
-      faucet1:    1_000_000_000,  // 100,000 SAYN
-      genesis1:     100_000_000,  // 10,000 SAYN
-      validator1:    10_000_000,  // 1,000 SAYN staked in genesis
+      faucet1:    10_000_000_000_000,  // 100,000 SAYN
+      genesis1:    1_000_000_000_000,  // 10,000 SAYN
+      validator1:    100_000_000_000,  // 1,000 SAYN staked in genesis
     }
   },
 
