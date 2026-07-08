@@ -29,39 +29,70 @@ import crypto from 'crypto';
 class SaymanClient {
   /**
    * @param {object} options
-   * @param {string} options.rpcUrl - e.g. 'http://localhost:10000' or 'https://sayman.onrender.com'
+   * @param {string|string[]} options.rpcUrl - e.g. 'http://localhost:10000' or an array/list of endpoints
    */
-  constructor({ rpcUrl } = {}) {
-    this.rpcUrl = (rpcUrl || 'http://localhost:10000').replace(/\/$/, '');
+  constructor({ rpcUrl, rpcUrls } = {}) {
+    let urls = [];
+    if (Array.isArray(rpcUrls)) {
+      urls = rpcUrls;
+    } else if (Array.isArray(rpcUrl)) {
+      urls = rpcUrl;
+    } else if (rpcUrl) {
+      urls = rpcUrl.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    if (urls.length === 0) {
+      urls = ['http://localhost:10000', 'https://sayman.up.railway.app', 'https://sayman.onrender.com'];
+    }
+    this.rpcUrls = urls.map(u => u.replace(/\/$/, ''));
+    this.activeUrlIndex = 0;
   }
 
   // ─── Internal fetch helpers ─────────────────────────────────────────────────
 
   async _post(endpoint, body) {
-    const res = await fetch(`${this.rpcUrl}${endpoint}`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body)
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || data.message || `HTTP ${res.status}`);
+    let lastError = new Error('No working peers');
+    for (let i = 0; i < this.rpcUrls.length; i++) {
+      const idx = (this.activeUrlIndex + i) % this.rpcUrls.length;
+      const baseUrl = this.rpcUrls[idx];
+      try {
+        const res = await fetch(`${baseUrl}${endpoint}`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          this.activeUrlIndex = idx;
+          return data;
+        }
+        throw new Error(data.error || data.message || `HTTP ${res.status}`);
+      } catch (err) {
+        lastError = err;
+        console.warn(`⚠️ SDK: Peer ${baseUrl} failed: ${err.message}. Trying next...`);
+      }
     }
-
-    return data;
+    throw lastError;
   }
 
   async _get(endpoint) {
-    const res  = await fetch(`${this.rpcUrl}${endpoint}`);
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || data.message || `HTTP ${res.status}`);
+    let lastError = new Error('No working peers');
+    for (let i = 0; i < this.rpcUrls.length; i++) {
+      const idx = (this.activeUrlIndex + i) % this.rpcUrls.length;
+      const baseUrl = this.rpcUrls[idx];
+      try {
+        const res = await fetch(`${baseUrl}${endpoint}`);
+        const data = await res.json();
+        if (res.ok) {
+          this.activeUrlIndex = idx;
+          return data;
+        }
+        throw new Error(data.error || data.message || `HTTP ${res.status}`);
+      } catch (err) {
+        lastError = err;
+        console.warn(`⚠️ SDK: Peer ${baseUrl} failed: ${err.message}. Trying next...`);
+      }
     }
-
-    return data;
+    throw lastError;
   }
 
   // ─── Wallet helpers ────────────────────────────────────────────────────────
