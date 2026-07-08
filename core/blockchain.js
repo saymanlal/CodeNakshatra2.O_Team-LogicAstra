@@ -183,6 +183,12 @@ class Blockchain {
         return null;
       }
 
+      // If a local validator address is configured, only produce blocks when we are selected
+      if (process.env.VALIDATOR_ADDRESS && validator !== process.env.VALIDATOR_ADDRESS) {
+        this.isProducing = false;
+        return null;
+      }
+
       const transactions = [];
       let blockGasUsed   = 0;
 

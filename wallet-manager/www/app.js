@@ -442,6 +442,7 @@
         updateCharts();
         updateAnalytics();
         updateUnstakeCountdown();
+        updateEstGasFee();
     }
 
     function renderWalletList() {
@@ -718,7 +719,7 @@
 
                 if (data.balance !== undefined) {
                     const b = Number(data.balance);
-                    activeWallet.balance = isFinite(b) && b < 1e15 ? b : (data.transactions || []).reduce((s,t) => s + (t.amount || 0), 0);
+                    activeWallet.balance = isFinite(b) ? b : 0;
                 }
                 if (data.stake !== undefined) {
                     activeWallet.stake = data.stake;
@@ -881,12 +882,11 @@
             const gasPriceNum = parseFloat(tx.gasPrice);
             const gasLimitNum = parseFloat(tx.gasLimit);
             if (!isNaN(gasPriceNum) && !isNaN(gasLimitNum)) {
-                const fee = (gasPriceNum * gasLimitNum) / 1e18;
-                gasFee = fee.toFixed(2) + ' ' + symbol;
+                const chainName = activeWallet?.chain || 'sayman';
+                const decimals = chainName === 'ethereum' || chainName === 'arbitrum' ? 18 : chainName === 'solana' ? 9 : 8;
+                const fee = (gasPriceNum * gasLimitNum) / Math.pow(10, decimals);
+                gasFee = fee.toFixed(decimals === 18 ? 18 : 8) + ' ' + symbol;
             }
-        }
-        if (gasFee === 'N/A' || gasFee === '0.00 ' + symbol) {
-            gasFee = '6 ' + symbol;
         }
 
         let timeDisplay = 'N/A';
@@ -1183,6 +1183,10 @@
                 return false;
             }
 
+            const decimals = activeWallet.chain === 'ethereum' || activeWallet.chain === 'arbitrum' ? 18 : activeWallet.chain === 'solana' ? 9 : 8;
+            const multiplier = Math.pow(10, decimals);
+            const baseAmount = Math.round(amount * multiplier);
+
             // Simulating other chains transaction broadcasting
             if (activeWallet.chain !== 'sayman') {
                 showLoading('Preparing transaction...');
@@ -1207,14 +1211,14 @@
                 }
                 showToast(`Transaction broadcasted on ${activeWallet.chain}!`, 'success');
 
-                activeWallet.balance = (activeWallet.balance || 0) - amount;
+                activeWallet.balance = (activeWallet.balance || 0) - baseAmount;
                 activeWallet.transactions.push({
                     type: 'TRANSFER',
-                    amount: -amount,
+                    amount: -baseAmount,
                     time: Date.now(),
                     txId: txHash,
                     blockNumber: currentBlock || 1,
-                    data: { from: activeWallet.address, to, amount }
+                    data: { from: activeWallet.address, to, amount: baseAmount }
                 });
                 saveState();
                 render();
@@ -1235,7 +1239,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     type: 'TRANSFER',
-                    data: { from: wallet.address, to, amount }
+                    data: { from: wallet.address, to, amount: baseAmount }
                 })
             });
             const gas = await gasEstimate.json();
@@ -1245,7 +1249,7 @@
 
             const txData = {
                 type: 'TRANSFER',
-                data: { from: wallet.address, to, amount },
+                data: { from: wallet.address, to, amount: baseAmount },
                 timestamp: Date.now(),
                 gasLimit: gasLimit || gas.recommendedGasLimit || 21000,
                 gasPrice: gasPrice || gas.minGasPrice || 1,
@@ -1286,16 +1290,17 @@
                 }
                 showToast(`Transaction sent!`, 'success');
 
-                activeWallet.balance = (activeWallet.balance || 0) - amount - ((txData.gasLimit * txData.gasPrice) / 100_000_000);
+                const gasFee = txData.gasLimit * txData.gasPrice;
+                activeWallet.balance = (activeWallet.balance || 0) - baseAmount - gasFee;
                 activeWallet.transactions.push({
                     type: 'TRANSFER',
-                    amount: -amount,
+                    amount: -baseAmount,
                     time: Date.now(),
                     txId: txHash,
                     blockNumber: currentBlock,
                     gasPrice: txData.gasPrice,
                     gasLimit: txData.gasLimit,
-                    data: { from: activeWallet.address, to, amount }
+                    data: { from: activeWallet.address, to, amount: baseAmount }
                 });
                 saveState();
 
@@ -2888,7 +2893,37 @@
                 loadTransactionHistory();
                 fetchBlockInfo();
             }
-        }, 6000);
+        }, 2000); //snappy 2 second refresh
+    }
+
+    function updateEstGasFee() {
+        const priceInput = dom.sendGasPrice.value;
+        const limitInput = dom.sendGasLimit.value;
+        
+        const wrapper = document.getElementById('estGasWrapper');
+        if (wrapper) {
+            if (priceInput || limitInput) {
+                wrapper.style.display = 'block';
+            } else {
+                wrapper.style.display = 'none';
+            }
+        }
+
+        const price = parseInt(priceInput) || 1;
+        const limit = parseInt(limitInput) || 21000;
+        const chainConfig = getChainConfig(activeWallet?.chain || 'sayman');
+        const symbol = chainConfig.symbol;
+        const decimals = activeWallet?.chain === 'ethereum' || activeWallet?.chain === 'arbitrum' ? 18 : activeWallet?.chain === 'solana' ? 9 : 8;
+        const fee = (price * limit) / Math.pow(10, decimals);
+        const displayElement = document.getElementById('estGasFeeDisplay');
+        if (displayElement) {
+            displayElement.innerHTML = `<i class="fas fa-info-circle"></i> Estimated Gas Fee: ${fee.toFixed(decimals === 18 ? 18 : 8)} ${symbol}`;
+        }
+    }
+
+    if (dom.sendGasPrice && dom.sendGasLimit) {
+        dom.sendGasPrice.addEventListener('input', updateEstGasFee);
+        dom.sendGasLimit.addEventListener('input', updateEstGasFee);
     }
 
     // Re-sync immediately when the app/tab regains focus — mobile OSes
