@@ -396,7 +396,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   });
 
   // Admin fund endpoint (testnet only)
-  router.post('/admin/fund', (req, res) => {
+  router.post('/admin/fund', async (req, res) => {
     try {
       const { address, amount, secret } = req.body;
       if (secret !== 'sayman-admin-2024') {
@@ -405,9 +405,21 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       if (!address || !amount) {
         return res.status(400).json({ error: 'Address and amount required' });
       }
-      blockchain.state.addBalance(address, amount);
-      blockchain.state.addBalance('faucet', 9999999999);
-      res.json({ success: true, message: 'Funded successfully' });
+
+      const { default: Transaction } = await import('../core/transaction.js');
+      const tx = new Transaction(
+        'GENESIS',
+        { to: address, amount: Number(amount) },
+        Date.now(),
+        0, // gasLimit
+        0, // gasPrice
+        0  // nonce
+      );
+      tx.id = tx.calculateHash();
+      
+      blockchain.mempool.push(tx);
+
+      res.json({ success: true, message: 'Funding transaction queued in mempool' });
     } catch (error) {
       res.status(400).json({ error: error.message });
     }
