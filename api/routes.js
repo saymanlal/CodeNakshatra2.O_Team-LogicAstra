@@ -441,15 +441,16 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
         return res.status(400).json({ error: 'Address required' });
       }
 
-      const faucetBalance = blockchain.state.getBalance('faucet');
-      if (faucetBalance < config.faucetAmount) {
-        return res.status(503).json({ 
-          error: 'Faucet is empty',
-          message: 'Please try again later'
-        });
-      }
+      const tx = new Transaction(
+        'GENESIS',
+        { to: address, amount: Number(config.faucetAmount) },
+        Date.now(),
+        0, // gasLimit
+        0, // gasPrice
+        0  // nonce
+      );
+      tx.id = tx.calculateHash();
 
-      const tx = Transaction.createTransfer('faucet', address, config.faucetAmount);
       blockchain.mempool.push(tx);
 
       console.log(`🚰 Faucet: ${config.faucetAmount} SAYN → ${address.substring(0, 8)}...`);
