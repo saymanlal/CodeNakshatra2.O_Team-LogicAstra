@@ -68,6 +68,7 @@ app.use('/assets', express.static(path.join(__dirname, 'frontend', 'assets')));
 let blockchain;
 let p2pServer;
 let miningInterval;
+let pingerInterval;
 let server;
 
 function loadOrCreateNodeId(dbPath) {
@@ -179,6 +180,7 @@ async function startServer() {
         setTimeout(() => {
           p2pServer.connectToBootstrapPeers(config.bootstrapPeers);
         }, 2000);
+        startBootstrapPinger(config.bootstrapPeers);
       }
 
       if (mode === 'validator') {
@@ -211,10 +213,50 @@ function startMining() {
   }, config.blockTime);
 }
 
+function startBootstrapPinger(peers) {
+  const urlsToPing = new Set();
+  
+  if (Array.isArray(peers)) {
+    peers.forEach(peerUrl => {
+      if (!peerUrl) return;
+      let httpUrl = peerUrl
+        .replace(/^wss:\/\//i, 'https://')
+        .replace(/^ws:\/\//i, 'http://')
+        .replace(/\/p2p\/?$/i, '');
+      urlsToPing.add(`${httpUrl}/health`);
+    });
+  }
+
+  // Also self-ping if running on Render
+  if (process.env.RENDER_EXTERNAL_URL) {
+    let selfUrl = process.env.RENDER_EXTERNAL_URL;
+    let httpUrl = selfUrl.endsWith('/') ? selfUrl.slice(0, -1) : selfUrl;
+    urlsToPing.add(`${httpUrl}/health`);
+  }
+
+  if (urlsToPing.size === 0) return;
+
+  const ping = () => {
+    urlsToPing.forEach(async (healthUrl) => {
+      try {
+        console.log(`[Keep-Alive] Pinged endpoint: ${healthUrl}`);
+        const res = await fetch(healthUrl, { signal: AbortSignal.timeout(10000) });
+        console.log(`[Keep-Alive] Response status for ${healthUrl}: ${res.status}`);
+      } catch (err) {
+        console.error(`[Keep-Alive] Failed to ping ${healthUrl}:`, err.message);
+      }
+    });
+  };
+
+  ping();
+  pingerInterval = setInterval(ping, 300_000); // 5 minutes
+}
+
 function gracefulShutdown() {
   console.log('\n🛑 Shutting down gracefully...');
 
   if (miningInterval) clearInterval(miningInterval);
+  if (pingerInterval) clearInterval(pingerInterval);
   if (p2pServer) p2pServer.close();
 
   const finish = () => {

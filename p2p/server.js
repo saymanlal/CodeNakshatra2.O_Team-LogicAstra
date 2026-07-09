@@ -21,6 +21,7 @@ export class P2PServer {
     this.discoveredPeers = new Set();
     this.discoveryInterval = null;
     this.pendingPeerRequests = new Map();
+    this.disconnectTimes = new Map();
   }
 
   // ─── Server startup ─────────────────────────────────────────────────────────
@@ -83,8 +84,26 @@ export class P2PServer {
         }
       }
 
-      // 3. Try to discover via DNS (if you have DNS seeds later)
-      // await this._discoverViaDNS();
+      // 3. Check for offline bootstrap peers to trigger self-healing deploy webhooks
+      for (const [url, disconnectTime] of this.disconnectTimes.entries()) {
+        const offlineDuration = Date.now() - disconnectTime;
+        if (offlineDuration > 3600_000) { // 1 hour
+          const host = url
+            .replace(/^https?:\/\//i, '')
+            .replace(/^wss?:\/\//i, '')
+            .replace(/\/p2p\/?$/i, '')
+            .replace(/[^a-z0-9]/gi, '_')
+            .toUpperCase();
+          const hookVarName = `DEPLOY_HOOK_${host}`;
+          const webhookUrl = process.env[hookVarName];
+          if (webhookUrl) {
+            console.warn(`⚠️ Peer ${url} has been offline for ${Math.round(offlineDuration / 60000)} minutes. Triggering deploy webhook: ${hookVarName}`);
+            fetch(webhookUrl, { method: 'POST' }).catch(() => {});
+            // Reset disconnect time to avoid spamming the webhook
+            this.disconnectTimes.set(url, Date.now());
+          }
+        }
+      }
 
     } catch (err) {
       // silently ignore
@@ -165,6 +184,7 @@ export class P2PServer {
       ws.on('open', () => {
         clearTimeout(timeout);
         console.log(`✅ Connected to peer: ${url}`);
+        this.disconnectTimes.delete(url);
         this._handleOutboundConnection(ws, url);
       });
 
@@ -181,6 +201,9 @@ export class P2PServer {
             this.peers.delete(id);
             break;
           }
+        }
+        if (!this.disconnectTimes.has(url)) {
+          this.disconnectTimes.set(url, Date.now());
         }
         this._scheduleReconnect(url);
       });
@@ -478,15 +501,13 @@ export class P2PServer {
     if (!peer) return;
 
     const from = msg.fromIndex || 0;
-    const blocks = this.blockchain.chain.slice(from);
+    const BATCH = 100;
+    const blocks = this.blockchain.chain.slice(from, from + BATCH);
 
     if (!blocks.length) return;
 
-    const BATCH = 50;
-    for (let i = 0; i < blocks.length; i += BATCH) {
-      const batch = blocks.slice(i, i + BATCH).map(b => b.toJSON ? b.toJSON() : b);
-      this._send(peer.ws, { type: 'blocks', blocks: batch });
-    }
+    const batch = blocks.map(b => b.toJSON ? b.toJSON() : b);
+    this._send(peer.ws, { type: 'blocks', blocks: batch });
   }
 
   async _handleBlocks(msg, peerId) {
@@ -530,7 +551,7 @@ export class P2PServer {
                 fromIndex: Math.max(0, blockData.index - 1),
               });
               this.syncQueue = []; // Clear queue since we're starting a new sync request
-              break;
+              return;
             }
           }
           continue;
@@ -544,7 +565,7 @@ export class P2PServer {
           } else {
             console.warn(`⚠️ addBlock rejected #${blockData.index}`);
             this.syncQueue = []; // Clear queue on rejection
-            break;
+            return;
           }
           continue;
         }
@@ -552,12 +573,18 @@ export class P2PServer {
         console.log(`⚠️ Gap: have ${ourHeight}, next is ${blockData.index}`);
         if (peer) this._requestBlocks(peer.ws);
         this.syncQueue = []; // Clear queue on gap, since we requested a fresh start
-        break;
+        return;
       }
 
       if (imported > 0) {
         console.log(`✅ Synced ${imported} blocks. New height: ${this.blockchain.chain.length}`);
         this._broadcastHandshake();
+      }
+
+      // If we are still behind the peer, request the next batch
+      if (peer && peer.chainHeight > this.blockchain.chain.length) {
+        console.log(`📥 Still behind peer (${this.blockchain.chain.length} < ${peer.chainHeight}). Requesting next batch...`);
+        this._requestBlocks(peer.ws);
       }
     } catch (err) {
       console.error('❌ _processBlocksBatch error:', err.message);
