@@ -470,6 +470,7 @@ class Blockchain {
     this.chain = this.chain.slice(0, height + 1);
     this.state.clear();
     await this.replayState();
+    await this.saveChain();
   }
 
   // ─── applyBlock / applyTransaction ──────────────────────────────────────────
