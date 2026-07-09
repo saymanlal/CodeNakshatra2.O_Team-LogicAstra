@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "build": "echo 'No build step required'",
     "testnet": "node server.js --network testnet",
     "mainnet": "node server.js --network mainnet",
     "public-testnet": "node server.js --network public-testnet",

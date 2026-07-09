@@ -3006,8 +3006,48 @@
         }
     }
 
+    async function discoverPeersDynamically() {
+        const bootstrapEndpoints = networkEndpoints[currentNetwork] || [];
+        if (!bootstrapEndpoints.length) return;
+
+        console.log("🔍 Starting dynamic peer discovery from bootstrap endpoints...");
+        for (const endpoint of bootstrapEndpoints) {
+            try {
+                const url = endpoint.endsWith('/api') ? `${endpoint}/network/stats` : `${endpoint}/api/network/stats`;
+                const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+                if (!res.ok) continue;
+                const stats = await res.json();
+                
+                if (stats && Array.isArray(stats.peerList)) {
+                    const discoveredUrls = [];
+                    for (const p of stats.peerList) {
+                        if (!p.url) continue;
+                        let httpUrl = p.url
+                            .replace(/^wss:\/\//i, 'https://')
+                            .replace(/^ws:\/\//i, 'http://')
+                            .replace(/\/p2p\/?$/i, '')
+                            .replace(/\/$/, '') + '/api';
+                        
+                        if (!bootstrapEndpoints.includes(httpUrl) && !discoveredUrls.includes(httpUrl)) {
+                            discoveredUrls.push(httpUrl);
+                        }
+                    }
+
+                    if (discoveredUrls.length > 0) {
+                        console.log(`✨ Dynamically discovered ${discoveredUrls.length} new peer(s):`, discoveredUrls);
+                        networkEndpoints[currentNetwork] = [...new Set([...bootstrapEndpoints, ...discoveredUrls])];
+                        break;
+                    }
+                }
+            } catch (err) {
+                console.log(`Failed to discover peers from ${endpoint}:`, err.message);
+            }
+        }
+    }
+
     async function init() {
         await loadWalletEnv();
+        await discoverPeersDynamically();
         let progress = 0;
         const interval = setInterval(() => {
             progress += Math.random() * 8 + 2;
