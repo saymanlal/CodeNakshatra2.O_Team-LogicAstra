@@ -203,6 +203,10 @@ function startMining() {
 
   miningInterval = setInterval(async () => {
     try {
+      if (p2pServer && p2pServer.isSyncing) {
+        // Skip block production while syncing from peers to prevent forks
+        return;
+      }
       const block = await blockchain.createBlock();
       if (block && p2pServer) {
         p2pServer.broadcastBlock(block);

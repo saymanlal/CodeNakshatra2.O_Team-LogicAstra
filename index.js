@@ -64,6 +64,9 @@ app.get('/', (req, res) => {
 // Auto-mining
 if (config.autoMine !== false) {
   setInterval(async () => {
+    if (p2pServer && p2pServer.isSyncing) {
+      return;
+    }
     const block = await blockchain.createBlock();
     if (block) {
       console.log(`✓ Block #${block.index} created by ${block.validator.substring(0, 8)}...`);
