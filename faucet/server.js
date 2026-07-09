@@ -70,6 +70,42 @@ const API_PEERS = process.env.API_PEERS
     );
 let activePeerIndex = 0;
 
+async function discoverFaucetPeers() {
+  const bootstrapPeers = [...API_PEERS];
+  console.log("🔍 Faucet starting dynamic peer discovery from:", bootstrapPeers);
+  for (const endpoint of bootstrapPeers) {
+    try {
+      const url = endpoint.endsWith('/api') ? `${endpoint}/network/stats` : `${endpoint}/api/network/stats`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) continue;
+      const stats = await res.json();
+      
+      if (stats && Array.isArray(stats.peerList)) {
+        const discovered = [];
+        for (const p of stats.peerList) {
+          if (!p.url) continue;
+          let httpUrl = p.url
+            .replace(/^wss:\/\//i, 'https://')
+            .replace(/^ws:\/\//i, 'http://')
+            .replace(/\/p2p\/?$/i, '')
+            .replace(/\/$/, '') + '/api';
+          if (!API_PEERS.includes(httpUrl)) {
+            discovered.push(httpUrl);
+          }
+        }
+        if (discovered.length > 0) {
+          API_PEERS.push(...discovered);
+          console.log("✨ Faucet dynamically discovered new peers:", discovered);
+          break;
+        }
+      }
+    } catch (err) {
+      // ignore
+    }
+  }
+}
+discoverFaucetPeers();
+
 async function apiFetch(path, options = {}) {
   let lastError = new Error('No working peers');
   for (let i = 0; i < API_PEERS.length; i++) {
