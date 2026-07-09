@@ -35,6 +35,7 @@
       <li class="nav-item"><button class="nav-btn" data-page="explorer" onclick="showPage('explorer')"><i class="fas fa-search"></i> Explorer</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="validators" onclick="showPage('validators')"><i class="fas fa-user-check"></i> Validators</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="contracts" onclick="showPage('contracts')"><i class="fas fa-file-contract"></i> Contracts</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="layers" onclick="showPage('layers')"><i class="fas fa-layer-group"></i> Layers</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="network" onclick="showPage('network')"><i class="fas fa-network-wired"></i> Network</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="docs" onclick="window.location.href='/docs'"><i class="fas fa-book"></i> Docs</button></li>
     </ul>
@@ -45,12 +46,26 @@
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Total Blocks</div><div class="stat-value" id="stat-blocks">—</div></div>
       <div class="stat-card"><div class="stat-label">Validators</div><div class="stat-value" id="stat-validators">—</div></div>
-      <div class="stat-card"><div class="stat-label">Total Stake</div><div class="stat-value"><span id="stat-stake">—</span><span class="stat-unit">SAYN</span></div></div>
+      <div class="stat-card">
+        <div class="stat-label">Total Stake</div>
+        <div class="stat-value"><span id="stat-stake">—</span><span class="stat-unit">SAYN</span></div>
+        <div id="stat-stake-raw" style="font-size:10px;color:var(--mono-500);margin-top:2px;"></div>
+      </div>
       <div class="stat-card"><div class="stat-label">Mempool</div><div class="stat-value" id="stat-mempool">—</div></div>
       <div class="stat-card"><div class="stat-label">Contracts</div><div class="stat-value" id="stat-contracts">—</div></div>
-      <div class="stat-card"><div class="stat-label">Block Reward</div><div class="stat-value"><span id="stat-reward">—</span><span class="stat-unit">SAYN</span></div></div>
+      <div class="stat-card">
+        <div class="stat-label">Block Reward</div>
+        <div class="stat-value"><span id="stat-reward">—</span><span class="stat-unit">SAYN</span></div>
+        <div id="stat-reward-raw" style="font-size:10px;color:var(--mono-500);margin-top:2px;"></div>
+      </div>
       <div class="stat-card"><div class="stat-label">Block Time</div><div class="stat-value"><span id="stat-blocktime">5</span><span class="stat-unit">s</span></div></div>
       <div class="stat-card"><div class="stat-label">Est. APR</div><div class="stat-value"><span id="stat-apr">—</span><span class="stat-unit">%</span></div></div>
+      <div class="stat-card"><div class="stat-label">Live TPS</div><div class="stat-value"><span id="stat-tps">—</span><span class="stat-unit">tx/s</span></div></div>
+      <div class="stat-card">
+        <div class="stat-label">Denomination</div>
+        <div class="stat-value" style="font-size:11px" id="stat-denom">—</div>
+        <div style="font-size:10px;color:var(--mono-500);margin-top:2px;" id="stat-denom-note"></div>
+      </div>
     </div>
     <div class="section">
       <div class="section-header"><h2>Live Block Feed</h2></div>
@@ -103,9 +118,9 @@
 
       <table>
         <thead>
-          <tr><th>Address</th><th>Stake (SAYN)</th><th>Share</th><th>Missed Blocks</th><th>Status</th></tr>
+          <tr><th>Address</th><th>Stake (SAYN)</th><th>Base Units</th><th>Share</th><th>Reputation</th><th>Missed Blocks</th><th>Status</th></tr>
         </thead>
-        <tbody id="validator-list"><tr><td colspan="5" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading validators…</td></tr></tbody>
+        <tbody id="validator-list"><tr><td colspan="7" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading validators…</td></tr></tbody>
       </table>
       <p style="font-size:11px;color:var(--mono-400);margin-top:calc(var(--grid)*1)">Click any row to see blocks validated by that address.</p>
     </div>
@@ -127,6 +142,85 @@
         <thead><tr><th>Address</th><th>Creator</th><th>Code Size</th></tr></thead>
         <tbody id="contract-list"><tr><td colspan="3" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading contracts…</td></tr></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- ═══ LAYERS ═══ -->
+  <div id="layers" class="page">
+    <div class="section">
+      <div class="section-header"><h2>📦 Multi-Layer Chains</h2></div>
+      <p style="color:var(--mono-400);font-size:13px;margin-bottom:calc(var(--grid)*3)">
+        SAYMAN supports Layer 1, Layer 2, and custom multi-layer chains. Anyone can create their own chain
+        (EVM-compatible style) anchored to the SAYMAN L1 via the Layer2Bridge contract.
+      </p>
+      <div class="stats-grid" style="margin-bottom:calc(var(--grid)*3)">
+        <div class="stat-card">
+          <div class="stat-label">This Chain Layer</div>
+          <div class="stat-value" id="layer-level">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Chain ID</div>
+          <div class="stat-value mono" id="layer-chain-id" style="font-size:14px">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Block Time</div>
+          <div class="stat-value"><span id="layer-blocktime">—</span><span class="stat-unit">ms</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Decimals</div>
+          <div class="stat-value" id="layer-decimals">—</div>
+        </div>
+      </div>
+
+      <div class="section" style="margin-bottom:calc(var(--grid)*4)">
+        <div class="section-header"><h3 style="font-size:14px">How to Create Your Own Chain</h3></div>
+        <div style="font-size:12px;color:var(--mono-300);line-height:1.8;">
+          <p><strong>1. Layer 2 Rollup (anchored to SAYMAN L1)</strong></p>
+          <pre style="background:var(--mono-950);padding:12px;overflow-x:auto;border:var(--border);font-size:11px;">import { ChainFactory } from './core/chain-factory.js';
+import Blockchain from './core/blockchain.js';
+
+const config = ChainFactory.createL2Config({
+  name: 'MyL2Chain',
+  chainId: 'my-l2-1',
+  apiPort: 11000,
+  l1RpcUrl: 'https://sayman.onrender.com',
+  l1Bridge: '&lt;BRIDGE_CONTRACT_ADDRESS&gt;',
+  genesis: { '&lt;YOUR_ADDRESS&gt;': 1_000_000_000 }
+});
+
+const chain = new Blockchain(config, './data/my-l2');
+await chain.initialize();</pre>
+
+          <p style="margin-top:12px"><strong>2. Independent Sidechain</strong></p>
+          <pre style="background:var(--mono-950);padding:12px;overflow-x:auto;border:var(--border);font-size:11px;">const config = ChainFactory.createSidechainConfig({
+  name: 'GameChain',
+  chainId: 'gamechain-1',
+  blockReward: 10_000_000,
+  minStake: 10_000_000,
+  genesis: { '&lt;DEV_WALLET&gt;': 100_000_000_000 }
+});</pre>
+
+          <p style="margin-top:12px"><strong>3. Custom Token (deploy on any chain)</strong></p>
+          <pre style="background:var(--mono-950);padding:12px;overflow-x:auto;border:var(--border);font-size:11px;">import { SaymanClient } from './sdk/client.js';
+const client = new SaymanClient({ rpcUrl: 'http://localhost:10000' });
+
+// Deploy token factory contract once, then:
+await client.callContract({
+  contractAddress: TOKEN_FACTORY_ADDR,
+  method: 'createToken',
+  args: { name: 'My Token', symbol: 'MTK', totalSupply: 1000000 },
+  wallet: myWallet,
+});</pre>
+
+          <p style="margin-top:12px"><strong>4. NFT Collection</strong></p>
+          <pre style="background:var(--mono-950);padding:12px;overflow-x:auto;border:var(--border);font-size:11px;">await client.callContract({
+  contractAddress: NFT_FACTORY_ADDR,
+  method: 'createCollection',
+  args: { name: 'CoolNFTs', symbol: 'COOL', maxSupply: 10000 },
+  wallet: myWallet,
+});</pre>
+        </div>
+      </div>
     </div>
   </div>
 

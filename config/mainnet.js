@@ -50,6 +50,7 @@ export function getBlockReward(blockHeight) {
 export default {
   networkName:  'SAYMAN Mainnet',
   chainId:      'sayman-mainnet-1',
+  layer:        1,                           // Layer 1 — SAYMAN base chain
   ticker:       TICKER,
   decimals:     DECIMALS,
 
@@ -57,7 +58,7 @@ export default {
   p2pPort:      parseInt(process.env.P2P_PORT) || null,
 
   // ─── Block production ────────────────────────────────────────────────────
-  blockTime:    5000,
+  blockTime:    2000,
 
   // blockReward is dynamic via getBlockReward(height) — this is the Year 1 value.
   // blockchain.js should call getBlockReward(block.index) when minting reward tx.
@@ -124,7 +125,7 @@ export default {
     DEFAULT:          21_000,
   },
 
-  maxGasPerBlock:   50_000_000,
+  maxGasPerBlock:   100_000_000,
   maxGasPerTx:      10_000_000,
   maxExecutionTime: 5_000,
   maxInstructions:  100_000,
