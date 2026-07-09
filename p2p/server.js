@@ -22,6 +22,7 @@ export class P2PServer {
     this.discoveryInterval = null;
     this.pendingPeerRequests = new Map();
     this.disconnectTimes = new Map();
+    this.urlToNodeId = new Map();
   }
 
   // ─── Server startup ─────────────────────────────────────────────────────────
@@ -274,8 +275,16 @@ export class P2PServer {
 
     ws.on('close', () => {
       const peer = this.peers.get(peerId);
-      console.log(`👋 Peer ${peerId} disconnected`);
-      this.peers.delete(peerId);
+      if (peer) {
+        console.log(`👋 Peer ${peerId} disconnected`);
+        if (peer.url) {
+          if (!this.disconnectTimes.has(peer.url)) {
+            this.disconnectTimes.set(peer.url, Date.now());
+          }
+          this._scheduleReconnect(peer.url);
+        }
+        this.peers.delete(peerId);
+      }
     });
 
     ws.on('error', (err) => {
@@ -369,6 +378,14 @@ export class P2PServer {
         return true;
       }
     }
+    const peerNodeId = this.urlToNodeId.get(url);
+    if (peerNodeId) {
+      for (const peer of this.peers.values()) {
+        if (peer.nodeId === peerNodeId && peer.ws.readyState === WebSocket.OPEN) {
+          return true;
+        }
+      }
+    }
     return false;
   }
 
@@ -390,6 +407,55 @@ export class P2PServer {
       peer.ws.close();
       this.peers.delete(peerId);
       return;
+    }
+
+    // Self-connection check
+    if (msg.nodeId === this.nodeId) {
+      console.log(`⚠️ Closed self-connection to node: ${msg.nodeId}`);
+      peer.ws.close();
+      this.peers.delete(peerId);
+      return;
+    }
+
+    // Map URL to nodeId if outbound URL exists
+    if (peer.url && msg.nodeId) {
+      this.urlToNodeId.set(peer.url, msg.nodeId);
+    }
+
+    // Check for duplicate connection to the same nodeId
+    for (const [otherId, otherPeer] of this.peers.entries()) {
+      if (otherId !== peerId && otherPeer.nodeId === msg.nodeId) {
+        console.log(`🔍 Duplicate connection to nodeId ${msg.nodeId} detected.`);
+
+        const peerInitiator = peer.url ? this.nodeId : msg.nodeId;
+        const otherPeerInitiator = otherPeer.url ? this.nodeId : msg.nodeId;
+
+        if (peerInitiator !== otherPeerInitiator) {
+          const keepInitiator = this.nodeId > msg.nodeId ? this.nodeId : msg.nodeId;
+
+          if (peerInitiator === keepInitiator) {
+            console.log(`↔️ Keeping new connection ${peerId} (initiated by ${peerInitiator}) and closing old one ${otherId}`);
+            if (otherPeer.url && !peer.url) {
+              peer.url = otherPeer.url;
+            }
+            otherPeer.ws.close();
+            this.peers.delete(otherId);
+          } else {
+            console.log(`↔️ Keeping old connection ${otherId} (initiated by ${otherPeerInitiator}) and closing new one ${peerId}`);
+            if (peer.url && !otherPeer.url) {
+              otherPeer.url = peer.url;
+            }
+            peer.ws.close();
+            this.peers.delete(peerId);
+            return;
+          }
+        } else {
+          console.log(`↔️ Keeping older connection ${otherId} and closing new one ${peerId}`);
+          peer.ws.close();
+          this.peers.delete(peerId);
+          return;
+        }
+      }
     }
 
     // If peer is ahead, sync
@@ -645,11 +711,25 @@ export class P2PServer {
   connectToPeerLegacy(url) { this.connectToPeer(url); }
 
   getStats() {
+    const uniquePeers = [];
+    const seenNodeIds = new Set();
+    
+    for (const peer of this.peers.values()) {
+      if (peer.nodeId) {
+        if (!seenNodeIds.has(peer.nodeId)) {
+          seenNodeIds.add(peer.nodeId);
+          uniquePeers.push(peer);
+        }
+      } else {
+        uniquePeers.push(peer);
+      }
+    }
+
     return {
       nodeId: this.nodeId,
-      peers: this.peers.size,
+      peers: uniquePeers.length,
       enabled: !!this.wss,
-      peerList: Array.from(this.peers.values()).map(p => ({
+      peerList: uniquePeers.map(p => ({
         id: p.id,
         nodeId: p.nodeId,
         chainHeight: p.chainHeight,

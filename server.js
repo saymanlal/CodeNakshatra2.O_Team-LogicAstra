@@ -168,7 +168,7 @@ async function startServer() {
 
       if (mode === 'validator' || mode === 'full' || mode === 'fullnode' || mode === 'observer') {
         try {
-          p2pServer.listen(server);
+          p2pServer.listen(config.p2pPort ? null : server);
         } catch (err) {
           console.error('❌ P2P server failed to start:', err.message);
           console.log('⚠️ Continuing in API-only mode');
