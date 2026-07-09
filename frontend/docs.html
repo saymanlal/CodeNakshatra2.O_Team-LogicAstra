@@ -8,63 +8,111 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
 
-<button class="mobile-menu-toggle" onclick="toggleSidebar()" aria-label="Open menu">
-  <i class="fas fa-bars"></i>
-</button>
-
-<div class="docs-wrapper">
-
-  <!-- ── Sidebar ── -->
-  <aside class="docs-sidebar" id="docsSidebar">
-
-    <div class="sidebar-header">
-      <a href="/" class="sidebar-logo">
-        <img src="./public/sayman-logo.png" alt="SAYMAN">
-        SAYMAN Docs
-      </a>
-      <button class="sidebar-close" onclick="toggleSidebar()" aria-label="Close menu">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
-
-    <div class="sidebar-search">
-      <div class="search-wrapper">
-        <i class="fas fa-search search-icon"></i>
-        <input
-          type="text"
-          id="docsSearch"
-          placeholder="Search docs... (Ctrl+K)"
-          oninput="searchDocs()"
-          autocomplete="off"
-        >
+<div class="container">
+  <!-- ── Header ── -->
+  <header class="header">
+    <div class="header-left">
+      <img src="./public/sayman-logo.png" alt="SAYMAN Logo" class="logo">
+      <div>
+        <h1>SAYMAN</h1>
+        <div class="header-subtitle">Civic Intelligence & Multi-Layer Web3 Platform</div>
       </div>
     </div>
-
-    <nav class="sidebar-nav" id="sidebarNav">
-      <!-- populated by renderSidebar() in docs.js -->
-    </nav>
-
-  </aside>
-
-  <!-- ── Main content ── -->
-  <main class="docs-main">
-    <div class="docs-content" id="docsContent">
-      <!-- populated by renderContent() in docs.js -->
+    <div class="header-meta">
+      <div class="meta-item"><span class="meta-label">Network</span><span class="meta-value" id="header-network">—</span></div>
+      <div class="meta-item"><span class="meta-label">Chain ID</span><span class="meta-value mono" id="header-chain">—</span></div>
+      <div class="meta-item"><span class="meta-label">Node ID</span><span class="meta-value mono" id="header-node">—</span></div>
+      <div class="meta-item"><span class="meta-label">Mode</span><span class="meta-value" id="header-mode">—</span></div>
     </div>
-  </main>
+  </header>
 
-  <!-- ── Table of contents ── -->
-  <aside class="docs-toc">
-    <div class="toc-header">On this page</div>
-    <nav class="toc-nav" id="tocNav">
-      <!-- populated by updateTOC() in docs.js -->
-    </nav>
-  </aside>
+  <!-- ── Nav ── -->
+  <nav class="nav">
+    <ul class="nav-list">
+      <li class="nav-item"><button class="nav-btn" data-page="dashboard" onclick="window.location.href='/'"><i class="fas fa-th-large"></i> Dashboard</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="explorer" onclick="window.location.href='/?page=explorer'"><i class="fas fa-search"></i> Explorer</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="validators" onclick="window.location.href='/?page=validators'"><i class="fas fa-user-check"></i> Validators</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="contracts" onclick="window.location.href='/?page=contracts'"><i class="fas fa-file-contract"></i> Contracts</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="layers" onclick="window.location.href='/?page=layers'"><i class="fas fa-layer-group"></i> Layers</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="network" onclick="window.location.href='/?page=network'"><i class="fas fa-network-wired"></i> Network</button></li>
+      <li class="nav-item"><button class="nav-btn active" data-page="docs" onclick="window.location.href='/docs'"><i class="fas fa-book"></i> Docs</button></li>
+    </ul>
+  </nav>
 
+  <button class="mobile-menu-toggle" onclick="toggleSidebar()" aria-label="Open menu">
+    <i class="fas fa-bars"></i>
+  </button>
+
+  <div class="docs-wrapper">
+
+    <!-- ── Sidebar ── -->
+    <aside class="docs-sidebar" id="docsSidebar">
+
+      <div class="sidebar-header">
+        <a href="/" class="sidebar-logo">
+          <img src="./public/sayman-logo.png" alt="SAYMAN">
+          SAYMAN Docs
+        </a>
+        <button class="sidebar-close" onclick="toggleSidebar()" aria-label="Close menu">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <div class="sidebar-search">
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input
+            type="text"
+            id="docsSearch"
+            placeholder="Search docs... (Ctrl+K)"
+            oninput="searchDocs()"
+            autocomplete="off"
+          >
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebarNav">
+        <!-- populated by renderSidebar() in docs.js -->
+      </nav>
+
+    </aside>
+
+    <!-- ── Main content ── -->
+    <main class="docs-main">
+      <div class="docs-content" id="docsContent">
+        <!-- populated by renderContent() in docs.js -->
+      </div>
+    </main>
+
+    <!-- ── Table of contents ── -->
+    <aside class="docs-toc">
+      <div class="toc-header">On this page</div>
+      <nav class="toc-nav" id="tocNav">
+        <!-- populated by updateTOC() in docs.js -->
+      </nav>
+    </aside>
+
+  </div>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <span>© 2026 SAYMAN Blockchain · 
+      <a href="#" onclick="event.preventDefault();showLegalModal('copyright')">Copyright</a> · 
+      <a href="#" onclick="event.preventDefault();showLegalModal('terms')">Terms</a> · 
+      <a href="#" onclick="event.preventDefault();showLegalModal('privacy')">Privacy</a> · 
+      <a href="#" onclick="event.preventDefault();showLegalModal('cookies')">Cookies</a>
+    </span>
+    <span class="footer-links">
+      <a href="https://github.com/saymanlal/SAYMAN" target="_blank" rel="noopener"><i class="fab fa-github"></i> GitHub</a>
+      <a href="https://sayman-wallet-manager.vercel.app/" target="_blank" rel="noopener"><i class="fas fa-wallet"></i> Wallet</a>
+      <a href="https://sayman-faucet-site.vercel.app/" target="_blank" rel="noopener"><i class="fas fa-tint"></i> Faucet</a>
+    </span>
+  </footer>
 </div>
 
 <script src="docs.js"></script>

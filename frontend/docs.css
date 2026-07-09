@@ -71,7 +71,6 @@
   .sidebar-logo img {
     height: 32px;
     width: auto;
-    filter: grayscale(1) brightness(0) invert(1);
   }
   
   .sidebar-close {
@@ -562,4 +561,65 @@
   
   ::-webkit-scrollbar-thumb:hover {
     background: var(--mono-500);
+  }
+
+  /* ── Overrides for Unified Header & Nav in Dark-Themed Docs ── */
+  body {
+    background: var(--mono-100) !important;
+  }
+
+  .container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  .header {
+    border-bottom: 1px solid var(--mono-300) !important;
+    color: var(--mono-900) !important;
+  }
+
+  .header h1 {
+    color: var(--mono-1000) !important;
+  }
+
+  .meta-item {
+    border: 1px solid var(--mono-300) !important;
+    background: var(--mono-200) !important;
+    color: var(--mono-900) !important;
+  }
+
+  .meta-label {
+    color: var(--mono-500) !important;
+  }
+
+  .meta-value {
+    color: var(--mono-1000) !important;
+  }
+
+  .nav {
+    border-bottom: 1px solid var(--mono-300) !important;
+  }
+
+  .nav-item {
+    border-right: 1px solid var(--mono-300) !important;
+  }
+
+  .nav-btn {
+    color: var(--mono-600) !important;
+  }
+
+  .nav-btn:hover {
+    background: var(--mono-200) !important;
+    color: var(--mono-1000) !important;
+  }
+
+  .nav-btn.active {
+    background: var(--mono-800) !important;
+    color: var(--mono-100) !important;
+  }
+
+  .docs-wrapper {
+    margin-top: calc(var(--grid)*2);
+    min-height: calc(100vh - 200px);
   }

@@ -1,6 +1,6 @@
 # ⛓️ SAYMAN BLOCKCHAIN — PHASE 14: MULTI-LAYER WEB3 PLATFORM
 
-**JavaScript-native Smart Contracts · Proof-of-Report · Multi-Layer Chains · Custom Tokens · NFTs · DEX · Memecoins · Staking Pools**
+**JavaScript-native Smart Contracts · Proof-of-Stake · Multi-Layer Chains · Custom Tokens · NFTs · DEX · Memecoins · Staking Pools**
 
 [![Phase](https://img.shields.io/badge/Phase-14-brightgreen)](https://github.com/saymanlal/SAYMAN)
 [![Network](https://img.shields.io/badge/Network-Public%20Testnet-blue)](https://sayman.onrender.com)

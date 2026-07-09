@@ -258,7 +258,12 @@ await client.callContract({
 
   <!-- ── Footer ── -->
   <footer>
-    <span>© 2026 SAYMAN Blockchain</span>
+    <span>© 2026 SAYMAN Blockchain · 
+      <a href="#" onclick="event.preventDefault();showLegalModal('copyright')">Copyright</a> · 
+      <a href="#" onclick="event.preventDefault();showLegalModal('terms')">Terms</a> · 
+      <a href="#" onclick="event.preventDefault();showLegalModal('privacy')">Privacy</a> · 
+      <a href="#" onclick="event.preventDefault();showLegalModal('cookies')">Cookies</a>
+    </span>
     <span class="footer-links">
       <a href="https://github.com/saymanlal/SAYMAN" target="_blank" rel="noopener"><i class="fab fa-github"></i> GitHub</a>
       <a href="https://sayman-wallet-manager.vercel.app/" target="_blank" rel="noopener"><i class="fas fa-wallet"></i> Wallet</a>
