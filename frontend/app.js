@@ -51,7 +51,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadExplorerEnv();
   await loadNetworkConfig();
   updateHeaderInfo();
-  showPage('dashboard');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const pageParam = urlParams.get('page');
+  if (pageParam && ['dashboard', 'explorer', 'validators', 'contracts', 'layers', 'network'].includes(pageParam)) {
+    showPage(pageParam);
+  } else {
+    showPage('dashboard');
+  }
 
   setInterval(poll, POLL);
   setInterval(updateHeaderInfo, POLL);
@@ -537,12 +544,195 @@ function renderContracts(contracts) {
   }
 
   tbody.innerHTML = contracts.map(c => `
-    <tr>
+    <tr onclick="showContractDetail('${c.address || ''}')">
       <td class="mono">${(c.address || '').slice(0, 20)}…</td>
       <td class="mono">${(c.creator || '').slice(0, 20)}…</td>
       <td>${(c.code?.length ?? 0).toLocaleString()} bytes</td>
     </tr>
   `).join('');
+}
+
+// Helper to sanitize contract state for privacy, security and compliance
+function sanitizeContractState(stateObj) {
+  if (!stateObj || typeof stateObj !== 'object') return stateObj;
+  
+  const sanitized = Array.isArray(stateObj) ? [] : {};
+  const sensitiveKeys = ['secret', 'key', 'password', 'pass', 'salt', 'seed', 'pwd', 'private', 'sk', 'priv'];
+  
+  for (const [key, val] of Object.entries(stateObj)) {
+    const isSensitive = sensitiveKeys.some(sk => key.toLowerCase().includes(sk));
+    if (isSensitive) {
+      if (Array.isArray(sanitized)) {
+        sanitized.push("[REDACTED FOR SECURITY & PRIVACY]");
+      } else {
+        sanitized[key] = "[REDACTED FOR SECURITY & PRIVACY]";
+      }
+    } else if (val && typeof val === 'object') {
+      if (Array.isArray(sanitized)) {
+        sanitized.push(sanitizeContractState(val));
+      } else {
+        sanitized[key] = sanitizeContractState(val);
+      }
+    } else {
+      if (Array.isArray(sanitized)) {
+        sanitized.push(val);
+      } else {
+        sanitized[key] = val;
+      }
+    }
+  }
+  return sanitized;
+}
+
+// ── Show contract detail modal (Realtime) ──────────────────────────────────────
+async function showContractDetail(address) {
+  if (!address) return;
+
+  // Clear any existing poll interval
+  if (window.contractPollInterval) {
+    clearInterval(window.contractPollInterval);
+  }
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width: 900px; max-height: 90vh;">
+      <div class="modal-header">
+        <h3><i class="fas fa-file-contract"></i> Contract: <span class="mono" style="font-size:12px; font-weight:bold;">${address}</span></h3>
+        <button class="modal-close" id="contract-modal-close"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: calc(var(--grid)*3); height: 100%; overflow: hidden;">
+        
+        <!-- Metadata and Tech Specs Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--grid)*3); flex-shrink: 0;">
+          <div style="border: var(--border); padding: calc(var(--grid)*2); background: var(--mono-950); border-radius: 4px;">
+            <h4 style="font-size: 11px; text-transform: uppercase; color: var(--mono-400); margin-bottom: var(--grid); border-bottom: 1px solid var(--mono-900); padding-bottom: 2px;">Metadata</h4>
+            <table style="width: 100%; font-size: 11px;">
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Name:</td><td style="padding: 4px 0; border: none; font-weight: bold;" id="c-meta-name">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Version:</td><td style="padding: 4px 0; border: none; font-weight: bold;" id="c-meta-version">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Creator:</td><td style="padding: 4px 0; border: none;" class="mono" id="c-meta-creator">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Created At:</td><td style="padding: 4px 0; border: none;" id="c-meta-created">—</td></tr>
+            </table>
+          </div>
+          <div style="border: var(--border); padding: calc(var(--grid)*2); background: var(--mono-950); border-radius: 4px;">
+            <h4 style="font-size: 11px; text-transform: uppercase; color: var(--mono-400); margin-bottom: var(--grid); border-bottom: 1px solid var(--mono-900); padding-bottom: 2px;">Tech Specs</h4>
+            <table style="width: 100%; font-size: 11px;">
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Code Size:</td><td style="padding: 4px 0; border: none;" id="c-tech-size">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Code Hash:</td><td style="padding: 4px 0; border: none;" class="mono" id="c-tech-hash">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Exposed Methods:</td><td style="padding: 4px 0; border: none;" id="c-tech-methods">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Last Update:</td><td style="padding: 4px 0; border: none;" id="c-tech-updated">—</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- Detail content with Split layout: left state (realtime), right ABI -->
+        <div style="display: flex; gap: calc(var(--grid)*3); flex: 1; overflow: hidden; min-height: 0;">
+          
+          <!-- Left: State View (Realtime & Sanitized) -->
+          <div style="flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%;">
+            <h4 style="font-size: 11px; text-transform: uppercase; color: var(--mono-400); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+              <span>On-Chain State</span>
+              <span style="font-size: 9px; padding: 2px 6px; background: #2a7a2a; color: white; border-radius: 2px; text-transform: none;"><i class="fas fa-sync fa-spin"></i> Live Realtime updates</span>
+            </h4>
+            <div style="flex: 1; border: var(--border); border-radius: 4px; overflow: auto; background: var(--mono-950); padding: calc(var(--grid)*1.5);">
+              <pre id="c-state" class="mono" style="font-size: 11px; margin: 0; white-space: pre-wrap; word-break: break-all; color: var(--mono-100);">Loading state…</pre>
+            </div>
+          </div>
+          
+          <!-- Right: Exposed Interface (ABI) View -->
+          <div style="flex: 1.2; display: flex; flex-direction: column; min-width: 0; height: 100%;">
+            <h4 style="font-size: 11px; text-transform: uppercase; color: var(--mono-400); margin-bottom: 4px;">Exposed Interface (ABI)</h4>
+            <div style="flex: 1; border: var(--border); border-radius: 4px; overflow: auto; background: var(--mono-950); padding: calc(var(--grid)*2);" id="c-abi-container">
+              <p style="color:var(--mono-400); font-size:11px;">Loading interface details…</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  const closeBtn = modal.querySelector('#contract-modal-close');
+  const cleanUp = () => {
+    clearInterval(window.contractPollInterval);
+    window.contractPollInterval = null;
+    modal.remove();
+  };
+
+  closeBtn.addEventListener('click', cleanUp);
+  modal.addEventListener('click', e => { if (e.target === modal) cleanUp(); });
+  document.body.appendChild(modal);
+
+  async function fetchAndUpdate() {
+    try {
+      const contract = await apiFetch(`/contracts/${address}`);
+      if (!contract) throw new Error('Contract not returned');
+
+      setEl('c-meta-name', contract.name || 'UnnamedContract');
+      setEl('c-meta-version', contract.version || '1.0.0');
+      setEl('c-meta-creator', contract.creator ? (contract.creator.slice(0, 30) + '…') : '—');
+      setEl('c-meta-created', contract.createdAt ? fmtTime(contract.createdAt) : '—');
+
+      setEl('c-tech-size', contract.code ? (contract.code.length.toLocaleString() + ' bytes') : '0 bytes');
+      setEl('c-tech-hash', contract.codeHash ? (contract.codeHash.slice(0, 16) + '…') : '—');
+      
+      const methods = contract.abi && Array.isArray(contract.abi) 
+        ? contract.abi.map(m => typeof m === 'string' ? m : (m.name || 'anonymous')).join(', ')
+        : '—';
+      setEl('c-tech-methods', methods || 'none');
+      setEl('c-tech-updated', fmtTime(Date.now()));
+
+      // Render Sanitized State (Hides secrets, keys, passwords, salts)
+      const stateEl = document.getElementById('c-state');
+      if (stateEl) {
+        if (contract.state && Object.keys(contract.state).length > 0) {
+          const sanitizedState = sanitizeContractState(contract.state);
+          stateEl.textContent = JSON.stringify(sanitizedState, null, 2);
+        } else {
+          stateEl.textContent = 'No state storage variables initialized yet.';
+        }
+      }
+
+      // Populate ABI interface list securely without revealing intellectual property
+      const abiContainer = document.getElementById('c-abi-container');
+      if (abiContainer) {
+        if (contract.abi && Array.isArray(contract.abi) && contract.abi.length > 0) {
+          abiContainer.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              ${contract.abi.map(m => {
+                const name = typeof m === 'string' ? m : (m.name || 'anonymous');
+                const inputs = m.inputs && Array.isArray(m.inputs)
+                  ? m.inputs.map(i => `${i.name || i}`).join(', ')
+                  : (m.args && Array.isArray(m.args) ? m.args.join(', ') : '');
+                const isConst = m.constant || m.stateMutability === 'view' || m.stateMutability === 'pure';
+                
+                return `
+                  <div style="border-bottom: 1px solid var(--mono-900); padding-bottom: 8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <strong class="mono" style="color:var(--mono-100); font-size:12px;">${name}(${inputs})</strong>
+                      <span style="font-size:9px; padding:2px 6px; background:${isConst ? 'var(--mono-900)' : 'var(--mono-100)'}; color:${isConst ? 'var(--mono-400)' : 'var(--mono-1000)'}; border-radius:2px; font-weight:500;">
+                        ${isConst ? 'Read-Only' : 'State-Changing'}
+                      </span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        } else {
+          abiContainer.innerHTML = '<p style="color:var(--mono-400); font-size:11px;">No ABI methods exposed.</p>';
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching contract details:', e);
+      const stateEl = document.getElementById('c-state');
+      if (stateEl) stateEl.textContent = 'Error loading contract details.';
+    }
+  }
+
+  await fetchAndUpdate();
+  window.contractPollInterval = setInterval(fetchAndUpdate, 2000);
 }
 
 // ── Network ───────────────────────────────────────────────────────────────────
@@ -644,7 +834,7 @@ function fmtUptime(s) {
 
 function sayn(baseUnits, withUnit = true) {
   if (baseUnits === null || baseUnits === undefined) return '—';
-  const dec = (typeof networkConfig !== 'undefined' && networkConfig && networkConfig.decimals) || 10000;
+  const dec = (typeof networkConfig !== 'undefined' && networkConfig && networkConfig.decimals) || 100000000;
   const v = Number(baseUnits) / dec;
   const fixed = dec === 100000000 ? 8 : 4;
   return Number.isFinite(v) ? v.toFixed(fixed) + (withUnit ? ' SAYN' : '') : '—';
@@ -656,4 +846,75 @@ function showNotification(msg) {
   n.textContent = msg;
   document.body.appendChild(n);
   setTimeout(() => n.remove(), 3000);
+}
+
+// ── Legal Modals ─────────────────────────────────────────────────────────────
+function showLegalModal(type) {
+  const modals = {
+    terms: {
+      title: "Terms & Conditions",
+      icon: "fa-gavel",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. Decentralized Nature</strong></p>
+        <p style="margin-bottom:16px;">SAYMAN is a decentralized, peer-to-peer open-source blockchain network. There is no central administrator, company, or authority that controls the network. By using this explorer or interacting with the network, you acknowledge that you are using a decentralized protocol at your own risk.</p>
+        <p style="margin-bottom:12px;"><strong>2. User Responsibility</strong></p>
+        <p style="margin-bottom:16px;">You are solely responsible for the security of your private keys, seed phrases, and wallets. Transactions broadcast to the SAYMAN network are immutable and irreversible. The developers, contributors, and validators cannot recover lost funds, reverse transactions, or restore access to locked accounts.</p>
+        <p style="margin-bottom:12px;"><strong>3. Smart Contracts & Custom Tokens</strong></p>
+        <p style="margin-bottom:16px;">Anyone can deploy smart contracts, custom tokens, memecoins, or DEX pools. The network and its developers do not verify, endorse, or guarantee the safety or legality of user-deployed contracts. Exercise extreme caution when interacting with third-party contracts.</p>
+        <p style="margin-bottom:12px;"><strong>4. Disclaimer of Warranty</strong></p>
+        <p>The software and network are provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.</p>
+      `
+    },
+    privacy: {
+      title: "Privacy Policy",
+      icon: "fa-shield-alt",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. On-Chain Ledger Transparency</strong></p>
+        <p style="margin-bottom:16px;">SAYMAN is a public ledger blockchain. All transactions, contract deployments, validator stakes, peer connections, and on-chain activities are public, globally accessible, and immutable. Do not store any personal, confidential, or personally identifiable information (PII) on the blockchain.</p>
+        <p style="margin-bottom:12px;"><strong>2. No Data Collection</strong></p>
+        <p style="margin-bottom:16px;">This blockchain explorer does not require registration, accounts, or email sign-ups. We do not collect, sell, or track personal information, IP addresses, or browsing history.</p>
+        <p style="margin-bottom:12px;"><strong>3. Third-Party Links</strong></p>
+        <p>The dashboard and docs contain links to external wallets, verification pages, or GitHub. We are not responsible for the privacy practices of third-party platforms.</p>
+      `
+    },
+    cookies: {
+      title: "Cookies Policy",
+      icon: "fa-cookie-bite",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. Strictly Necessary Cookies</strong></p>
+        <p style="margin-bottom:16px;">This explorer interface does not use third-party tracking, profiling, or advertising cookies. We only use functional local storage (such as browser localStorage) to remember configuration choices (e.g. API endpoint base URLs or page selections).</p>
+        <p style="margin-bottom:12px;"><strong>2. Opt-out</strong></p>
+        <p>Since we do not deploy tracking or analytical cookies, there is no tracking to opt-out of. You can clear your browser's local cache at any time to remove saved network settings.</p>
+      `
+    },
+    copyright: {
+      title: "Copyright Notice",
+      icon: "fa-copyright",
+      content: `
+        <p style="margin-bottom:12px;"><strong>MIT License</strong></p>
+        <p style="margin-bottom:16px;">Copyright (c) 2026 SAYMAN Blockchain Team</p>
+        <p style="margin-bottom:16px;">Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+        <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+      `
+    }
+  };
+
+  const item = modals[type];
+  if (!item) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3><i class="fas ${item.icon}"></i> ${item.title}</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body" style="line-height: 1.6; font-size: 13px; color: var(--mono-100); padding: calc(var(--grid)*3); overflow-y: auto;">
+        ${item.content}
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
 }

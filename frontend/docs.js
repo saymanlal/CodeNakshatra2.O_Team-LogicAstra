@@ -1007,7 +1007,7 @@ sayman stake 1000000000   // testnet: 1,000,000,000 base units = 10 SAYN minimum
         <strong>Only the Android APK and web wallet are real right now.</strong> Windows/Mac/Linux/CLI-binary/genesis-file download cards have been left out until those artifacts actually exist and are hosted somewhere.
       </div>
     `
-  }
+  },
 
   // ── Phase 14: Multi-Layer Chain docs ─────────────────────────────────────
 
@@ -1369,7 +1369,33 @@ document.addEventListener('DOMContentLoaded', () => {
   renderContent('overview');
   updateActiveNav('overview');
   updateTOC('overview');
+
+  updateHeaderInfo();
+  setInterval(updateHeaderInfo, 5000);
 });
+
+// ── API helpers ──────────────────────────────────────────────────────────────
+const API = '/api';
+async function apiFetch(path) {
+  const res = await fetch(API + path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+function setEl(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = (value === null || value === undefined) ? '—' : value;
+}
+async function updateHeaderInfo() {
+  try {
+    const d = await apiFetch('/network/stats');
+    setEl('header-network', d.network  || '—');
+    setEl('header-chain',   d.chainId  || '—');
+    setEl('header-node',    (d.nodeId  || '').slice(0, 16) + '…');
+    setEl('header-mode',    (d.mode    || '—').toUpperCase());
+  } catch {
+    setEl('header-network', 'Connection error');
+  }
+}
 
 // ── Render Sidebar ────────────────────────────────────────────────────────
 function renderSidebar() {
@@ -1533,3 +1559,74 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('docsSidebar').classList.remove('open');
   }
 });
+
+// ── Legal Modals ─────────────────────────────────────────────────────────────
+function showLegalModal(type) {
+  const modals = {
+    terms: {
+      title: "Terms & Conditions",
+      icon: "fa-gavel",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. Decentralized Nature</strong></p>
+        <p style="margin-bottom:16px;">SAYMAN is a decentralized, peer-to-peer open-source blockchain network. There is no central administrator, company, or authority that controls the network. By using this explorer or interacting with the network, you acknowledge that you are using a decentralized protocol at your own risk.</p>
+        <p style="margin-bottom:12px;"><strong>2. User Responsibility</strong></p>
+        <p style="margin-bottom:16px;">You are solely responsible for the security of your private keys, seed phrases, and wallets. Transactions broadcast to the SAYMAN network are immutable and irreversible. The developers, contributors, and validators cannot recover lost funds, reverse transactions, or restore access to locked accounts.</p>
+        <p style="margin-bottom:12px;"><strong>3. Smart Contracts & Custom Tokens</strong></p>
+        <p style="margin-bottom:16px;">Anyone can deploy smart contracts, custom tokens, memecoins, or DEX pools. The network and its developers do not verify, endorse, or guarantee the safety or legality of user-deployed contracts. Exercise extreme caution when interacting with third-party contracts.</p>
+        <p style="margin-bottom:12px;"><strong>4. Disclaimer of Warranty</strong></p>
+        <p>The software and network are provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.</p>
+      `
+    },
+    privacy: {
+      title: "Privacy Policy",
+      icon: "fa-shield-alt",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. On-Chain Ledger Transparency</strong></p>
+        <p style="margin-bottom:16px;">SAYMAN is a public ledger blockchain. All transactions, contract deployments, validator stakes, peer connections, and on-chain activities are public, globally accessible, and immutable. Do not store any personal, confidential, or personally identifiable information (PII) on the blockchain.</p>
+        <p style="margin-bottom:12px;"><strong>2. No Data Collection</strong></p>
+        <p style="margin-bottom:16px;">This blockchain explorer does not require registration, accounts, or email sign-ups. We do not collect, sell, or track personal information, IP addresses, or browsing history.</p>
+        <p style="margin-bottom:12px;"><strong>3. Third-Party Links</strong></p>
+        <p>The dashboard and docs contain links to external wallets, verification pages, or GitHub. We are not responsible for the privacy practices of third-party platforms.</p>
+      `
+    },
+    cookies: {
+      title: "Cookies Policy",
+      icon: "fa-cookie-bite",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. Strictly Necessary Cookies</strong></p>
+        <p style="margin-bottom:16px;">This explorer interface does not use third-party tracking, profiling, or advertising cookies. We only use functional local storage (such as browser localStorage) to remember configuration choices (e.g. API endpoint base URLs or page selections).</p>
+        <p style="margin-bottom:12px;"><strong>2. Opt-out</strong></p>
+        <p>Since we do not deploy tracking or analytical cookies, there is no tracking to opt-out of. You can clear your browser's local cache at any time to remove saved network settings.</p>
+      `
+    },
+    copyright: {
+      title: "Copyright Notice",
+      icon: "fa-copyright",
+      content: `
+        <p style="margin-bottom:12px;"><strong>MIT License</strong></p>
+        <p style="margin-bottom:16px;">Copyright (c) 2026 SAYMAN Blockchain Team</p>
+        <p style="margin-bottom:16px;">Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+        <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+      `
+    }
+  };
+
+  const item = modals[type];
+  if (!item) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3><i class="fas ${item.icon}"></i> ${item.title}</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body" style="line-height: 1.6; font-size: 13px; color: var(--mono-100); padding: calc(var(--grid)*3); overflow-y: auto;">
+        ${item.content}
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
