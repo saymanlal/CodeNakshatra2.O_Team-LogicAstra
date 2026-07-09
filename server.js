@@ -9,6 +9,7 @@ import Blockchain from './core/blockchain.js';
 import { P2PServer } from './p2p/server.js';
 import { setupRoutes } from './api/routes.js';
 import { loadConfig } from './config/index.js';
+import { submitRollupToL1 } from './core/rollup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -119,8 +120,8 @@ async function startServer() {
     }
 
     console.log('\n╔════════════════════════════════════════╗');
-    console.log('║   SAYMAN BLOCKCHAIN - PHASE 7          ║');
-    console.log('║   Public Network + Real P2P            ║');
+    console.log('║   SAYMAN BLOCKCHAIN - PHASE 14         ║');
+    console.log('║   Multi-Layer + NFT + Custom Tokens    ║');
     console.log('╚════════════════════════════════════════╝\n');
     console.log(`🌐 NETWORK: ${networkFlag.toUpperCase()}`);
     console.log(`🔧 MODE: ${mode.toUpperCase()}`);
@@ -166,7 +167,7 @@ async function startServer() {
       console.log(`📚 Docs: http://localhost:${PORT}/docs`);
       console.log(`🔗 Mode: ${mode.toUpperCase()}`);
 
-      if (mode === 'validator' || mode === 'full' || mode === 'fullnode' || mode === 'observer') {
+      if (mode === 'validator' || mode === 'full' || mode === 'fullnode' || mode === 'observer' || mode === 'sequencer') {
         try {
           p2pServer.listen(config.p2pPort ? null : server);
         } catch (err) {
@@ -183,9 +184,9 @@ async function startServer() {
         startBootstrapPinger(config.bootstrapPeers);
       }
 
-      if (mode === 'validator') {
-        console.log('\n⛏️ Starting block production...');
-        startMining();
+      if (mode === 'validator' || mode === 'sequencer') {
+        console.log(`\n⛏️ Starting block production in ${mode.toUpperCase()} mode...`);
+        startMining(mode);
       }
     });
 
@@ -198,7 +199,7 @@ async function startServer() {
   }
 }
 
-function startMining() {
+function startMining(mode) {
   const config = blockchain.config;
 
   miningInterval = setInterval(async () => {
@@ -208,8 +209,16 @@ function startMining() {
         return;
       }
       const block = await blockchain.createBlock();
-      if (block && p2pServer) {
-        p2pServer.broadcastBlock(block);
+      if (block) {
+        if (p2pServer) {
+          p2pServer.broadcastBlock(block);
+        }
+        // If this node is running as a sequencer (L2 Rollup node), submit commitment to L1
+        if (mode === 'sequencer' && block.index > 0 && block.index % 5 === 0) {
+          submitRollupToL1(block, config).catch(err => {
+            console.error('[Rollup] Error submitting to L1:', err.message);
+          });
+        }
       }
     } catch (err) {
       console.error('Mining error:', err.message);

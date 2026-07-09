@@ -29,6 +29,7 @@ const envPeers = process.env.BOOTSTRAP_PEERS
 export default {
   networkName:  'Sayman Public Testnet',
   chainId:      'sayman-public-testnet-1',
+  layer:        1,                           // Layer 1 — SAYMAN base chain
   ticker:       TICKER,
   decimals:     DECIMALS,
 
@@ -36,7 +37,7 @@ export default {
   p2pPort:      parseInt(process.env.P2P_PORT) || null,
 
   // ─── Block production ────────────────────────────────────────────────────
-  blockTime:    5000,
+  blockTime:    1000,
 
   // 0.5 SAYN/block = 50,000,000 base units
   blockReward:  50_000_000,
@@ -91,7 +92,7 @@ export default {
     DEFAULT:          21_000,
   },
 
-  maxGasPerBlock:    50_000_000,
+  maxGasPerBlock:    100_000_000,
   maxGasPerTx:       10_000_000,
   maxExecutionTime:  5_000,
   maxInstructions:   100_000,

@@ -100,7 +100,7 @@ export class P2PServer {
       }
 
       // 1. Ask all connected peers for their known peers
-      this._broadcast({ type: 'get_peers' });
+      this.broadcast({ type: 'get_peers' });
 
       // 2. If we have bootstrap peers, connect to them
       for (const url of this.bootstrapUrls) {
@@ -352,6 +352,14 @@ export class P2PServer {
         this._handlePeers(msg, peerId);
         break;
 
+      case 'ping':
+        this._handlePing(msg, peerId);
+        break;
+
+      case 'pong':
+        // just update lastSeen (already done above)
+        break;
+
       default:
         break;
     }
@@ -393,6 +401,15 @@ export class P2PServer {
     }
     if (newPeers) {
       console.log(`✨ Discovered ${newPeers} new peer(s)`);
+    }
+  }
+
+  // ─── Ping / Pong ─────────────────────────────────────────────────────────────
+
+  _handlePing(_msg, peerId) {
+    const peer = this.peers.get(peerId);
+    if (peer && peer.ws.readyState === 1) {
+      this._send(peer.ws, { type: 'pong', timestamp: Date.now() });
     }
   }
 
@@ -671,6 +688,22 @@ export class P2PServer {
       if (imported > 0) {
         console.log(`✅ Synced ${imported} blocks. New height: ${this.blockchain.chain.length}`);
         this._broadcastHandshake();
+
+        // ── Reward peer reputation for contributing blocks to our sync ────────
+        // Each peer that sends us valid blocks earns 2 reputation points per block.
+        // This incentivises honest and available peers in the network.
+        if (peer && peer.nodeId) {
+          // Map nodeId to a deterministic address using SHA-256 of nodeId
+          const crypto = await import('crypto');
+          const peerAddr = crypto.default
+            .createHash('sha256')
+            .update('peer:' + peer.nodeId)
+            .digest('hex')
+            .slice(0, 40);
+          const reputationDelta = imported * 2;
+          this.blockchain.state.increaseReputation(peerAddr, reputationDelta);
+          console.log(`⭐ Peer ${peer.nodeId.slice(0, 8)} earned +${reputationDelta} reputation for syncing ${imported} blocks`);
+        }
       }
 
       // If we are still behind the peer, request the next batch

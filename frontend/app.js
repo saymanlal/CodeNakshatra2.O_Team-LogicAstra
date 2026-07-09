@@ -65,6 +65,7 @@ function poll() {
     case 'explorer':   loadExplorer(explorerPage);         break;
     case 'validators': loadValidators();                   break;
     case 'contracts':  loadContracts();                    break;
+    case 'layers':     loadLayers();                       break;
     case 'network':    loadNetwork();                      break;
     case 'docs':       break;
   }
@@ -103,6 +104,7 @@ function showPage(pageId) {
     case 'explorer':   loadExplorer(1);        break;
     case 'validators': loadValidators();       break;
     case 'contracts':  loadContracts();        break;
+    case 'layers':     loadLayers();           break;
     case 'network':    loadNetwork();          break;
     case 'docs':       break;
   }
@@ -117,6 +119,8 @@ async function loadDashboard() {
       apiFetch('/validators'),
     ]);
 
+    const dec = (networkConfig && networkConfig.decimals) || 100_000_000;
+
     setEl('stat-blocks',    stats.blocks     ?? 0);
     setEl('stat-validators', valData.validators?.length ?? 0);
     setEl('stat-stake',     sayn(valData.totalStake ?? 0, false));
@@ -125,6 +129,21 @@ async function loadDashboard() {
     setEl('stat-reward',    sayn(stats.blockReward ?? 0, false));
     setEl('stat-blocktime', Math.round((stats.blockTime ?? 5000) / 1000));
     setEl('stat-apr',       valData.estimatedAPR ?? 0);
+
+    // ── TPS ───────────────────────────────────────────────────────────
+    setEl('stat-tps', stats.tps ?? '0');
+
+    // ── Denomination card — eliminate all confusion about SAYN vs base units ──
+    const ticker = (networkConfig && networkConfig.ticker) || 'SAYN';
+    setEl('stat-denom',      `1 ${ticker} = ${dec.toLocaleString()} base units`);
+    setEl('stat-denom-note', `All on-chain amounts are integers (base units). Divide by ${dec} to get ${ticker}.`);
+
+    // ── Show raw base-unit values below SAYN values for clarity ──────────────
+    const stakeRaw = document.getElementById('stat-stake-raw');
+    if (stakeRaw) stakeRaw.textContent = `${(valData.totalStake ?? 0).toLocaleString()} base units`;
+
+    const rewardRaw = document.getElementById('stat-reward-raw');
+    if (rewardRaw) rewardRaw.textContent = `${(stats.blockReward ?? 0).toLocaleString()} base units`;
 
     const blocks = (blocksData.blocks || []).sort((a, b) => b.index - a.index);
     const feed   = document.getElementById('block-feed');
@@ -378,8 +397,10 @@ function renderValidatorList(validators) {
   tbody.innerHTML = validators.map(v => `
     <tr onclick="showValidatorDetail('${v.address || ''}')">
       <td class="mono">${(v.address || '').slice(0, 20)}…</td>
-      <td>${sayn(v.stake ?? 0)}</td>
+      <td>${sayn(v.stake ?? 0)} <span style="font-size:10px;color:var(--mono-500)">(${(v.stake ?? 0).toLocaleString()} bu)</span></td>
+      <td style="font-size:11px;color:var(--mono-500)">${(v.stake ?? 0).toLocaleString()}</td>
       <td>${v.percentage ?? 0}%</td>
+      <td>${v.reputation ?? 0}</td>
       <td>${v.missedBlocks ?? 0}</td>
       <td>
         <span style="font-size:11px;padding:2px 8px;border:1px solid ${v.isActive ? '#2a7a2a' : 'var(--mono-800)'};color:${v.isActive ? '#2a7a2a' : 'var(--mono-400)'}">
@@ -462,6 +483,20 @@ async function showValidatorDetail(address) {
     const c = document.getElementById('vd-loading');
     if (c) c.innerHTML = '<p style="color:#c00;font-size:12px;text-align:center;">Error loading validator blocks.</p>';
   }
+}
+
+// ── Layers ─────────────────────────────────────────────────────────────────────────
+async function loadLayers() {
+  try {
+    const net = await apiFetch('/network');
+    setEl('layer-level',    net.layer ? 'Layer ' + net.layer : 'Layer 1 (Main)');
+    setEl('layer-chain-id', net.chainId || '—');
+    setEl('layer-blocktime', net.blockTime || '—');
+    setEl('layer-decimals', net.decimals
+      ? `${net.decimals.toLocaleString()} (1 SAYN = ${net.decimals.toLocaleString()} base units)`
+      : '—'
+    );
+  } catch (e) { console.error('Layers:', e); }
 }
 
 // ── Contracts ─────────────────────────────────────────────────────────────────

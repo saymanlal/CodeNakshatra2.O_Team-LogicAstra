@@ -29,17 +29,28 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   // Network info
   router.get('/network', (req, res) => {
     const stats = blockchain.getStats();
+    const dec   = config.decimals || 100_000_000;
     res.json({
-      network: config.networkName,
-      chainId: config.chainId,
+      network:       config.networkName,
+      chainId:       config.chainId,
+      layer:         config.layer || 1,
+      ticker:        config.ticker || 'SAYN',
       faucetEnabled: config.faucetEnabled,
-      blockTime: config.blockTime,
-      blockReward: config.blockReward,
-      minStake: config.minStake,
-      gasLimits: stats.gasLimits,
-      gasCosts: stats.gasCosts,
-      stateRoot: stats.stateRoot,
-      decimals: config.decimals || 10000
+      blockTime:     config.blockTime,
+      blockReward:   config.blockReward,
+      minStake:      config.minStake,
+      gasLimits:     stats.gasLimits,
+      gasCosts:      stats.gasCosts,
+      stateRoot:     stats.stateRoot,
+      decimals:      dec,
+      // Explicit denomination guide — eliminates all confusion in the explorer
+      denomination: {
+        ticker:        config.ticker || 'SAYN',
+        decimals:      dec,
+        humanUnit:     '1 SAYN',
+        baseUnit:      `${dec} base units`,
+        description:   `All balances on-chain are stored as integers in base units. Divide by ${dec} to get SAYN.`
+      }
     });
   });
 
@@ -250,6 +261,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     const validators = blockchain.state.getValidators();
     const validatorInfo = validators.find(v => v.address === address);
     
+    const reputation = blockchain.state.getReputation(address);
     res.json({
       address,
       balance,
@@ -257,6 +269,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       unstaking,
       unlockBlock,
       nonce,
+      reputation,
       transactions: transactions.reverse(),
       isValidator: !!validatorInfo,
       validatorInfo: validatorInfo || null
@@ -282,6 +295,17 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     });
   });
 
+  // Reputation
+  router.get('/reputation/:address', (req, res) => {
+    try {
+      const { address } = req.params;
+      const score = blockchain.state.getReputation(address);
+      res.json({ address, reputation: score });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Validators
   router.get('/validators', (req, res) => {
     const validators = blockchain.state.getValidators();
@@ -294,6 +318,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     res.json({
       validators: validators.map(v => ({
         ...v,
+        reputation: blockchain.state.getReputation(v.address),
         percentage: totalStake > 0 ? ((v.stake / totalStake) * 100).toFixed(2) : 0
       })),
       totalStake,
@@ -589,6 +614,114 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       count: p2pStats.peers,
       peers: p2pStats.peerList
     });
+  });
+
+  // Live TPS
+  router.get('/tps', (req, res) => {
+    try {
+      const tps = blockchain._estimateTPS();
+      const dec = blockchain.config.decimals || 10_000;
+      const blockHeight = blockchain.chain.length;
+      const lastBlock = blockchain.getLastBlock();
+      res.json({
+        tps,
+        blockHeight,
+        decimals: dec,
+        ticker: blockchain.config.ticker || 'SAYN',
+        denomination: {
+          ticker:    blockchain.config.ticker || 'SAYN',
+          decimals:  dec,
+          humanUnit: '1 SAYN',
+          baseUnit:  `${dec.toLocaleString()} base units`,
+          note:      `All on-chain amounts are in base units. Divide by ${dec} to get SAYN.`,
+        },
+        lastBlockHash: lastBlock?.hash?.slice(0, 16),
+        lastBlockTime: lastBlock?.timestamp,
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Denomination guide — always available, no confusion about units
+  router.get('/denomination', (req, res) => {
+    const dec = config.decimals || 10_000;
+    res.json({
+      ticker:      config.ticker    || 'SAYN',
+      decimals:    dec,
+      humanUnit:   '1 SAYN',
+      baseUnit:    `${dec.toLocaleString()} base units`,
+      examples: [
+        { sayn: 1,      baseUnits: dec },
+        { sayn: 0.5,    baseUnits: dec * 0.5 },
+        { sayn: 100,    baseUnits: dec * 100 },
+        { sayn: 1000,   baseUnits: dec * 1000 },
+      ],
+      description: `All balances on-chain are stored as integers in base units (sprinkles). Divide by ${dec} to convert to SAYN.`,
+    });
+  });
+
+  // Token factory registry — lists all custom tokens deployed via token-factory or memecoin-factory
+  router.get('/tokens', (req, res) => {
+    try {
+      const tokens = [];
+      for (const contract of blockchain.state.getAllContracts()) {
+        const all = contract.state?.all_tokens || [];
+        const reg = contract.state?.registry || [];   // memecoin-factory
+        for (const t of [...all, ...reg]) {
+          tokens.push({
+            ...t,
+            contractAddress: contract.address,
+            contractName:    contract.name,
+          });
+        }
+      }
+      res.json({ tokens, total: tokens.length });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // NFT collection registry — lists all NFT collections deployed via nft-factory
+  router.get('/nfts', (req, res) => {
+    try {
+      const collections = [];
+      for (const contract of blockchain.state.getAllContracts()) {
+        const colls = contract.state?.all_collections || [];
+        for (const c of colls) {
+          collections.push({
+            ...c,
+            contractAddress: contract.address,
+            contractName:    contract.name,
+          });
+        }
+      }
+      res.json({ collections, total: collections.length });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Staking pools — lists all staking pool contracts
+  router.get('/staking-pools', (req, res) => {
+    try {
+      const pools = [];
+      for (const contract of blockchain.state.getAllContracts()) {
+        if (contract.state?.owner && contract.state?.totalDelegated !== undefined) {
+          pools.push({
+            address:        contract.address,
+            name:           contract.name,
+            owner:          contract.state.owner,
+            totalDelegated: contract.state.totalDelegated || 0,
+            totalRewards:   contract.state.totalRewards   || 0,
+            operatorFee:    contract.state.operatorFee    || 10,
+          });
+        }
+      }
+      res.json({ pools, total: pools.length });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.use('/api', router);

@@ -479,6 +479,9 @@ class Blockchain {
     for (const tx of block.transactions) {
       this.applyTransaction(tx, block.index);
     }
+    if (block.validator) {
+      this.state.increaseReputation(block.validator, 10);
+    }
   }
 
   applyTransaction(tx, blockIndex) {
@@ -597,10 +600,12 @@ class Blockchain {
 
         case TX_TYPES.REPORT_VERIFY:
           if (gasCost > 0) this.state.subtractBalance(tx.data.verifier || tx.data.from, gasCost);
+          this.state.increaseReputation(tx.data.verifier || tx.data.from, 5);
           break;
 
         case TX_TYPES.REPORT_RESOLVE:
           if (gasCost > 0) this.state.subtractBalance(tx.data.authority || tx.data.from, gasCost);
+          this.state.increaseReputation(tx.data.authority || tx.data.from, 10);
           break;
 
         case TX_TYPES.REPUTATION_UPDATE:
@@ -814,6 +819,7 @@ class Blockchain {
     return {
       network:         this.networkName,
       chainId:         this.chainId,
+      layer:           this.config.layer || 1,
       blocks:          blockHeight,
       mempool:         this.mempool.length,
       validators:      this.state.getValidators?.()?.length || 0,
@@ -822,8 +828,24 @@ class Blockchain {
       reports:         this.reportIndex.size,
       blockReward,
       blockRewardSAYN: this._fmt(blockReward),
+      blockTime:       this.config.blockTime,
+      decimals:        this.config.decimals || 10_000,
+      ticker:          this.config.ticker || 'SAYN',
       stateRoot:       this.state.computeStateRoot(),
+      gasLimits:       this.gas.limits,
+      gasCosts:        this.gas.costs,
+      tps:             this._estimateTPS(),
     };
+  }
+
+  // ─── TPS estimate ────────────────────────────────────────────────────────────
+  // Uses last 10 blocks to calculate live transactions-per-second.
+  _estimateTPS() {
+    if (this.chain.length < 2) return 0;
+    const recent   = this.chain.slice(-Math.min(10, this.chain.length));
+    const txCount  = recent.reduce((s, b) => s + (b.transactions?.length || 0), 0);
+    const timeDiff = (recent[recent.length - 1].timestamp - recent[0].timestamp) || 1;
+    return +(txCount / (timeDiff / 1000)).toFixed(2);
   }
 
   _fmt(baseUnits) {

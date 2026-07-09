@@ -20,6 +20,7 @@ export const DISPLAY_NAME = 'SAYMAN';
 export default {
   networkName:  'SAYMAN Testnet',
   chainId:      'sayman-testnet-1',
+  layer:        1,                             // Layer 1 — SAYMAN base chain
   ticker:       TICKER,
   decimals:     DECIMALS,                    // always pass this through config
 
@@ -27,7 +28,7 @@ export default {
   p2pPort:      parseInt(process.env.P2P_PORT) || null,
 
   // ─── Block production ────────────────────────────────────────────────────
-  blockTime:    5000,                        // 5 seconds
+  blockTime:    1000,                        // 1 second
 
   // 0.5 SAYN per block = 50,000,000 base units
   // Testnet is intentionally generous so developers get tokens fast.
@@ -99,7 +100,7 @@ export default {
   },
 
   // Block gas cap
-  maxGasPerBlock:    50_000_000,
+  maxGasPerBlock:    100_000_000,
   maxGasPerTx:       10_000_000,
   maxExecutionTime:  5_000,                 // ms per contract call
   maxInstructions:   100_000,
