@@ -75,6 +75,30 @@ export class P2PServer {
 
   async _discoverPeers() {
     try {
+      // 0. Prune inactive connections (no message received for > 90 seconds)
+      const now = Date.now();
+      const INACTIVE_TIMEOUT = 90_000; // 90 seconds
+      for (const [peerId, peer] of this.peers.entries()) {
+        const inactiveDuration = now - peer.lastSeen;
+        if (inactiveDuration > INACTIVE_TIMEOUT) {
+          console.warn(`⚠️ Peer ${peerId} (${peer.url || 'inbound'}) is inactive for ${Math.round(inactiveDuration / 1000)}s. Terminating connection.`);
+          try {
+            if (peer.ws.terminate) {
+              peer.ws.terminate();
+            } else {
+              peer.ws.close();
+            }
+          } catch (e) {}
+          this.peers.delete(peerId);
+          if (peer.url) {
+            this.outboundUrls.delete(peer.url);
+            if (!this.disconnectTimes.has(peer.url)) {
+              this.disconnectTimes.set(peer.url, now);
+            }
+          }
+        }
+      }
+
       // 1. Ask all connected peers for their known peers
       this._broadcast({ type: 'get_peers' });
 
@@ -490,9 +514,10 @@ export class P2PServer {
           console.warn(`⚠️ Fork at block ${blockData.index}. Requesting sync from common ancestor...`);
           const peer = this.peers.get(peerId);
           if (peer) {
+            const rollbackHeight = Math.max(0, blockData.index - 50);
             this._send(peer.ws, {
               type: 'get_blocks',
-              fromIndex: Math.max(0, blockData.index - 1),
+              fromIndex: rollbackHeight,
             });
           }
         }
@@ -610,11 +635,12 @@ export class P2PServer {
           if (localBlock && localBlock.hash !== blockData.hash) {
             console.warn(`⚠️ Fork detected at block #${blockData.index}`);
             if (peer && peer.chainHeight > ourHeight) {
-              console.log(`🔄 Peer has longer chain (${peer.chainHeight} > ${ourHeight}). Rolling back local chain to #${blockData.index - 1} and syncing...`);
-              await this.blockchain._rollbackToHeight(blockData.index - 1);
+              const rollbackHeight = Math.max(0, blockData.index - 50);
+              console.log(`🔄 Peer has longer chain (${peer.chainHeight} > ${ourHeight}). Rolling back local chain to #${rollbackHeight} and syncing...`);
+              await this.blockchain._rollbackToHeight(rollbackHeight);
               this._send(peer.ws, {
                 type: 'get_blocks',
-                fromIndex: Math.max(0, blockData.index - 1),
+                fromIndex: rollbackHeight,
               });
               this.syncQueue = []; // Clear queue since we're starting a new sync request
               return;
