@@ -13,6 +13,7 @@ export class P2PServer {
     this.syncQueue = [];
 
     this.outboundUrls = new Set();
+    this.selfUrls = new Set();
     this.reconnectTimers = new Map();
     this.RECONNECT_DELAY = 15_000;
 
@@ -206,6 +207,7 @@ export class P2PServer {
     url = url.trim();
     if (!url) return;
 
+    if (this.selfUrls.has(url)) return;
     if (this.outboundUrls.has(url)) return;
     this.outboundUrls.add(url);
 
@@ -272,6 +274,7 @@ export class P2PServer {
   }
 
   _scheduleReconnect(url) {
+    if (this.selfUrls.has(url)) return;
     if (this.reconnectTimers.has(url)) return;
     const timer = setTimeout(() => {
       this.reconnectTimers.delete(url);
@@ -487,6 +490,9 @@ export class P2PServer {
     // Self-connection check
     if (msg.nodeId === this.nodeId) {
       console.log(`⚠️ Closed self-connection to node: ${msg.nodeId}`);
+      if (peer.url) {
+        this.selfUrls.add(peer.url);
+      }
       peer.ws.close();
       this.peers.delete(peerId);
       return;

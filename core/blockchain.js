@@ -773,10 +773,49 @@ class Blockchain {
   }
 
   async replayState() {
+    const targetHeight = this.chain.length;
+    let snapshot = null;
+    
+    // Find the latest snapshot that is <= our target chain height
+    try {
+      const files = fs.readdirSync(this.snapshotDir)
+        .filter(f => /^snapshot-\d+\.json$/.test(f))
+        .map(f => ({ file: f, height: parseInt(f.match(/\d+/)[0]) }))
+        .sort((a, b) => b.height - a.height);
+      
+      for (const f of files) {
+        if (f.height <= targetHeight) {
+          const snapPath = path.join(this.snapshotDir, f.file);
+          snapshot = JSON.parse(fs.readFileSync(snapPath, 'utf8'));
+          break;
+        }
+      }
+    } catch (err) {
+      console.log('No usable snapshot found for replay, falling back to full genesis replay.');
+    }
+
     this.state.clear();
-    this.applyGenesisAllocations();
-    for (const block of this.chain) {
-      this.applyBlock(block);
+    let startIndex = 0;
+
+    if (snapshot) {
+      console.log(`📸 Replay State: Loaded snapshot at block ${snapshot.blockHeight} to accelerate replay (target: ${targetHeight})`);
+      this.state.importState(snapshot.state);
+      startIndex = snapshot.blockHeight + 1;
+    } else {
+      this.applyGenesisAllocations();
+    }
+
+    let count = 0;
+    for (let i = startIndex; i < targetHeight; i++) {
+      const block = this.chain[i];
+      if (block) {
+        this.applyBlock(block);
+        count++;
+        // Yield to the event loop every 50 blocks to keep WebSocket connections alive
+        if (count % 50 === 0) {
+          await new Promise(resolve => setImmediate(resolve));
+        }
+      }
     }
   }
 
