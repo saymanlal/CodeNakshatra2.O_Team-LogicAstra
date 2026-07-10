@@ -42,9 +42,7 @@ export const ChainTemplate = {
       STORAGE_READ:       100,
       STORAGE_WRITE:      500,
       STORAGE_BYTE:         1,
-      REPORT_CREATE:    5_000,
-      REPORT_VERIFY:    5_000,
-      REPORT_RESOLVE:   5_000,
+
       DEFAULT:          5_000,
     },
     maxGasPerBlock:  10_000_000,

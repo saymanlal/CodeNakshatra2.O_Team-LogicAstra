@@ -56,15 +56,7 @@ class GasCalculator {
       storageByte:             1,   // per byte of contract code stored
       STORAGE_BYTE:            1,
 
-      // Native tx types
-      reportCreate:       21_000,
-      REPORT_CREATE:      21_000,
 
-      reportVerify:       21_000,
-      REPORT_VERIFY:      21_000,
-
-      reportResolve:      21_000,
-      REPORT_RESOLVE:     21_000,
 
       // Fallback
       defaultMin:         21_000,
@@ -114,9 +106,7 @@ class GasCalculator {
         return this.costs.contractUpgrade + Math.floor(code.length / 10);
       }
 
-      case 'REPORT_CREATE':  return this.costs.reportCreate;
-      case 'REPORT_VERIFY':  return this.costs.reportVerify;
-      case 'REPORT_RESOLVE': return this.costs.reportResolve;
+
 
       default:
         return this.costs.defaultMin;

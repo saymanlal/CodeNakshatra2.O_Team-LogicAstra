@@ -238,7 +238,9 @@
     };
 
     let activeEndpointIndex = 0;
-    let networkDecimals = 10000;
+    let networkDecimals = 100_000_000;
+    let networkMinStake = 1_000_000_000;
+    let networkTicker = 'SAYN';
 
     function getApiBase() { 
         const eps = networkEndpoints[currentNetwork];
@@ -313,12 +315,27 @@
         try {
             const res = await apiFetch('/network');
             const data = await res.json();
-            if (data && data.decimals) {
-                networkDecimals = data.decimals;
-                console.log(`🌐 Loaded network config. Decimals: ${networkDecimals}`);
+            if (data) {
+                if (data.decimals) networkDecimals = data.decimals;
+                if (data.minStake !== undefined) networkMinStake = data.minStake;
+                if (data.ticker) networkTicker = data.ticker;
+                if (data.unstakeDelay !== undefined) UNSTAKE_LOCK_BLOCKS = data.unstakeDelay;
+                console.log(`🌐 Loaded network config. Decimals: ${networkDecimals}, minStake: ${networkMinStake}, ticker: ${networkTicker}, unstakeDelay: ${UNSTAKE_LOCK_BLOCKS}`);
+                updateDynamicNetworkUI();
             }
         } catch (e) {
             console.error('Error fetching network config:', e);
+        }
+    }
+
+    function updateDynamicNetworkUI() {
+        const minStakeHuman = networkMinStake / networkDecimals;
+        if (dom.stakeAmount) {
+            dom.stakeAmount.placeholder = `Min ${minStakeHuman} ${networkTicker}`;
+        }
+        const minDisplay = document.getElementById('stakeMinDisplay');
+        if (minDisplay) {
+            minDisplay.innerHTML = `<i class="fas fa-info-circle"></i> Minimum: ${minStakeHuman} ${networkTicker}`;
         }
     }
 
@@ -396,7 +413,7 @@
     }
 
     async function createWalletFromPrivateKey(privateKey, name, chain = 'sayman') {
-        const wallet = new SaymanWallet(privateKey);
+        const wallet = new SaymanWallet(privateKey, chain);
         await wallet.initialize();
         return {
             id: generateId(),
@@ -416,7 +433,7 @@
     }
 
     async function generateNewWallet(name, chain = 'sayman') {
-        const wallet = new SaymanWallet();
+        const wallet = new SaymanWallet(null, chain);
         await wallet.initialize();
         return {
             id: generateId(),
@@ -1357,9 +1374,16 @@
         closeModal('qrPayModal');
     });
 
-    dom.networkSelect.addEventListener('change', function() {
+    dom.networkSelect.addEventListener('change', async function() {
         currentNetwork = this.value;
         dom.detailNetwork.textContent = getNetworkName();
+        showLoading('Switching network...');
+        try {
+            await fetchNetworkConfig();
+        } catch (e) {
+            console.error('Failed to fetch config on network change:', e);
+        }
+        hideLoading();
         render();
         if (activeWallet) {
             loadTransactionHistory();
@@ -1414,14 +1438,15 @@
                 return;
             }
 
-            if (amountHuman < 10) {
-                showToast('Minimum stake is 10 SAYN', 'error');
+            const minStakeHuman = networkMinStake / (networkDecimals || 100_000_000);
+            if (amountHuman < minStakeHuman) {
+                showToast(`Minimum stake is ${minStakeHuman} ${networkTicker}`, 'error');
                 return;
             }
 
             showLoading('Preparing stake...');
 
-            const wallet = new SaymanWallet(activeWallet.privateKey);
+            const wallet = new SaymanWallet(activeWallet.privateKey, activeWallet.chain);
             await wallet.initialize();
 
             // Convert human-readable SAYN to base units (same pattern as TRANSFER)
@@ -1553,7 +1578,7 @@
         try {
             showLoading('Preparing unstake...');
 
-            const wallet = new SaymanWallet(activeWallet.privateKey);
+            const wallet = new SaymanWallet(activeWallet.privateKey, activeWallet.chain);
             await wallet.initialize();
 
             const addressRes = await apiFetch(`/address/${wallet.address}`);
@@ -2489,6 +2514,10 @@
     });
 
     function updateCharts() {
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js library is not loaded. Skipping chart rendering.');
+            return;
+        }
         if (!activeWallet) {
             if (spendingChart) { spendingChart.destroy(); spendingChart = null; }
             if (monthlyChart) { monthlyChart.destroy(); monthlyChart = null; }
@@ -2596,6 +2625,13 @@
     function updateAnalytics() {
         if (!activeWallet) {
             dom.annualSummary.innerHTML = '<p class="text-muted"><i class="fas fa-info-circle"></i> Select a wallet to view analytics</p>';
+            return;
+        }
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js library is not loaded. Skipping analytics charts.');
+            dom.annualSummary.innerHTML = '<p class="text-muted"><i class="fas fa-exclamation-triangle"></i> Charts are unavailable (Chart.js offline)</p>';
+            renderHeatmap();
+            renderAnnualSummary();
             return;
         }
         renderCategoryChart();
@@ -3087,6 +3123,7 @@
                 dom.loading.classList.add('hidden');
             }, 400);
 
+            await fetchNetworkConfig();
             render();
 
             if (activeWallet) {

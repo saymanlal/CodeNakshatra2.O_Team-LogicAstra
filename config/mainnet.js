@@ -119,9 +119,7 @@ export default {
     STORAGE_READ:         500,
     STORAGE_WRITE:       2_000,
     STORAGE_BYTE:            1,
-    REPORT_CREATE:    21_000,
-    REPORT_VERIFY:    21_000,
-    REPORT_RESOLVE:   21_000,
+
     DEFAULT:          21_000,
   },
 
