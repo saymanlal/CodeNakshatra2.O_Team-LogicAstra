@@ -622,7 +622,7 @@ console.log(result.txId);</code></pre>
       </div>
 
       <div class="warning">
-        <strong>Not implemented server-side:</strong> per-key contract state routes, an events API, a reputation API, and civic-report transaction types referenced in earlier SDK drafts. <code>readState()</code> works around the first by fetching the whole contract object and reading the key client-side.
+        <strong>Not implemented server-side:</strong> per-key contract state routes, an events API, and a reputation API. <code>readState()</code> works around the first by fetching the whole contract object and reading the key client-side.
       </div>
     `
   },

@@ -39,6 +39,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       blockTime:     config.blockTime,
       blockReward:   config.blockReward,
       minStake:      config.minStake,
+      unstakeDelay:  config.unstakeDelay,
       gasLimits:     stats.gasLimits,
       gasCosts:      stats.gasCosts,
       stateRoot:     stats.stateRoot,

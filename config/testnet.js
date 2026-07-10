@@ -90,10 +90,7 @@ export default {
     STORAGE_WRITE:       2_000,
     STORAGE_BYTE:            1,             // per byte of code stored
 
-    // Native tx types
-    REPORT_CREATE:    21_000,
-    REPORT_VERIFY:    21_000,
-    REPORT_RESOLVE:   21_000,
+
 
     // Fallback
     DEFAULT:          21_000,

@@ -9,8 +9,7 @@ const ec = new EC('secp256k1');
  * Transaction — Phase 9: Smart Contract Platform
  *
  * New in Phase 9:
- *  - REPORT_CREATE, REPORT_VERIFY, REPORT_RESOLVE   — native CrowdPulse tx types
- *  - REPUTATION_UPDATE                              — native reputation tx type
+ *  - REPUTATION_UPDATE                              — native reputation tx type (CivicChain)
  *  - CONTRACT_UPGRADE                               — upgrade contract code
  *  - All new factory methods
  *  - isValid() updated to allow new system tx types
@@ -35,12 +34,7 @@ const TX_TYPES = {
   CONTRACT_CALL:    'CONTRACT_CALL',
   CONTRACT_UPGRADE: 'CONTRACT_UPGRADE',
 
-  // ✅ Phase 9: Native CrowdPulse types
-  REPORT_CREATE:    'REPORT_CREATE',
-  REPORT_VERIFY:    'REPORT_VERIFY',
-  REPORT_RESOLVE:   'REPORT_RESOLVE',
-
-  // ✅ Phase 9: Native reputation type
+  // System reputation type
   REPUTATION_UPDATE: 'REPUTATION_UPDATE',
 };
 
@@ -188,57 +182,7 @@ class Transaction {
     });
   }
 
-  // ✅ Phase 9: Native CrowdPulse factories
 
-  /**
-   * Create a civic report on-chain.
-   * @param {string} from - reporter wallet address
-   * @param {object} report - { category, location: {lat,lng}, severity, evidenceHash, description }
-   */
-  static createReport(from, report) {
-    return new Transaction(TX_TYPES.REPORT_CREATE, {
-      from,
-      category:     report.category,
-      location:     report.location || {},
-      severity:     report.severity || 'MEDIUM',
-      evidenceHash: report.evidenceHash || null,
-      description:  report.description || '',
-      timestamp:    Date.now()
-    });
-  }
-
-  /**
-   * AI or validator verifies a report.
-   * @param {string} verifier
-   * @param {string} reportId - original REPORT_CREATE tx id
-   * @param {object} result - { confidence, isValid, aiCategory }
-   */
-  static verifyReport(verifier, reportId, result) {
-    return new Transaction(TX_TYPES.REPORT_VERIFY, {
-      verifier,
-      reportId,
-      confidence: result.confidence || 0,
-      isValid:    result.isValid !== false,
-      aiCategory: result.aiCategory || null
-    });
-  }
-
-  /**
-   * Authority resolves a report.
-   * @param {string} authority
-   * @param {string} reportId
-   * @param {string} resolution - 'RESOLVED' | 'REJECTED' | 'IN_PROGRESS'
-   * @param {string} [note]
-   */
-  static resolveReport(authority, reportId, resolution, note = '') {
-    return new Transaction(TX_TYPES.REPORT_RESOLVE, {
-      authority,
-      reportId,
-      resolution,
-      note,
-      resolvedAt: Date.now()
-    });
-  }
 
   /**
    * System-issued reputation update (no gas, no signature).

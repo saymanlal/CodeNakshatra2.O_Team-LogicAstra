@@ -60,7 +60,6 @@ class Blockchain {
     this.lastCleanup    = Date.now();
 
     this.pendingNonces  = new Map();
-    this.reportIndex    = new Map();
   }
 
   ensureSnapshotDir() {
@@ -233,47 +232,7 @@ class Blockchain {
               );
               break;
             }
-            case TX_TYPES.REPORT_CREATE: {
-              gasTracker.gasUsed += this.gas.costs.reportCreate;
-              this.reportIndex.set(tx.id, {
-                txId:         tx.id,
-                reporter:     tx.data.from,
-                category:     tx.data.category,
-                severity:     tx.data.severity,
-                location:     tx.data.location,
-                evidenceHash: tx.data.evidenceHash,
-                description:  tx.data.description,
-                status:       'OPEN',
-                createdAt:    tx.timestamp,
-              });
-              break;
-            }
-            case TX_TYPES.REPORT_VERIFY: {
-              gasTracker.gasUsed += this.gas.costs.reportVerify;
-              const report = this.reportIndex.get(tx.data.reportId);
-              if (report) {
-                report.verified   = true;
-                report.confidence = tx.data.confidence;
-                report.verifiedBy = tx.data.verifier;
-                report.verifiedAt = Date.now();
-                report.aiCategory = tx.data.aiCategory;
-              }
-              if (tx.data.isValid && report?.reporter) {
-                transactions.push(Transaction.updateReputation(report.reporter, 20, 'Valid report'));
-              }
-              break;
-            }
-            case TX_TYPES.REPORT_RESOLVE: {
-              gasTracker.gasUsed += this.gas.costs.reportResolve;
-              const report = this.reportIndex.get(tx.data.reportId);
-              if (report) {
-                report.status     = tx.data.resolution;
-                report.resolvedBy = tx.data.authority;
-                report.resolvedAt = tx.data.resolvedAt;
-                report.note       = tx.data.note;
-              }
-              break;
-            }
+
             default:
               gasTracker.gasUsed = this.gas.calculateTransactionGas(tx);
           }
@@ -489,7 +448,6 @@ class Blockchain {
       const userTypes = new Set([
         TX_TYPES.TRANSFER, TX_TYPES.STAKE, TX_TYPES.UNSTAKE,
         TX_TYPES.CONTRACT_DEPLOY, TX_TYPES.CONTRACT_CALL, TX_TYPES.CONTRACT_UPGRADE,
-        TX_TYPES.REPORT_CREATE, TX_TYPES.REPORT_VERIFY, TX_TYPES.REPORT_RESOLVE,
       ]);
       
       if (userTypes.has(tx.type)) {
@@ -594,19 +552,7 @@ class Blockchain {
           break;
         }
 
-        case TX_TYPES.REPORT_CREATE:
-          if (gasCost > 0) this.state.subtractBalance(tx.data.from, gasCost);
-          break;
 
-        case TX_TYPES.REPORT_VERIFY:
-          if (gasCost > 0) this.state.subtractBalance(tx.data.verifier || tx.data.from, gasCost);
-          this.state.increaseReputation(tx.data.verifier || tx.data.from, 5);
-          break;
-
-        case TX_TYPES.REPORT_RESOLVE:
-          if (gasCost > 0) this.state.subtractBalance(tx.data.authority || tx.data.from, gasCost);
-          this.state.increaseReputation(tx.data.authority || tx.data.from, 10);
-          break;
 
         case TX_TYPES.REPUTATION_UPDATE:
           if (tx.data.address && tx.data.delta !== undefined) {
@@ -736,17 +682,7 @@ class Blockchain {
     }));
   }
 
-  getReports({ category, status, limit } = {}) {
-    let results = Array.from(this.reportIndex.values());
-    if (category) results = results.filter(r => r.category === category);
-    if (status)   results = results.filter(r => r.status   === status);
-    if (limit)    results = results.slice(-limit);
-    return results;
-  }
 
-  getReport(reportId) {
-    return this.reportIndex.get(reportId) || null;
-  }
 
   // ─── Persistence ────────────────────────────────────────────────────────────
 
@@ -825,7 +761,6 @@ class Blockchain {
       validators:      this.state.getValidators?.()?.length || 0,
       totalStake:      this.state.getTotalStake?.() || 0,
       contracts:       this.contracts.contracts.size,
-      reports:         this.reportIndex.size,
       blockReward,
       blockRewardSAYN: this._fmt(blockReward),
       blockTime:       this.config.blockTime,
