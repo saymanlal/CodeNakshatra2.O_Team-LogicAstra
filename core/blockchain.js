@@ -81,7 +81,7 @@ class Blockchain {
         console.log(`📸 Snapshot at block ${snapshot.blockHeight} — loading...`);
         this.state.importState(snapshot.state);
 
-        const savedChain = await this.db.get('chain').catch(() => null);
+        const savedChain = await this._getSavedChain();
         if (savedChain?.length > 0) {
           const loadLimit = Math.min(savedChain.length, snapshot.blockHeight + 1);
           for (let i = 0; i < loadLimit; i++) {
@@ -104,7 +104,7 @@ class Blockchain {
         }
 
       } else {
-        const savedChain = await this.db.get('chain').catch(() => null);
+        const savedChain = await this._getSavedChain();
         if (savedChain?.length > 0) {
           console.log(`📚 Loading chain (${savedChain.length} blocks)...`);
           for (const b of savedChain) this.chain.push(await Block.fromJSON(b));
@@ -769,14 +769,90 @@ class Blockchain {
   saveBlock(_block) { this.saveChain(); }
 
   async saveChain() {
-    await this.db.put('chain', this.chain.map(b => b.toJSON ? b.toJSON() : b));
+    if (this.chain.length > 0) {
+      const latestBlock = this.chain[this.chain.length - 1];
+      const json = latestBlock.toJSON ? latestBlock.toJSON() : latestBlock;
+      await this.db.put(`block:${latestBlock.index}`, json);
+      await this.db.put('latest_height', latestBlock.index);
+    }
+    // Also save the full chain asynchronously for backup compatibility
+    this.db.put('chain', this.chain.map(b => b.toJSON ? b.toJSON() : b)).catch(() => {});
+  }
+
+  async _getSavedChain() {
+    const latestHeight = await this.db.get('latest_height').catch(() => null);
+    let savedChain = null;
+    if (latestHeight !== null) {
+      savedChain = [];
+      for (let i = 0; i <= latestHeight; i++) {
+        const blockData = await this.db.get(`block:${i}`).catch(() => null);
+        if (blockData) {
+          savedChain.push(blockData);
+        } else {
+          console.error(`⚠️ Block #${i} missing from individual key! Falling back to full chain key.`);
+          savedChain = null;
+          break;
+        }
+      }
+    }
+
+    if (!savedChain) {
+      savedChain = await this.db.get('chain').catch(() => null);
+      if (savedChain && savedChain.length > 0) {
+        console.log(`⚠️ Migrating ${savedChain.length} blocks to individual keys for safe persistence...`);
+        for (let i = 0; i < savedChain.length; i++) {
+          await this.db.put(`block:${i}`, savedChain[i]);
+        }
+        await this.db.put('latest_height', savedChain.length - 1);
+      }
+    }
+    return savedChain;
   }
 
   async replayState() {
+    const targetHeight = this.chain.length;
+    let snapshot = null;
+    
+    // Find the latest snapshot that is <= our target chain height
+    try {
+      const files = fs.readdirSync(this.snapshotDir)
+        .filter(f => /^snapshot-\d+\.json$/.test(f))
+        .map(f => ({ file: f, height: parseInt(f.match(/\d+/)[0]) }))
+        .sort((a, b) => b.height - a.height);
+      
+      for (const f of files) {
+        if (f.height <= targetHeight) {
+          const snapPath = path.join(this.snapshotDir, f.file);
+          snapshot = JSON.parse(fs.readFileSync(snapPath, 'utf8'));
+          break;
+        }
+      }
+    } catch (err) {
+      console.log('No usable snapshot found for replay, falling back to full genesis replay.');
+    }
+
     this.state.clear();
-    this.applyGenesisAllocations();
-    for (const block of this.chain) {
-      this.applyBlock(block);
+    let startIndex = 0;
+
+    if (snapshot) {
+      console.log(`📸 Replay State: Loaded snapshot at block ${snapshot.blockHeight} to accelerate replay (target: ${targetHeight})`);
+      this.state.importState(snapshot.state);
+      startIndex = snapshot.blockHeight + 1;
+    } else {
+      this.applyGenesisAllocations();
+    }
+
+    let count = 0;
+    for (let i = startIndex; i < targetHeight; i++) {
+      const block = this.chain[i];
+      if (block) {
+        this.applyBlock(block);
+        count++;
+        // Yield to the event loop every 50 blocks to keep WebSocket connections alive
+        if (count % 50 === 0) {
+          await new Promise(resolve => setImmediate(resolve));
+        }
+      }
     }
   }
 

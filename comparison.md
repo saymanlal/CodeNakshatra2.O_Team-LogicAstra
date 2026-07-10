@@ -25,7 +25,7 @@ This document provides a simple, high-level comparison of the development roadma
 | **Phase 15** | **Android APK Build** | Configured Capacitor/Gradle to compile the PUKY Wallet APK. |
 | **Phase 16** | **Sandbox Hardening** | Frozen JS prototypes in VM to prevent escapes; added PDF doc generator. |
 | **Phase 17** | **Constructor State Fix** | Fixed VM constructor execution (prototype pre-binding); added Dark Theme & SPA routing. |
-| **Phase 18** | **Pipelined Concurrency** | Implemented parallel transaction scheduling, P2P socket leak protection, and concurrency UI. |
+| **Phase 18** | **Pipelined Concurrency & Database Security** | Implemented parallel scheduling, snapshot-accelerated block replay (no more event-loop blocking), atomic block persistence (preventing data loss/corruption), self-connection blacklisting, and WebSocket leak fixes. |
 
 ---
 
@@ -90,6 +90,10 @@ This document provides a simple, high-level comparison of the development roadma
 * **VM Reliability**: Bound state helpers to contract prototypes *before* constructor instantiation to fix constructor runtime crashes and enable contract state updates.
 * **UX/UI**: SPA routing fallbacks for `/block/:id`, `/tx/:hash`, `/contract/:address` and built-in Moon/Sun dark theme.
 
-### Phase 18: Pipelined Concurrency
+### Phase 18: Pipelined Concurrency & Database Security
 * **Parallel Execution**: Dependency analysis on read/write sets schedules independent transactions into layers to run concurrently.
-* **Socket Safety**: Patched P2P WebSocket cleanups to close connections on removal, preventing file descriptor leaks and out-of-sync block heights.
+* **Atomic Block Persistence**: Saves blocks individually (`block:${index}`) to prevent database corruption or full history loss during power cuts or peer crashes. Migrates legacy chain keys on startup.
+* **Snapshot Rollbacks**: Accelerates fork syncing by loading historical state snapshots instead of replaying the entire chain from block 0.
+* **Non-Blocking Replays**: Yields execution control periodically to the event loop during replay, preventing heartbeats from timing out.
+* **Self-Connection Blacklist**: Keeps nodes from trying to connect to themselves, resolving reconnect loop spam.
+* **Socket Safety**: Patched P2P WebSocket cleanups to close connections on removal, preventing file descriptor leaks.
