@@ -1,32 +1,27 @@
-# ⛓️ SAYMAN BLOCKCHAIN — PHASE 14: MULTI-LAYER WEB3 PLATFORM
+# ⛓️ SAYMAN BLOCKCHAIN — PHASE 15: P2P STABILITY & WALLET FIXES
 
 **JavaScript-native Smart Contracts · Proof-of-Stake · Multi-Layer Chains · Custom Tokens · NFTs · DEX · Memecoins · Staking Pools**
 
-[![Phase](https://img.shields.io/badge/Phase-14-brightgreen)](https://github.com/saymanlal/SAYMAN)
+[![Phase](https://img.shields.io/badge/Phase-15-brightgreen)](https://github.com/saymanlal/SAYMAN)
 [![Network](https://img.shields.io/badge/Network-Public%20Testnet-blue)](https://sayman.onrender.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
 
-## 🎯 What's New in Phase 14
+## 🎯 What's New in Phase 15
 
-Phase 14 transforms SAYMAN from a civic-intelligence blockchain into a **full Web3 platform** — anyone can now deploy their own chain, token, NFT collection, memecoin, DEX pool, or staking contract.
+Phase 15 focuses on **P2P consensus stability** and resolving critical **wallet staking / history synchronization issues** across the web-client and mobile APK.
 
 | Feature | Status |
 |---|---|
-| **Multi-Layer Chains** | ✅ L2 Rollup, Sidechain, Permissioned — via `ChainFactory` |
-| **Custom Tokens (ERC-20)** | ✅ `token-factory.js` — deploy a token in one call |
-| **NFT Collections (ERC-721)** | ✅ `nft-factory.js` — collections with mint, transfer, approve |
-| **Memecoin Launcher** | ✅ `memecoin-factory.js` — burn, tax, anti-whale, open registry |
-| **DEX / AMM** | ✅ `dex.js` — Uniswap V2-style x\*y=k, 0.3% fee, LP tokens |
-| **Staking Pools** | ✅ `staking-pool.js` — delegate SAYN, earn block rewards without a node |
-| **L2 Rollup Sequencer** | ✅ `core/rollup.js` — commits state roots to L1 bridge every 5 blocks |
-| **Layer2Bridge Contract** | ✅ Deposit, withdraw, state anchoring L1 ↔ L2 |
-| **TPS Tracking** | ✅ `GET /api/tps` — live transactions-per-second metric |
-| **Denomination Clarity** | ✅ `GET /api/denomination` + explorer card — no more SAYN/base-unit confusion |
-| **Peer Reputation** | ✅ Peers earn +2 rep per synced block; validators earn +10 per block |
-| **Explorer Layers Page** | ✅ Multi-chain dashboard + how-to-create-your-own-chain guide |
-| **New API Endpoints** | ✅ `/api/tokens`, `/api/nfts`, `/api/staking-pools`, `/api/tps`, `/api/denomination` |
+| **P2P Heartbeat Keep-Alive** | ✅ Heartbeat pings every 15s to keep connections alive and prune dead sockets |
+| **P2P Catch-up Sync** | ✅ Handshake protocol now triggers immediate block sync if a peer is lagging |
+| **Stake Amount Normalization** | ✅ Wallet converts human SAYN amounts to base units (sprinkles) for valid blockchain execution |
+| **Gas Denomination Fix** | ✅ Staking/Unstaking gas checks rewritten using `networkDecimals` (removed hardcoded `1e18`) |
+| **Genesis/Faucet History Remap** | ✅ Transactions of type `GENESIS` going to the user are rendered as `FAUCET` entries |
+| **Android APK Compilation** | ✅ Updated wallet codebase bundled and compiled into `apk/base.apk` via Gradle |
+| **Multi-Layer Chains** | ✅ L2 Rollup, Sidechain, Permissioned — via `ChainFactory` (Phase 14) |
+| **Custom Tokens / NFTs / DEX** | ✅ ERC-20, ERC-721, Uniswap V2 DEX pool launches (Phase 14) |
 
 ---
 

@@ -682,6 +682,11 @@
                         amount = parseFloat(tx.amount) || 0;
                     }
 
+                    // Remap GENESIS going TO this address as FAUCET for history display
+                    if (tx.type === 'GENESIS' && tx.data && tx.data.to === activeWallet.address) {
+                        tx = { ...tx, type: 'FAUCET' };
+                    }
+
                     if (tx.type === 'TRANSFER' && tx.data) {
                         if (tx.data.to === activeWallet.address) {
                             amount = Math.abs(amount);
@@ -694,7 +699,7 @@
                         amount = -Math.abs(amount);
                     }
 
-                    if (tx.type === 'REWARD' || tx.type === 'FAUCET') {
+                    if (tx.type === 'REWARD' || tx.type === 'FAUCET' || tx.type === 'GENESIS') {
                         amount = Math.abs(amount);
                     }
 
@@ -703,15 +708,15 @@
                     }
 
                     if (!tx.txId && !tx.hash) {
-                        tx.txId = '0x' + generateId().padStart(64, '0');
+                        tx.txId = tx.id || ('0x' + generateId().padStart(64, '0'));
                     }
 
                     if (!tx.blockNumber && !tx.block) {
-                        tx.blockNumber = currentBlock || 0;
+                        tx.blockNumber = tx.blockIndex || currentBlock || 0;
                     }
 
                     if (!tx.time) {
-                        tx.time = Date.now();
+                        tx.time = tx.timestamp || Date.now();
                     }
 
                     return { ...tx, amount: amount };
@@ -1402,15 +1407,15 @@
         }
 
         try {
-            const amount = parseFloat(dom.stakeAmount.value);
+            const amountHuman = parseFloat(dom.stakeAmount.value);
 
-            if (!amount || amount <= 0) {
+            if (!amountHuman || amountHuman <= 0) {
                 showToast('Please enter a valid amount', 'error');
                 return;
             }
 
-            if (amount < 100) {
-                showToast('Minimum stake is 100 SAYN', 'error');
+            if (amountHuman < 10) {
+                showToast('Minimum stake is 10 SAYN', 'error');
                 return;
             }
 
@@ -1418,6 +1423,10 @@
 
             const wallet = new SaymanWallet(activeWallet.privateKey);
             await wallet.initialize();
+
+            // Convert human-readable SAYN to base units (same pattern as TRANSFER)
+            const dec = networkDecimals || 100_000_000;
+            const amount = Math.round(amountHuman * dec); // base units
 
             const addressRes = await apiFetch(`/address/${wallet.address}`);
             const addressData = await addressRes.json();
@@ -1433,14 +1442,14 @@
             });
             const gas = await gasEstimate.json();
 
-            const gasLimit = gas.recommendedGasLimit || 21000;
+            const gasLimit = gas.recommendedGasLimit || 60000;
             const gasPrice = gas.minGasPrice || 1;
-            const gasFeeInSAY = (gasLimit * gasPrice) / 1e18;
+            const gasFeeBaseUnits = gasLimit * gasPrice; // base units
 
-            const totalNeeded = amount + gasFeeInSAY;
+            const totalNeeded = amount + gasFeeBaseUnits;
             if (totalNeeded > (activeWallet.balance || 0)) {
                 hideLoading();
-                showToast(`Insufficient balance. Need ${formatBalance(totalNeeded)} SAYN (${formatBalance(amount)} + ${formatBalance(gasFeeInSAY)} gas)`, 'error');
+                showToast(`Insufficient balance. Need ${formatBalance(totalNeeded)} SAYN (${formatBalance(amount)} stake + ${formatBalance(gasFeeBaseUnits)} gas)`, 'error');
                 return;
             }
 
@@ -1484,11 +1493,12 @@
                         <i class="fas fa-check-circle"></i>
                         <strong>Stake Transaction Broadcast!</strong><br>
                         <small>TX ID: ${txHash.substring(0, 16)}...</small>
-                        <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAYN</small>
+                        <br><small>Gas Fee: ${formatBalance(gasFeeBaseUnits)} SAYN</small>
                     </div>
                 `;
 
-                activeWallet.balance = (activeWallet.balance || 0) - amount - gasFeeInSAY;
+                // Update local state in base units
+                activeWallet.balance = (activeWallet.balance || 0) - amount - gasFeeBaseUnits;
                 activeWallet.stake = (activeWallet.stake || 0) + amount;
                 activeWallet.transactions.push({
                     type: 'STAKE',
@@ -1498,13 +1508,13 @@
                     blockNumber: currentBlock,
                     gasPrice: gasPrice,
                     gasLimit: gasLimit,
-                    gasFee: gasFeeInSAY,
+                    gasFee: gasFeeBaseUnits,
                     data: { from: activeWallet.address, amount }
                 });
                 saveState();
 
                 dom.stakeAmount.value = '';
-                showToast(`Staked ${formatBalance(amount)} SAYN (gas: ${formatBalance(gasFeeInSAY)} SAYN)`, 'success');
+                showToast(`Staked ${formatBalance(amount)} SAYN (gas: ${formatBalance(gasFeeBaseUnits)} SAYN)`, 'success');
 
                 setTimeout(() => {
                     loadTransactionHistory();
@@ -1560,9 +1570,9 @@
             });
             const gas = await gasEstimate.json();
 
-            const gasLimit = gas.recommendedGasLimit || 21000;
+            const gasLimit = gas.recommendedGasLimit || 60000;
             const gasPrice = gas.minGasPrice || 1;
-            const gasFeeInSAY = (gasLimit * gasPrice) / 1e18;
+            const gasFeeBaseUnits = gasLimit * gasPrice; // base units
 
             hideLoading();
             showLoading('Signing unstake...');
@@ -1604,7 +1614,7 @@
                 activeWallet.lockedAmount = (activeWallet.lockedAmount || 0) + unstakeAmount;
                 activeWallet.stake = 0;
                 activeWallet.lockBlock = lockBlock;
-                activeWallet.balance = (activeWallet.balance || 0) - gasFeeInSAY;
+                activeWallet.balance = (activeWallet.balance || 0) - gasFeeBaseUnits;
 
                 activeWallet.transactions.push({
                     type: 'UNSTAKE',
@@ -1615,7 +1625,7 @@
                     lockBlock: lockBlock,
                     gasPrice: gasPrice,
                     gasLimit: gasLimit,
-                    gasFee: gasFeeInSAY,
+                    gasFee: gasFeeBaseUnits,
                     data: { from: activeWallet.address }
                 });
                 saveState();
@@ -1626,7 +1636,7 @@
                         <i class="fas fa-check-circle"></i>
                         <strong>Unstake Transaction Broadcast!</strong><br>
                         <small>🔒 Tokens locked for ${lockBlocks} blocks (~${lockTimeMinutes} minutes)</small>
-                        <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAYN</small>
+                        <br><small>Gas Fee: ${formatBalance(gasFeeBaseUnits)} SAYN</small>
                     </div>
                 `;
 
