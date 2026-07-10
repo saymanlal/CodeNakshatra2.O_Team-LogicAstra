@@ -1,27 +1,26 @@
-# ⛓️ SAYMAN BLOCKCHAIN — PHASE 16: SANDBOX HARDENING & GENERALIZATION
+# ⛓️ SAYMAN BLOCKCHAIN — PHASE 17: PRODUCTION SANDBOX REFINEMENT, RENDER RPC INTEGRATION & MOBILE UX POLISH
 
 **JavaScript-native Smart Contracts · Proof-of-Stake · Multi-Layer Chains · Custom Tokens · NFTs · DEX · Memecoins · Staking Pools**
 
-[![Phase](https://img.shields.io/badge/Phase-16-brightgreen)](https://github.com/saymanlal/SAYMAN)
+[![Phase](https://img.shields.io/badge/Phase-17-brightgreen)](https://github.com/saymanlal/SAYMAN)
 [![Network](https://img.shields.io/badge/Network-Public%20Testnet-blue)](https://sayman.onrender.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
 
-## 🎯 What's New in Phase 16
+## 🎯 What's New in Phase 17
 
-Phase 16 focuses on **sandbox security hardening** against prototype walk-up exploits, establishing a **100% general-purpose Proof-of-Stake blockchain**, re-branding the first system project to **CivicChain**, and exporting full developer docs to a local PDF.
+Phase 17 focuses on **smart contract execution reliability** (binding helpers to prototypes to fix constructor state issues), **Render RPC priority integration**, **SPA path-based route fallbacks** on the node server, **enhanced mobile responsiveness** on wallet grids/tables, and **persisted Dark Theme** support.
 
 | Feature | Status |
 |---|---|
-| **Sandbox Prototype Shielding** | ✅ Recursively clears `.constructor` on all prototypes (async, generators, typed arrays) and freezes prototypes to prevent VM escape |
-| **CivicChain Decoupling** | ✅ Removed hardcoded CrowdPulse report tx types (`REPORT_CREATE`, etc.) and stats entries to make it a generic PoS platform |
-| **PDF Docs Generation** | ✅ Automated script to compile docs.js content into a styled, print-ready `docs.pdf` file |
-| **P2P Heartbeat Keep-Alive** | ✅ Heartbeat pings every 15s to keep connections alive and prune dead sockets (Phase 15) |
-| **P2P Catch-up Sync** | ✅ Handshake protocol now triggers immediate block sync if a peer is lagging (Phase 15) |
-| **Android APK Compilation** | ✅ Updated wallet codebase bundled and compiled into `apk/base.apk` via Gradle (Phase 15) |
-| **Multi-Layer Chains** | ✅ L2 Rollup, Sidechain, Permissioned — via `ChainFactory` (Phase 14) |
-| **Custom Tokens / NFTs / DEX** | ✅ ERC-20, ERC-721, Uniswap V2 DEX pool launches (Phase 14) |
+| **Constructor State Binding** | ✅ Pre-binds VM state helpers to class prototypes to resolve `TypeError: this.setState is not a function` in constructors |
+| **Render RPC Integration** | ✅ Reordered network configuration endpoints to prioritize the live node `sayman.onrender.com` |
+| **SPA Route Redirections** | ✅ Configured Express fallbacks for block, transaction, and contract paths to serve `index.html` cleanly |
+| **Mobile UX Polish** | ✅ Auto-wrapping mobile grid fields, touch-friendly scrollable tables, and click-outside side navbar close overlays |
+| **Theme Toggles** | ✅ Integrated Sun/Moon dark theme toggles with persistent `localStorage` cache |
+| **7000 TPS Performance** | ✅ Upgraded TPS estimation to scale up to 7,000 TPS under simulated demo load |
+| **Block Fees** | ✅ Shows total cumulative fees paid by transactions inside mined blocks |
 
 ---
 

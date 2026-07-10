@@ -221,7 +221,8 @@ class StateEngine {
       abi:     meta.abi     || [],
       state:   {},
       createdAt: Date.now(),
-      codeHash
+      codeHash,
+      blockIndex: meta.blockIndex || null
     });
 
     this.updateStateTree(address, codeHash);

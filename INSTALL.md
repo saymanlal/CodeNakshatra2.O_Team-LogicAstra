@@ -1,4 +1,4 @@
-# Sayman Phase 16 - Complete Installation Guide
+# Sayman Phase 17 - Complete Installation Guide
 
 ## Prerequisites
 
@@ -108,8 +108,8 @@ npm run testnet
 **Output:**
 ```
 ╔════════════════════════════════════════╗
-║   SAYMAN BLOCKCHAIN - PHASE 16         ║
-║   Hardened Sandbox + General-Purpose   ║
+║   SAYMAN BLOCKCHAIN - PHASE 17         ║
+║   Sandbox Refinement & Render RPC      ║
 ╚════════════════════════════════════════╝
 
 🌐 NETWORK: TESTNET
@@ -608,7 +608,7 @@ rm -rf ~/.sayman/
 
 ---
 
-**Congratulations! You've successfully installed Sayman Phase 16.**
+**Congratulations! You've successfully installed Sayman Phase 17.**
 
 Start exploring with:
 ```bash

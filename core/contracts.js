@@ -50,9 +50,10 @@ class ContractEngine {
    * @param {object|string} payload - { name, version, abi, code, feePolicy? } or raw string
    * @param {number} timestamp
    * @param {object} gasTracker
+   * @param {number|null} blockIndex
    * @returns {string} contractAddress
    */
-  deploy(from, payload, timestamp, gasTracker) {
+  deploy(from, payload, timestamp, gasTracker, blockIndex = null) {
     let name, version, abi, code, feePolicy;
 
     if (typeof payload === 'string') {
@@ -95,6 +96,7 @@ class ContractEngine {
       state:       {},              // persistent state — key/value store
       sponsorBalance: 0,           // base units available for 'sponsor' policy
       createdAt:   timestamp,
+      blockIndex,
     };
 
     // Save to in-memory cache
@@ -102,7 +104,7 @@ class ContractEngine {
 
     // Save to persistent state store
     this.state.deployContract(contractAddress, code, from, {
-      name, version, abi, codeHash, feePolicy,
+      name, version, abi, codeHash, feePolicy, blockIndex
     });
 
     console.log(
@@ -237,7 +239,6 @@ class ContractEngine {
                   set: () => {},
                   configurable: false
                 });
-                Object.freeze(obj.prototype);
               }
             } catch (e) {}
           };
@@ -249,7 +250,7 @@ class ContractEngine {
             } catch (e) {}
           }
 
-          // Clean and freeze hidden or implicit prototype constructors
+          // Clean hidden or implicit prototype constructors
           try {
             const asyncFn = (async () => {}).constructor;
             clean(asyncFn);
@@ -263,14 +264,22 @@ class ContractEngine {
             if (arrayIterator) clean(arrayIterator.constructor);
           } catch (e) {}
 
-          // Freeze main standard prototypes
-          const prototypesToFreeze = [
+          // Clean main standard prototypes
+          const prototypesToClean = [
             Object.prototype, Function.prototype, Array.prototype, String.prototype,
             Number.prototype, Boolean.prototype, Date.prototype, RegExp.prototype,
             Error.prototype, Map.prototype, Set.prototype, Promise.prototype
           ];
-          for (const proto of prototypesToFreeze) {
-            try { if (proto) Object.freeze(proto); } catch (e) {}
+          for (const proto of prototypesToClean) {
+            try {
+              if (proto) {
+                Object.defineProperty(proto, 'constructor', {
+                  get: () => undefined,
+                  set: () => {},
+                  configurable: false
+                });
+              }
+            } catch (e) {}
           }
 
           delete globalThis.__bridge;
@@ -289,16 +298,17 @@ class ContractEngine {
           });
           for (const _cls of _classes) {
             try {
+              // Bind helpers to prototype so constructor has access
+              globalThis[_cls].prototype.getState  = getState;
+              globalThis[_cls].prototype.setState  = setState;
+              globalThis[_cls].prototype.emit      = emit;
+              globalThis[_cls].prototype.transfer  = transfer;
+              globalThis[_cls].prototype.getBalance = getBalance;
+              globalThis[_cls].prototype.require   = require;
+              globalThis[_cls].prototype.msg       = msg;
+
               const _inst = new globalThis[_cls]();
               if (typeof _inst['${method}'] === 'function') {
-                // Give instance access to state helpers via 'this'
-                _inst.getState  = getState;
-                _inst.setState  = setState;
-                _inst.emit      = emit;
-                _inst.transfer  = transfer;
-                _inst.getBalance = getBalance;
-                _inst.require   = require;
-                _inst.msg       = msg;
                 __returnValue   = _inst['${method}'](args);
                 return;
               }
@@ -413,7 +423,6 @@ class ContractEngine {
                   set: () => {},
                   configurable: false
                 });
-                Object.freeze(obj.prototype);
               }
             } catch (e) {}
           };
@@ -425,7 +434,7 @@ class ContractEngine {
             } catch (e) {}
           }
 
-          // Clean and freeze hidden or implicit prototype constructors
+          // Clean hidden or implicit prototype constructors
           try {
             const asyncFn = (async () => {}).constructor;
             clean(asyncFn);
@@ -439,14 +448,22 @@ class ContractEngine {
             if (arrayIterator) clean(arrayIterator.constructor);
           } catch (e) {}
 
-          // Freeze main standard prototypes
-          const prototypesToFreeze = [
+          // Clean main standard prototypes
+          const prototypesToClean = [
             Object.prototype, Function.prototype, Array.prototype, String.prototype,
             Number.prototype, Boolean.prototype, Date.prototype, RegExp.prototype,
             Error.prototype, Map.prototype, Set.prototype, Promise.prototype
           ];
-          for (const proto of prototypesToFreeze) {
-            try { if (proto) Object.freeze(proto); } catch (e) {}
+          for (const proto of prototypesToClean) {
+            try {
+              if (proto) {
+                Object.defineProperty(proto, 'constructor', {
+                  get: () => undefined,
+                  set: () => {},
+                  configurable: false
+                });
+              }
+            } catch (e) {}
           }
 
           delete globalThis.__bridge;
@@ -463,11 +480,15 @@ class ContractEngine {
           });
           for (const _cls of _classes) {
             try {
+              // Bind helpers to prototype so constructor has access
+              globalThis[_cls].prototype.getState   = getState;
+              globalThis[_cls].prototype.setState   = setState;
+              globalThis[_cls].prototype.emit       = emit;
+              globalThis[_cls].prototype.require    = require;
+              globalThis[_cls].prototype.msg        = msg;
+
               const _inst = new globalThis[_cls]();
               if (typeof _inst['${method}'] === 'function') {
-                _inst.getState = getState; _inst.setState = setState;
-                _inst.emit = emit; _inst.require = require;
-                _inst.msg = msg;
                 __returnValue = _inst['${method}'](args);
                 return;
               }

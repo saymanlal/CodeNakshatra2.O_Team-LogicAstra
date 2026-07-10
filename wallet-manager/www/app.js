@@ -34,8 +34,8 @@
             decimals: 8,
             icon: 'fa-wallet',
             color: '#4f6ef7',
-            rpc: 'https://sayman.up.railway.app/api',
-            explorer: 'https://sayman.up.railway.app',
+            rpc: 'https://sayman.onrender.com/api',
+            explorer: 'https://sayman.onrender.com',
             active: true,
             faucet: true
         },
@@ -105,9 +105,9 @@
     };
 
     const networkEndpoints = {
-        'testnet': ['https://sayman.up.railway.app/api', 'https://sayman.onrender.com/api'],
-        'public-testnet': ['https://sayman.up.railway.app/api', 'https://sayman.onrender.com/api'],
-        'mainnet': ['https://sayman.up.railway.app/api', 'https://sayman.onrender.com/api']
+        'testnet': ['https://sayman.onrender.com/api', 'https://sayman.up.railway.app/api'],
+        'public-testnet': ['https://sayman.onrender.com/api', 'https://sayman.up.railway.app/api'],
+        'mainnet': ['https://sayman.onrender.com/api', 'https://sayman.up.railway.app/api']
     };
 
     const networkNames = {
@@ -123,8 +123,8 @@
     };
 
     const faucetEndpoints = {
-        'testnet': ['https://sayman.up.railway.app/api/faucet', 'https://sayman.onrender.com/api/faucet'],
-        'public-testnet': ['https://sayman.up.railway.app/api/faucet', 'https://sayman.onrender.com/api/faucet'],
+        'testnet': ['https://sayman.onrender.com/api/faucet', 'https://sayman.up.railway.app/api/faucet'],
+        'public-testnet': ['https://sayman.onrender.com/api/faucet', 'https://sayman.up.railway.app/api/faucet'],
         'mainnet': []
     };
 
@@ -153,6 +153,7 @@
         detailNetwork: $('#detailNetwork'),
         detailTxList: $('#detailTxList'),
         networkSelect: $('#networkSelect'),
+        themeToggleBtn: $('#themeToggleBtn'),
         refreshBtn: $('#refreshBtn'),
         mobileMenuBtn: $('#mobileMenuBtn'),
         mobileOverlay: $('#mobileOverlay'),
@@ -985,7 +986,7 @@
                     ` : ''}
                 ` : ''}
 
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;">
                     <div class="form-group">
                         <label><i class="fas fa-clock"></i> Timestamp</label>
                         <input type="text" value="${timeDisplay}" readonly />
@@ -997,7 +998,7 @@
                     </div>
                 </div>
 
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(90px, 1fr));gap:10px;">
                     <div class="form-group">
                         <label><i class="fas fa-gas-pump"></i> Gas Price</label>
                         <input type="text" value="${tx.gasPrice || '1'}" readonly />
@@ -2248,7 +2249,7 @@
         const chain = getChainConfig(wallet.chain || 'sayman');
         const displayAddress = getAddressForChain(wallet.address, wallet.chain);
         content.innerHTML = `
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:12px;">
                 <div class="form-group">
                     <label><i class="fas fa-tag"></i> Name</label>
                     <input type="text" value="${wallet.name}" readonly />
@@ -2303,7 +2304,8 @@
                         <i class="fas fa-exclamation-triangle"></i> Never share your private key!
                     </div>
                 </div>
-                <div class="form-group" style="grid-column:1/-1;text-align:center;padding-top:8px;border-top:1px solid var(--border-color);">
+                <div class="form-group" style="grid-column:1/-1;text-align:center;padding-top:8px;border-top:1px solid var(--border-color);display:flex;justify-content:center;gap:8px;">
+                    <button class="btn-primary-sm" onclick="editWallet('${wallet.id}')"><i class="fas fa-edit"></i> Edit</button>
                     <button class="btn-outline-sm" onclick="closeModal('detailsModal')"><i class="fas fa-times"></i> Close</button>
                 </div>
             </div>
@@ -2311,6 +2313,15 @@
         window._privateKey = wallet.privateKey;
         openModal('detailsModal');
     }
+
+    window.editWallet = function(id) {
+        const wallet = wallets.find(w => w.id === id);
+        if (!wallet) return;
+        activeWallet = wallet;
+        closeModal('detailsModal');
+        dom.editWalletName.value = wallet.name;
+        openModal('editWalletModal');
+    };
 
     window.togglePrivateKey = function() {
         const input = document.getElementById('privateKeyDisplay');
@@ -2456,6 +2467,38 @@
         dom.sidebar.classList.remove('open');
         dom.mobileOverlay.classList.remove('active');
     });
+
+    // Theme loading and toggle listener
+    function initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        setTheme(savedTheme);
+    }
+
+    function setTheme(theme) {
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark-theme');
+            document.documentElement.setAttribute('data-theme', 'dark');
+            if (dom.themeToggleBtn) {
+                dom.themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
+            }
+        } else {
+            document.documentElement.classList.remove('dark-theme');
+            document.documentElement.setAttribute('data-theme', 'light');
+            if (dom.themeToggleBtn) {
+                dom.themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+        }
+        localStorage.setItem('theme', theme);
+    }
+
+    if (dom.themeToggleBtn) {
+        dom.themeToggleBtn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            setTheme(current);
+        });
+    }
+
+    initTheme();
 
     // Removed — mobileOverlay click handler already closes the sidebar cleanly.
 // The old document-level click listener was firing before wallet-item
@@ -2801,6 +2844,13 @@
     }
 
     function showToast(message, type = 'info') {
+        if (!message) {
+            if (type === 'error') message = 'An unexpected error occurred';
+            else return;
+        }
+        if (typeof message === 'object') {
+            message = message.message || message.error || JSON.stringify(message);
+        }
         const existing = document.querySelector('.toast-container');
         if (existing) existing.remove();
 
@@ -3135,6 +3185,37 @@
 
             // APK Update check
             async function checkForUpdates() {
+                // 1. Try active RPC node first (real-time from deployment)
+                try {
+                    const baseRpc = networkEndpoints[currentNetwork]?.[0] || 'https://sayman.onrender.com/api';
+                    const nodeUrl = baseRpc.replace('/api', '');
+                    const res = await window.fetch(`${nodeUrl}/apk/version.json`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const latestSha = data.sha;
+                        const relativeUrl = data.download_url || '/apk/base.apk';
+                        const downloadUrl = relativeUrl.startsWith('http') ? relativeUrl : (nodeUrl + relativeUrl);
+
+                        const installedSha = localStorage.getItem('installed_apk_sha');
+                        if (!installedSha) {
+                            localStorage.setItem('installed_apk_sha', latestSha);
+                            return;
+                        }
+
+                        if (installedSha !== latestSha) {
+                            latestApkDownloadUrl = downloadUrl;
+                            latestApkSha = latestSha;
+                            document.getElementById('updateModalMessage').textContent = 'A new wallet APK update is available on the network.';
+                            document.getElementById('updateShaDisplay').textContent = `SHA: ${latestSha.substring(0, 10)}`;
+                            document.getElementById('updateModal').classList.add('open');
+                            return; // Success, skip github
+                        }
+                    }
+                } catch (err) {
+                    console.log('Node APK update check skipped/failed, trying GitHub...');
+                }
+
+                // 2. Fallback to GitHub
                 if (!githubRepo) return;
                 try {
                     const url = `https://api.github.com/repos/${githubRepo}/contents/apk/base.apk?ref=${githubBranch}`;
@@ -3156,6 +3237,7 @@
                         if (installedSha !== latestSha) {
                             latestApkDownloadUrl = downloadUrl;
                             latestApkSha = latestSha;
+                            document.getElementById('updateModalMessage').textContent = 'A new wallet APK update has dropped in the repository.';
                             document.getElementById('updateShaDisplay').textContent = `SHA: ${latestSha.substring(0, 10)}`;
                             document.getElementById('updateModal').classList.add('open');
                         }

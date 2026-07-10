@@ -130,6 +130,7 @@ const DOCS_DATA = {
         <h1>SAYMAN Documentation</h1>
         <p class="subtitle">Everything you need to build, validate, deploy and integrate with SAYMAN Blockchain — including multi-layer chains, token factories, NFTs, and DeFi primitives.</p>
         <div class="hero-buttons">
+          <a href="${ANDROID_APK_URL}" class="btn btn-primary" download style="background:var(--mono-100);color:var(--mono-1000);border-color:var(--mono-100);"><i class="fab fa-android"></i> Download Wallet APK</a>
           <a href="#install-sdk" class="btn btn-primary" onclick="navigateTo('install-sdk')"><i class="fas fa-rocket"></i> Get Started</a>
           <a href="#layers-overview" class="btn btn-secondary" onclick="navigateTo('layers-overview')"><i class="fas fa-layer-group"></i> Multi-Layer</a>
           <a href="#token-factory" class="btn btn-secondary" onclick="navigateTo('token-factory')"><i class="fas fa-coins"></i> Token Factory</a>
@@ -141,7 +142,7 @@ const DOCS_DATA = {
       <p>SAYMAN is a Proof-of-Stake Layer 1 blockchain with a built-in JavaScript smart contract engine, multi-layer chain support (L1/L2/Sidechain), EVM-like token and NFT factories, a DEX, staking pools, a peer reputation system, a REST API, a CLI wallet, a browser-based JS SDK, an Android wallet, and a testnet faucet.</p>
 
       <div class="note">
-        <strong>Phase 14 — now live:</strong> Multi-layer chain architecture, token/NFT/memecoin factories, DEX contract, staking pools, peer reputation points, and clear SAYN ↔ base-unit denomination throughout the explorer and API.
+        <strong>Phase 17 — now live:</strong> Dynamic smart contract constructor execution (prototype pre-binding), Render RPC node priority integration, Express SPA route fallbacks on the node server, full Moon/Sun Dark Mode toggle, mobile UX polished (auto-stacking grids, scrollable tables), and up to 7,000 simulated TPS.
       </div>
 
       <h3>What works today</h3>
@@ -1370,9 +1371,35 @@ document.addEventListener('DOMContentLoaded', () => {
   updateActiveNav('overview');
   updateTOC('overview');
 
+  // Sync theme toggle button
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) {
+    if (savedTheme === 'dark') {
+      btn.innerHTML = '<i class="fas fa-sun"></i> Theme';
+    } else {
+      btn.innerHTML = '<i class="fas fa-moon"></i> Theme';
+    }
+  }
+
   updateHeaderInfo();
   setInterval(updateHeaderInfo, 5000);
 });
+
+window.toggleExplorerTheme = function() {
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  if (isDark) {
+    document.documentElement.classList.remove('dark-theme');
+    localStorage.setItem('theme', 'light');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.innerHTML = '<i class="fas fa-moon"></i> Theme';
+  } else {
+    document.documentElement.classList.add('dark-theme');
+    localStorage.setItem('theme', 'dark');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.innerHTML = '<i class="fas fa-sun"></i> Theme';
+  }
+};
 
 // ── API helpers ──────────────────────────────────────────────────────────────
 const API = '/api';

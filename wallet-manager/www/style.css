@@ -39,6 +39,26 @@
     --navbar-height: 60px;
 }
 
+html.dark-theme, body.dark-theme, [data-theme="dark"] {
+    --bg-primary: #0b0e14;
+    --bg-secondary: #12161f;
+    --bg-card: #181f2b;
+    --bg-input: #1b2230;
+    --bg-hover: #222b3c;
+    --border-color: #242f42;
+    --border-hover: #354560;
+    --text-primary: #f0f2f8;
+    --text-secondary: #c8cedb;
+    --text-muted: #8a94a8;
+    --text-light: #5d6785;
+    --accent: #6b88ff;
+    --accent-hover: #8ba2ff;
+    --accent-light: rgba(107, 136, 255, 0.15);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.5);
+}
+
 body {
     font-family: var(--font);
     background: var(--bg-primary);
@@ -205,14 +225,14 @@ body {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0);
+    background: rgba(0, 0, 0, 0.4);
     z-index: 49;
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .mobile-overlay.active {
     display: block;
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .navbar {
@@ -508,7 +528,7 @@ body {
 }
 
 .wallet-item .wallet-delete {
-    opacity: 0;
+    opacity: 0.6;
     background: transparent;
     border: none;
     color: var(--text-muted);
@@ -565,9 +585,9 @@ body {
     }
 
     .mobile-overlay.active {
-    display: block;
-    pointer-events: none;
-}
+        display: block;
+        pointer-events: auto;
+    }
 }
 
 .btn-primary-sm {

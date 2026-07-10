@@ -52,6 +52,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadNetworkConfig();
   updateHeaderInfo();
 
+  // Sync theme toggle button
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) {
+    if (savedTheme === 'dark') {
+      btn.innerHTML = '<i class="fas fa-sun"></i> Theme';
+    } else {
+      btn.innerHTML = '<i class="fas fa-moon"></i> Theme';
+    }
+  }
+
   const urlParams = new URLSearchParams(window.location.search);
   const pageParam = urlParams.get('page');
   if (pageParam && ['dashboard', 'explorer', 'validators', 'contracts', 'layers', 'network'].includes(pageParam)) {
@@ -60,9 +71,68 @@ document.addEventListener('DOMContentLoaded', async () => {
     showPage('dashboard');
   }
 
+  // Handle path-based routing for blocks, txs, and contracts
+  const path = window.location.pathname;
+  if (path.startsWith('/block/')) {
+    const parts = path.split('/');
+    const blockIndex = parts[2];
+    if (blockIndex) {
+      showPage('explorer');
+      showBlockDetail(blockIndex);
+    }
+  } else if (path.startsWith('/tx/')) {
+    const parts = path.split('/');
+    const txHash = parts[2];
+    if (txHash) {
+      showPage('explorer');
+      apiFetch(`/search/${txHash}`).then(res => {
+        if (res && res.type === 'transaction' && res.result) {
+          showBlockDetail(res.result.blockIndex).then(() => {
+            setTimeout(() => {
+              const txElements = document.querySelectorAll('.tx-item');
+              txElements.forEach(el => {
+                if (el.textContent.includes(txHash)) {
+                  el.style.border = '1px solid var(--mono-100)';
+                  el.style.padding = 'calc(var(--grid)*1.5)';
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              });
+            }, 500);
+          });
+        } else {
+          showNotification('Transaction not found');
+        }
+      }).catch(() => {
+        showNotification('Error loading transaction');
+      });
+    }
+  } else if (path.startsWith('/contract/')) {
+    const parts = path.split('/');
+    const address = parts[2];
+    if (address) {
+      showPage('contracts');
+      showContractDetail(address);
+    }
+  }
+
   setInterval(poll, POLL);
   setInterval(updateHeaderInfo, POLL);
 });
+
+window.toggleExplorerTheme = function() {
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  if (isDark) {
+    document.documentElement.classList.remove('dark-theme');
+    localStorage.setItem('theme', 'light');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.innerHTML = '<i class="fas fa-moon"></i> Theme';
+  } else {
+    document.documentElement.classList.add('dark-theme');
+    localStorage.setItem('theme', 'dark');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.innerHTML = '<i class="fas fa-sun"></i> Theme';
+  }
+};
 
 function poll() {
   const active = document.querySelector('.nav-btn.active');
@@ -249,7 +319,7 @@ function renderExplorerRows(blocks) {
         <td class="mono">${(b.hash || '').slice(0, 20)}…</td>
         <td class="mono" onclick="event.stopPropagation();showValidatorDetail('${b.validator || ''}')">${(b.validator || '—').slice(0, 16)}…</td>
         <td>${b.transactions?.length ?? 0}</td>
-        <td>${gas.toLocaleString()}</td>
+        <td>${gas.toLocaleString()} gas</td>
         <td>${fmtTime(b.timestamp)}</td>
       </tr>
     `;
@@ -315,7 +385,8 @@ async function showBlockDetail(index) {
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-user-check"></i> Validator</td><td class="mono">${block.validator || '—'}</td></tr>
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-clock"></i> Timestamp</td><td>${fmtTime(block.timestamp)}</td></tr>
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-link"></i> Chain ID</td><td>${block.chainId || '—'}</td></tr>
-            <tr class="detail-row"><td class="detail-label"><i class="fas fa-gas-pump"></i> Gas Used</td><td>${gas.toLocaleString()}</td></tr>
+            <tr class="detail-row"><td class="detail-label"><i class="fas fa-gas-pump"></i> Gas Used</td><td>${gas.toLocaleString()} gas</td></tr>
+            <tr class="detail-row"><td class="detail-label"><i class="fas fa-coins"></i> Block Fees</td><td>${sayn(block.transactions?.reduce((sum, tx) => sum + (tx.gasUsed || 0) * (tx.gasPrice || 0), 0) || 0)}</td></tr>
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-database"></i> State Root</td><td class="mono" style="word-break:break-all;">${block.stateRoot || '—'}</td></tr>
           </table>
 
@@ -331,7 +402,8 @@ async function showBlockDetail(index) {
                     ${tx.data?.from   ? `<div><strong>From:</strong> <span class="mono">${tx.data.from}</span></div>`   : ''}
                     ${tx.data?.to     ? `<div><strong>To:</strong> <span class="mono">${tx.data.to}</span></div>`     : ''}
                     ${tx.data?.amount ? `<div><strong>Amount:</strong> ${sayn(tx.data.amount)}</div>`                 : ''}
-                    ${tx.gasUsed      ? `<div><strong>Gas:</strong> ${tx.gasUsed}</div>`                              : ''}
+                    ${tx.gasUsed      ? `<div><strong>Gas Used:</strong> ${tx.gasUsed.toLocaleString()} gas</div>`   : ''}
+                    ${tx.gasUsed && tx.gasPrice ? `<div><strong>Fee:</strong> ${sayn((tx.gasUsed || 0) * (tx.gasPrice || 0))}</div>` : ''}
                   </div>
                 `).join('')
               : '<p style="color:var(--mono-400);font-size:12px;">No transactions in this block</p>'
@@ -479,7 +551,7 @@ async function showValidatorDetail(address) {
               <td style="padding:calc(var(--grid)*1);">#${b.index}</td>
               <td style="padding:calc(var(--grid)*1);font-family:'SF Mono',monospace;font-size:11px;">${(b.hash||'').slice(0,20)}…</td>
               <td style="padding:calc(var(--grid)*1);">${b.transactions?.length ?? 0}</td>
-              <td style="padding:calc(var(--grid)*1);">${(b.gasUsed ?? 0).toLocaleString()}</td>
+              <td style="padding:calc(var(--grid)*1);">${(b.gasUsed ?? 0).toLocaleString()} gas</td>
               <td style="padding:calc(var(--grid)*1);">${fmtTime(b.timestamp)}</td>
             </tr>
           `).join('')}
@@ -612,6 +684,7 @@ async function showContractDetail(address) {
               <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Version:</td><td style="padding: 4px 0; border: none; font-weight: bold;" id="c-meta-version">—</td></tr>
               <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Creator:</td><td style="padding: 4px 0; border: none;" class="mono" id="c-meta-creator">—</td></tr>
               <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Created At:</td><td style="padding: 4px 0; border: none;" id="c-meta-created">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Block:</td><td style="padding: 4px 0; border: none; font-weight: bold;" id="c-meta-block">—</td></tr>
             </table>
           </div>
           <div style="border: var(--border); padding: calc(var(--grid)*2); background: var(--mono-950); border-radius: 4px;">
@@ -673,6 +746,7 @@ async function showContractDetail(address) {
       setEl('c-meta-version', contract.version || '1.0.0');
       setEl('c-meta-creator', contract.creator ? (contract.creator.slice(0, 30) + '…') : '—');
       setEl('c-meta-created', contract.createdAt ? fmtTime(contract.createdAt) : '—');
+      setEl('c-meta-block', contract.blockIndex !== undefined && contract.blockIndex !== null ? `#${contract.blockIndex}` : '—');
 
       setEl('c-tech-size', contract.code ? (contract.code.length.toLocaleString() + ' bytes') : '0 bytes');
       setEl('c-tech-hash', contract.codeHash ? (contract.codeHash.slice(0, 16) + '…') : '—');
@@ -837,7 +911,8 @@ function sayn(baseUnits, withUnit = true) {
   const dec = (typeof networkConfig !== 'undefined' && networkConfig && networkConfig.decimals) || 100000000;
   const v = Number(baseUnits) / dec;
   const fixed = dec === 100000000 ? 8 : 4;
-  return Number.isFinite(v) ? v.toFixed(fixed) + (withUnit ? ' SAYN' : '') : '—';
+  const ticker = (typeof networkConfig !== 'undefined' && networkConfig && networkConfig.ticker) || 'SAYN';
+  return Number.isFinite(v) ? v.toFixed(fixed) + (withUnit ? ' ' + ticker : '') : '—';
 }
 
 function showNotification(msg) {
