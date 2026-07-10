@@ -780,7 +780,11 @@ export class P2PServer {
     const data = JSON.stringify(message);
     for (const peer of this.peers.values()) {
       if (peer.ws.readyState === WebSocket.OPEN) {
-        peer.ws.send(data);
+        try {
+          peer.ws.send(data);
+        } catch (e) {
+          console.warn(`Failed to send broadcast to peer: ${e.message}`);
+        }
       }
     }
   }
@@ -789,7 +793,11 @@ export class P2PServer {
     const data = JSON.stringify(message);
     for (const [id, peer] of this.peers.entries()) {
       if (id !== excludePeerId && peer.ws.readyState === WebSocket.OPEN) {
-        peer.ws.send(data);
+        try {
+          peer.ws.send(data);
+        } catch (e) {
+          console.warn(`Failed to send broadcastExcept to peer ${id}: ${e.message}`);
+        }
       }
     }
   }
@@ -797,7 +805,11 @@ export class P2PServer {
   _broadcastHandshake() {
     for (const peer of this.peers.values()) {
       if (peer.ws.readyState === WebSocket.OPEN) {
-        this._sendHandshake(peer.ws);
+        try {
+          this._sendHandshake(peer.ws);
+        } catch (e) {
+          console.warn(`Failed to send handshake to peer: ${e.message}`);
+        }
       }
     }
   }

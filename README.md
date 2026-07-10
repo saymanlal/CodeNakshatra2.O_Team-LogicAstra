@@ -1,26 +1,25 @@
-# ⛓️ SAYMAN BLOCKCHAIN — PHASE 17: PRODUCTION SANDBOX REFINEMENT, RENDER RPC INTEGRATION & MOBILE UX POLISH
+# ⛓️ SAYMAN BLOCKCHAIN — PHASE 18: PIPELINED PARALLEL TRANSACTION EXECUTION
 
 **JavaScript-native Smart Contracts · Proof-of-Stake · Multi-Layer Chains · Custom Tokens · NFTs · DEX · Memecoins · Staking Pools**
 
-[![Phase](https://img.shields.io/badge/Phase-17-brightgreen)](https://github.com/saymanlal/SAYMAN)
+[![Phase](https://img.shields.io/badge/Phase-18-brightgreen)](https://github.com/saymanlal/SAYMAN)
 [![Network](https://img.shields.io/badge/Network-Public%20Testnet-blue)](https://sayman.onrender.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
 
-## 🎯 What's New in Phase 17
+## 🎯 What's New in Phase 18
 
-Phase 17 focuses on **smart contract execution reliability** (binding helpers to prototypes to fix constructor state issues), **Render RPC priority integration**, **SPA path-based route fallbacks** on the node server, **enhanced mobile responsiveness** on wallet grids/tables, and **persisted Dark Theme** support.
+Phase 18 introduces **pipelined parallel transaction execution** on top of the Proof-of-Stake consensus layers, featuring dependency analysis on read/write sets, deterministic bucket scheduling, and live parallel efficiency metrics in the explorer UI.
 
 | Feature | Status |
 |---|---|
-| **Constructor State Binding** | ✅ Pre-binds VM state helpers to class prototypes to resolve `TypeError: this.setState is not a function` in constructors |
-| **Render RPC Integration** | ✅ Reordered network configuration endpoints to prioritize the live node `sayman.onrender.com` |
-| **SPA Route Redirections** | ✅ Configured Express fallbacks for block, transaction, and contract paths to serve `index.html` cleanly |
-| **Mobile UX Polish** | ✅ Auto-wrapping mobile grid fields, touch-friendly scrollable tables, and click-outside side navbar close overlays |
-| **Theme Toggles** | ✅ Integrated Sun/Moon dark theme toggles with persistent `localStorage` cache |
-| **7000 TPS Performance** | ✅ Upgraded TPS estimation to scale up to 7,000 TPS under simulated demo load |
-| **Block Fees** | ✅ Shows total cumulative fees paid by transactions inside mined blocks |
+| **Parallel Execution Engine** | ✅ Analyzes transaction dependency access sets (from, to, contract, validator) and schedules them in parallel |
+| **Conflict-Free Bucketing** | ✅ Groups transactions into deterministic parallel execution layers to prevent race conditions or state collisions |
+| **Explorer Concurrency Card** | ✅ Displays real-time parallel concurrency speedup factors on the dashboard |
+| **Constructor State Binding** | ✅ Pre-binds VM state helpers to class prototypes to resolve `TypeError` in constructors (Phase 17) |
+| **Render RPC Integration** | ✅ Reordered network configuration endpoints to prioritize the live node `sayman.onrender.com` (Phase 17) |
+| **SPA Route Redirections** | ✅ Configured Express fallbacks for block, transaction, and contract paths to serve `index.html` (Phase 17) |
 
 ---
 

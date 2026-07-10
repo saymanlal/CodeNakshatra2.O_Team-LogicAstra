@@ -207,8 +207,9 @@ async function loadDashboard() {
     setEl('stat-blocktime', Math.round((stats.blockTime ?? 5000) / 1000));
     setEl('stat-apr',       valData.estimatedAPR ?? 0);
 
-    // ── TPS ───────────────────────────────────────────────────────────
+    // ── TPS & Concurrency ─────────────────────────────────────────────
     setEl('stat-tps', stats.tps ?? '0');
+    setEl('stat-parallel', (stats.parallelEfficiency ?? 1.0).toFixed(2));
 
     // ── Denomination card — eliminate all confusion about SAYN vs base units ──
     const ticker = (networkConfig && networkConfig.ticker) || 'SAYN';
