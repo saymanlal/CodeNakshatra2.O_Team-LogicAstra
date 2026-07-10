@@ -20,6 +20,7 @@ export class P2PServer {
     this.bootstrapUrls = [];
     this.discoveredPeers = new Set();
     this.discoveryInterval = null;
+    this.heartbeatInterval = null;
     this.pendingPeerRequests = new Map();
     this.disconnectTimes = new Map();
     this.urlToNodeId = new Map();
@@ -55,6 +56,9 @@ export class P2PServer {
       // ── Start auto-discovery ──────────────────────────────────────
       this._startDiscovery();
 
+      // ── Start heartbeat pings ─────────────────────────────────────
+      this._startHeartbeat();
+
     } catch (err) {
       console.error('❌ P2P startup failed:', err.message);
       console.log('📡 API-only mode');
@@ -71,6 +75,36 @@ export class P2PServer {
 
     // Initial discovery after 5 seconds
     setTimeout(() => this._discoverPeers(), 5000);
+  }
+
+  // ─── Heartbeat: keep connections alive ───────────────────────────────────────
+
+  _startHeartbeat() {
+    // Send a ping to every peer every 15 seconds.
+    // If a peer has not responded for > 45 seconds, it will be pruned by _discoverPeers.
+    this.heartbeatInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [peerId, peer] of this.peers.entries()) {
+        if (peer.ws.readyState === 1 /* OPEN */) {
+          try {
+            this._send(peer.ws, { type: 'ping', timestamp: now });
+          } catch (e) {
+            // ignore send errors — socket will be cleaned up naturally
+          }
+        } else if (peer.ws.readyState > 1 /* CLOSING / CLOSED */) {
+          // Socket is already dead — remove immediately
+          console.warn(`⚠️ Peer ${peerId} socket is dead (readyState=${peer.ws.readyState}). Removing.`);
+          this.peers.delete(peerId);
+          if (peer.url) {
+            this.outboundUrls.delete(peer.url);
+            if (!this.disconnectTimes.has(peer.url)) {
+              this.disconnectTimes.set(peer.url, now);
+            }
+            this._scheduleReconnect(peer.url);
+          }
+        }
+      }
+    }, 15_000);
   }
 
   async _discoverPeers() {
@@ -499,10 +533,19 @@ export class P2PServer {
       }
     }
 
+    // Update peer's chain height so dashboard always shows accurate values
+    peer.chainHeight = msg.chainHeight || peer.chainHeight || 0;
+
     // If peer is ahead, sync
     if (msg.chainHeight > this.blockchain.chain.length) {
       console.log(`📥 Peer is ahead (${msg.chainHeight} > ${this.blockchain.chain.length}). Syncing...`);
       this._requestBlocks(peer.ws);
+    } else if (msg.chainHeight < this.blockchain.chain.length) {
+      // Peer is behind — help them catch up by sending our latest blocks
+      this._send(peer.ws, {
+        type: 'get_blocks',
+        fromIndex: Math.max(0, msg.chainHeight - 1),
+      });
     }
   }
 
@@ -809,6 +852,10 @@ export class P2PServer {
   close() {
     if (this.discoveryInterval) {
       clearInterval(this.discoveryInterval);
+    }
+
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
     }
 
     for (const [url, timer] of this.reconnectTimers.entries()) {
