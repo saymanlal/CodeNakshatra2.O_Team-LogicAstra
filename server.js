@@ -149,6 +149,11 @@ async function startServer() {
 
     setupRoutes(app, blockchain, p2pServer, config);
 
+    // Explorer SPA routing fallbacks for blocks, txs, and contracts
+    app.get(['/block/:id', '/tx/:hash', '/contract/:address'], (req, res) => {
+      res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
+    });
+
     app.get('/health', (_req, res) => {
       res.status(200).json({
         status: 'ok',

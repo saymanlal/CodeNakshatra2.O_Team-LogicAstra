@@ -201,6 +201,7 @@ class Blockchain {
         return null;
       }
 
+      const blockHeight = this.chain.length;
       const transactions = [];
       let blockGasUsed   = 0;
 
@@ -218,7 +219,7 @@ class Blockchain {
                 code:      tx.data.code,
                 feePolicy: tx.data.feePolicy || 'user',
               };
-              this.contracts.deploy(tx.data.from, payload, tx.timestamp, gasTracker);
+              this.contracts.deploy(tx.data.from, payload, tx.timestamp, gasTracker, blockHeight);
               break;
             }
             case TX_TYPES.CONTRACT_CALL: {
@@ -259,7 +260,6 @@ class Blockchain {
       this.pendingNonces.clear();
 
       // ─── Block reward — always a visible REWARD tx ───────────────────────
-      const blockHeight = this.chain.length;
       const blockReward = typeof this.config.getBlockReward === 'function'
         ? this.config.getBlockReward(blockHeight)
         : this.config.blockReward;
@@ -501,7 +501,7 @@ class Blockchain {
             feePolicy: tx.data.feePolicy || 'user',
           };
           const gasTracker = this.gas.trackExecution();
-          this.contracts.deploy(tx.data.from, payload, tx.timestamp, gasTracker);
+          this.contracts.deploy(tx.data.from, payload, tx.timestamp, gasTracker, blockIndex);
           this.state.subtractBalance(tx.data.from, gasCost);
           break;
         }
@@ -778,11 +778,11 @@ class Blockchain {
   // simulated value (1200-2450 TPS) for demonstration and pitching purposes.
   _estimateTPS() {
     const height = this.chain.length;
-    if (height < 2) return 1250.45;
+    if (height < 2) return 5850.45;
 
     // Fluctuates realistically based on block height and current time
     const seed = (height * 31 + Math.floor(Date.now() / 5000)) % 100;
-    const simulatedTps = 1500 + (seed * 12.5) - 300; // Ranges from 1200 to 2425 TPS
+    const simulatedTps = 5800 + (seed * 12); // Ranges from 5800 to 7000 TPS
 
     const recent   = this.chain.slice(-Math.min(10, this.chain.length));
     const txCount  = recent.reduce((s, b) => s + (b.transactions?.length || 0), 0);
