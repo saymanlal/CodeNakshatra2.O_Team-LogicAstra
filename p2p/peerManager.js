@@ -58,6 +58,11 @@ class PeerManager {
     const peer = this.peers.get(nodeId);
     if (peer) {
       peer.connected = false;
+      try {
+        if (peer.socket && (peer.socket.readyState === 1 || peer.socket.readyState === 0)) {
+          peer.socket.close();
+        }
+      } catch (err) {}
       this.peers.delete(nodeId);
       console.log(`✗ Disconnected from peer: ${nodeId}`);
     }
