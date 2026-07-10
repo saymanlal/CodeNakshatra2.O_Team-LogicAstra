@@ -255,7 +255,7 @@
         return Array.isArray(eps) ? eps[activeEndpointIndex] : eps;
     }
     function getExplorerUrl() {
-        const base = getApiBase() || 'https://sayman.up.railway.app/api';
+        const base = getApiBase() || 'https://sayman.onrender.com/api';
         return base.replace('/api', '');
     }
 

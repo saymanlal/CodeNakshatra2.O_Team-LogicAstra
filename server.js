@@ -206,13 +206,39 @@ async function startServer() {
 
 function startMining(mode) {
   const config = blockchain.config;
+  const startupTime = Date.now();
 
   miningInterval = setInterval(async () => {
     try {
-      if (p2pServer && p2pServer.isSyncing) {
+      if (p2pServer) {
         // Skip block production while syncing from peers to prevent forks
-        return;
+        if (p2pServer.isSyncing) {
+          return;
+        }
+
+        // Skip block production if we are behind any connected peer
+        let maxPeerHeight = 0;
+        for (const peer of p2pServer.peers.values()) {
+          if (peer.chainHeight > maxPeerHeight) {
+            maxPeerHeight = peer.chainHeight;
+          }
+        }
+        if (maxPeerHeight > blockchain.chain.length) {
+          console.log(`[Miner] Skipping block production: local height (${blockchain.chain.length}) is behind peer height (${maxPeerHeight})`);
+          return;
+        }
+
+        // If bootstrap peers are configured, wait to connect to at least one peer
+        // to avoid producing blocks in isolation, with a 30-second startup grace period
+        if (config.bootstrapPeers?.length > 0 && p2pServer.peers.size === 0) {
+          const elapsed = Date.now() - startupTime;
+          if (elapsed < 30_000) {
+            console.log(`[Miner] Waiting to connect to bootstrap peers before starting block production...`);
+            return;
+          }
+        }
       }
+
       const block = await blockchain.createBlock();
       if (block) {
         if (p2pServer) {
