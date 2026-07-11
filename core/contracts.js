@@ -77,7 +77,7 @@ class ContractEngine {
       throw new Error(`Invalid feePolicy: ${feePolicy}. Must be 'user', 'sponsor', or 'free'`);
     }
 
-    const contractAddress = this._generateAddress(from, timestamp);
+    const contractAddress = payload.existingAddress || this._generateAddress(from, timestamp);
     const codeHash        = crypto.createHash('sha256').update(code).digest('hex');
 
     // Charge gas: base deploy cost + 1 gas unit per 10 bytes of code

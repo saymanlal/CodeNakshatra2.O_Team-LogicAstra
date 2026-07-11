@@ -436,6 +436,24 @@
                 </div>
             </main>
         </div>
+
+        <!-- BOTTOM NAVIGATION (MOBILE) -->
+        <nav class="bottom-nav">
+            <button class="bottom-nav-btn active" onclick="document.getElementById('mobileMenuBtn').click()">
+                <i class="fas fa-wallet"></i>
+                <span>Wallets</span>
+            </button>
+            <button class="bottom-nav-btn center-scan-btn" onclick="document.getElementById('scanQrNavBtn').click()">
+                <div class="scan-btn-inner">
+                    <i class="fas fa-qrcode"></i>
+                </div>
+                <span>Scan & Pay</span>
+            </button>
+            <button class="bottom-nav-btn" onclick="document.getElementById('profileModal').classList.add('active'); document.getElementById('mobileOverlay').classList.add('active');">
+                <i class="fas fa-user"></i>
+                <span>Profile</span>
+            </button>
+        </nav>
     </div>
 
     <!-- ===== MODALS ===== -->
@@ -643,6 +661,38 @@
                 </button>
             </div>
             <div class="modal-body" id="txDetailContent">
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div class="modal-overlay" id="profileModal">
+        <div class="modal modal-md modal-animated">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-circle"></i> Profile & Settings</h3>
+                <button class="modal-close" onclick="document.getElementById('profileModal').classList.remove('active'); document.getElementById('mobileOverlay').classList.remove('active');">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div style="text-align:center; padding: 20px 0;">
+                    <div style="font-size: 64px; color: var(--accent); margin-bottom: 10px;">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <h4>My SAYMAN Vault</h4>
+                    <p class="helper-text">Manage your multi-chain assets</p>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <button class="btn-outline-sm" style="width: 100%; margin-bottom: 10px;" onclick="document.getElementById('exportAllBtn').click()">
+                        <i class="fas fa-file-export"></i> Export All Wallets
+                    </button>
+                    <button class="btn-outline-sm" style="width: 100%; margin-bottom: 10px;" onclick="document.getElementById('themeToggleBtn').click()">
+                        <i class="fas fa-moon"></i> Toggle Dark Mode
+                    </button>
+                    <button class="btn-primary" style="width: 100%;" onclick="window.location.reload()">
+                        <i class="fas fa-sync"></i> Refresh App
+                    </button>
+                </div>
             </div>
         </div>
     </div>

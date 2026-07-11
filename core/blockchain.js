@@ -221,6 +221,7 @@ class Blockchain {
                 abi:       tx.data.abi,
                 code:      tx.data.code,
                 feePolicy: tx.data.feePolicy || 'user',
+                existingAddress: tx.data.contractAddress,
               };
               this.contracts.deploy(tx.data.from, payload, tx.timestamp, gasTracker, blockHeight);
               break;
@@ -579,6 +580,7 @@ class Blockchain {
             abi:       tx.data.abi,
             code:      tx.data.code,
             feePolicy: tx.data.feePolicy || 'user',
+            existingAddress: tx.data.contractAddress,
           };
           const gasTracker = this.gas.trackExecution();
           this.contracts.deploy(tx.data.from, payload, tx.timestamp, gasTracker, blockIndex);

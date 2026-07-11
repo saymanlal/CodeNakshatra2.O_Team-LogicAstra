@@ -2,6 +2,27 @@ import WebSocket, { WebSocketServer } from 'ws';
 import crypto from 'crypto';
 import Block from '../core/block.js';
 
+function normalizeUrl(url) {
+  if (!url) return '';
+  return url
+    .replace(/^https?:\/\//i, '')
+    .replace(/^wss?:\/\//i, '')
+    .replace(/\/p2p\/?$/i, '')
+    .replace(/\/+$/, '')
+    .toLowerCase();
+}
+
+function getPublicP2PUrl() {
+  if (process.env.PUBLIC_P2P_URL) return process.env.PUBLIC_P2P_URL;
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return process.env.RENDER_EXTERNAL_URL.replace(/^http/, 'ws') + '/p2p';
+  }
+  if (process.env.RAILWAY_STATIC_URL) {
+    return `wss://${process.env.RAILWAY_STATIC_URL}/p2p`;
+  }
+  return null;
+}
+
 export class P2PServer {
   constructor(blockchain, port = null) {
     this.blockchain = blockchain;
@@ -15,6 +36,7 @@ export class P2PServer {
     this.outboundUrls = new Set();
     this.selfUrls = new Set();
     this.reconnectTimers = new Map();
+    this.reconnectDelays = new Map();
     this.RECONNECT_DELAY = 15_000;
 
     // ── AUTO DISCOVERY ──────────────────────────────────────────────
@@ -72,7 +94,7 @@ export class P2PServer {
     // Every 30 seconds, try to discover new peers
     this.discoveryInterval = setInterval(() => {
       this._discoverPeers();
-    }, 30_000);
+    }, 60_000);
 
     // Initial discovery after 5 seconds
     setTimeout(() => this._discoverPeers(), 5000);
@@ -81,14 +103,17 @@ export class P2PServer {
   // ─── Heartbeat: keep connections alive ───────────────────────────────────────
 
   _startHeartbeat() {
-    // Send a ping to every peer every 15 seconds.
-    // If a peer has not responded for > 45 seconds, it will be pruned by _discoverPeers.
+    // Send a ping to every peer every 25 seconds to keep Render/Railway connections alive.
+    // If a peer has not responded for > 180 seconds, it will be pruned by _discoverPeers.
     this.heartbeatInterval = setInterval(() => {
       const now = Date.now();
       for (const [peerId, peer] of this.peers.entries()) {
         if (peer.ws.readyState === 1 /* OPEN */) {
           try {
             this._send(peer.ws, { type: 'ping', timestamp: now });
+            if (typeof peer.ws.ping === 'function') {
+              peer.ws.ping();
+            }
           } catch (e) {
             // ignore send errors — socket will be cleaned up naturally
           }
@@ -98,21 +123,23 @@ export class P2PServer {
           this.peers.delete(peerId);
           if (peer.url) {
             this.outboundUrls.delete(peer.url);
-            if (!this.disconnectTimes.has(peer.url)) {
-              this.disconnectTimes.set(peer.url, now);
+            if (!peer.isDuplicate && !peer.ws.isDuplicate) {
+              if (!this.disconnectTimes.has(peer.url)) {
+                this.disconnectTimes.set(peer.url, now);
+              }
+              this._scheduleReconnect(peer.url);
             }
-            this._scheduleReconnect(peer.url);
           }
         }
       }
-    }, 15_000);
+    }, 45_000);
   }
 
   async _discoverPeers() {
     try {
-      // 0. Prune inactive connections (no message received for > 90 seconds)
+      // 0. Prune inactive connections (no message received for > 300 seconds)
       const now = Date.now();
-      const INACTIVE_TIMEOUT = 90_000; // 90 seconds
+      const INACTIVE_TIMEOUT = 300_000; // 300 seconds
       for (const [peerId, peer] of this.peers.entries()) {
         const inactiveDuration = now - peer.lastSeen;
         if (inactiveDuration > INACTIVE_TIMEOUT) {
@@ -227,7 +254,7 @@ export class P2PServer {
       console.log(`🔗 Connecting to peer: ${url}`);
       let ws;
       try {
-        ws = new WebSocket(url);
+        ws = new WebSocket(url, { perMessageDeflate: false });
       } catch (err) {
         console.error(`❌ Bad peer URL ${url}:`, err.message);
         this._scheduleReconnect(url);
@@ -246,6 +273,7 @@ export class P2PServer {
         clearTimeout(timeout);
         console.log(`✅ Connected to peer: ${url}`);
         this.disconnectTimes.delete(url);
+        this.reconnectDelays.delete(url);
         this._handleOutboundConnection(ws, url);
       });
 
@@ -257,11 +285,17 @@ export class P2PServer {
       ws.on('close', () => {
         clearTimeout(timeout);
         console.log(`🔌 Outbound peer closed: ${url}`);
+        let isDuplicate = ws.isDuplicate;
         for (const [id, peer] of this.peers.entries()) {
           if (peer.url === url) {
+            if (peer.isDuplicate) isDuplicate = true;
             this.peers.delete(id);
             break;
           }
+        }
+        if (isDuplicate) {
+          console.log(`↔️ Not scheduling reconnect for duplicate peer connection to ${url}`);
+          return;
         }
         if (!this.disconnectTimes.has(url)) {
           this.disconnectTimes.set(url, Date.now());
@@ -276,11 +310,16 @@ export class P2PServer {
   _scheduleReconnect(url) {
     if (this.selfUrls.has(url)) return;
     if (this.reconnectTimers.has(url)) return;
+    
+    const currentDelay = this.reconnectDelays.get(url) || 15_000;
+    const nextDelay = Math.min(currentDelay * 2, 120_000);
+    this.reconnectDelays.set(url, nextDelay);
+
     const timer = setTimeout(() => {
       this.reconnectTimers.delete(url);
       this.outboundUrls.delete(url);
       this.connectToPeer(url);
-    }, this.RECONNECT_DELAY);
+    }, currentDelay);
     this.reconnectTimers.set(url, timer);
   }
 
@@ -339,10 +378,14 @@ export class P2PServer {
       if (peer) {
         console.log(`👋 Peer ${peerId} disconnected`);
         if (peer.url) {
-          if (!this.disconnectTimes.has(peer.url)) {
-            this.disconnectTimes.set(peer.url, Date.now());
+          if (peer.isDuplicate || ws.isDuplicate) {
+            console.log(`↔️ Not scheduling reconnect for duplicate peer connection to ${peer.url}`);
+          } else {
+            if (!this.disconnectTimes.has(peer.url)) {
+              this.disconnectTimes.set(peer.url, Date.now());
+            }
+            this._scheduleReconnect(peer.url);
           }
-          this._scheduleReconnect(peer.url);
         }
         this.peers.delete(peerId);
       }
@@ -451,9 +494,14 @@ export class P2PServer {
   }
 
   _isConnected(url) {
+    const normUrl = normalizeUrl(url);
+    if (!normUrl) return false;
+
     for (const peer of this.peers.values()) {
-      if (peer.url === url && peer.ws.readyState === WebSocket.OPEN) {
-        return true;
+      if (peer.ws.readyState === WebSocket.OPEN) {
+        if (peer.url && normalizeUrl(peer.url) === normUrl) {
+          return true;
+        }
       }
     }
     const peerNodeId = this.urlToNodeId.get(url);
@@ -498,7 +546,13 @@ export class P2PServer {
       return;
     }
 
-    // Map URL to nodeId if outbound URL exists
+    // Map URL to nodeId if outbound URL exists or publicUrl is provided
+    if (msg.publicUrl) {
+      this.urlToNodeId.set(msg.publicUrl, msg.nodeId);
+      if (!peer.url) {
+        peer.url = msg.publicUrl;
+      }
+    }
     if (peer.url && msg.nodeId) {
       this.urlToNodeId.set(peer.url, msg.nodeId);
     }
@@ -519,6 +573,8 @@ export class P2PServer {
             if (otherPeer.url && !peer.url) {
               peer.url = otherPeer.url;
             }
+            otherPeer.isDuplicate = true;
+            if (otherPeer.ws) otherPeer.ws.isDuplicate = true;
             otherPeer.ws.close();
             this.peers.delete(otherId);
           } else {
@@ -526,12 +582,16 @@ export class P2PServer {
             if (peer.url && !otherPeer.url) {
               otherPeer.url = peer.url;
             }
+            peer.isDuplicate = true;
+            if (peer.ws) peer.ws.isDuplicate = true;
             peer.ws.close();
             this.peers.delete(peerId);
             return;
           }
         } else {
           console.log(`↔️ Keeping older connection ${otherId} and closing new one ${peerId}`);
+          peer.isDuplicate = true;
+          if (peer.ws) peer.ws.isDuplicate = true;
           peer.ws.close();
           this.peers.delete(peerId);
           return;
@@ -562,6 +622,7 @@ export class P2PServer {
       chainHeight: this.blockchain.chain.length,
       chainId: this.blockchain.chainId,
       timestamp: Date.now(),
+      publicUrl: getPublicP2PUrl(),
     });
   }
 
@@ -580,7 +641,7 @@ export class P2PServer {
           console.warn(`⚠️ Fork at block ${blockData.index}. Requesting sync from common ancestor...`);
           const peer = this.peers.get(peerId);
           if (peer) {
-            const rollbackHeight = Math.max(0, blockData.index - 50);
+            const rollbackHeight = Math.max(0, blockData.index - 1);
             this._send(peer.ws, {
               type: 'get_blocks',
               fromIndex: rollbackHeight,
@@ -649,7 +710,7 @@ export class P2PServer {
   _requestBlocks(ws) {
     this._send(ws, {
       type: 'get_blocks',
-      fromIndex: Math.max(0, this.blockchain.chain.length - 1),
+      fromIndex: this.blockchain.chain.length,
     });
   }
 
@@ -658,7 +719,7 @@ export class P2PServer {
     if (!peer) return;
 
     const from = msg.fromIndex || 0;
-    const BATCH = 100;
+    const BATCH = 500; // Increased to 500 for fast block sharing and catching up
     const blocks = this.blockchain.chain.slice(from, from + BATCH);
 
     if (!blocks.length) return;
@@ -700,8 +761,8 @@ export class P2PServer {
           const localBlock = this.blockchain.chain[blockData.index];
           if (localBlock && localBlock.hash !== blockData.hash) {
             console.warn(`⚠️ Fork detected at block #${blockData.index}`);
-            if (peer && peer.chainHeight > ourHeight) {
-              const rollbackHeight = Math.max(0, blockData.index - 50);
+            if (peer && peer.chainHeight > ourHeight + 5) {
+              const rollbackHeight = Math.max(0, blockData.index - 5);
               console.log(`🔄 Peer has longer chain (${peer.chainHeight} > ${ourHeight}). Rolling back local chain to #${rollbackHeight} and syncing...`);
               await this.blockchain._rollbackToHeight(rollbackHeight);
               this._send(peer.ws, {
@@ -722,6 +783,15 @@ export class P2PServer {
             imported++;
           } else {
             console.warn(`⚠️ addBlock rejected #${blockData.index}`);
+            if (peer && peer.chainHeight > ourHeight + 5) {
+              const rollbackHeight = Math.max(0, ourHeight - 5);
+              console.log(`🔄 Peer is ahead (${peer.chainHeight} > ${ourHeight}) but block #${blockData.index} was rejected. We might be on a fork. Rolling back local chain to #${rollbackHeight} and requesting sync...`);
+              await this.blockchain._rollbackToHeight(rollbackHeight);
+              this._send(peer.ws, {
+                type: 'get_blocks',
+                fromIndex: rollbackHeight,
+              });
+            }
             this.syncQueue = []; // Clear queue on rejection
             return;
           }
@@ -755,9 +825,9 @@ export class P2PServer {
         }
       }
 
-      // If we are still behind the peer, request the next batch
-      if (peer && peer.chainHeight > this.blockchain.chain.length) {
-        console.log(`📥 Still behind peer (${this.blockchain.chain.length} < ${peer.chainHeight}). Requesting next batch...`);
+      // If we received a substantial batch (100+ blocks), request the next batch to speed up syncing
+      if (peer && blocks.length >= 100) {
+        console.log(`📥 Received substantial batch (${blocks.length} blocks). Requesting next batch...`);
         this._requestBlocks(peer.ws);
       }
     } catch (err) {

@@ -2042,3 +2042,74 @@ body {
 .btn-outline-sm:active {
     transform: scale(0.97);
 }
+
+/* BOTTOM NAVIGATION (MOBILE) */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+    z-index: 99;
+    padding: 10px 0;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+}
+
+.bottom-nav-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    flex: 1;
+    font-family: inherit;
+    transition: all 0.3s;
+}
+
+.bottom-nav-btn i {
+    font-size: 1.2rem;
+}
+
+.bottom-nav-btn.active, .bottom-nav-btn:hover {
+    color: var(--accent);
+}
+
+.center-scan-btn {
+    position: relative;
+    top: -20px;
+    color: var(--accent);
+}
+
+.scan-btn-inner {
+    background: var(--accent);
+    color: white;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 5px;
+    box-shadow: 0 4px 10px rgba(79, 110, 247, 0.4);
+    transition: transform 0.3s;
+}
+
+.center-scan-btn:active .scan-btn-inner {
+    transform: scale(0.9);
+}
+
+@media (max-width: 768px) {
+    .bottom-nav {
+        display: flex;
+    }
+    .main-layout {
+        padding-bottom: 80px; /* Space for bottom nav */
+    }
+}

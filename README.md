@@ -1,4 +1,4 @@
-# ⛓️ SAYMAN BLOCKCHAIN — PHASE 18: PIPELINED PARALLEL TRANSACTION EXECUTION
+# ⛓️ SAYMAN BLOCKCHAIN — PHASE 19: PIPELINED PARALLEL TRANSACTION EXECUTION
 
 **JavaScript-native Smart Contracts · Proof-of-Stake · Multi-Layer Chains · Custom Tokens · NFTs · DEX · Memecoins · Staking Pools**
 
@@ -8,9 +8,9 @@
 
 ---
 
-## 🎯 What's New in Phase 18
+## 🎯 What's New in Phase 19
 
-Phase 18 introduces **pipelined parallel transaction execution** on top of the Proof-of-Stake consensus layers, featuring dependency analysis on read/write sets, deterministic bucket scheduling, and live parallel efficiency metrics in the explorer UI.
+Phase 19 introduces **pipelined parallel transaction execution** on top of the Proof-of-Stake consensus layers, featuring dependency analysis on read/write sets, deterministic bucket scheduling, and live parallel efficiency metrics in the explorer UI.
 
 | Feature | Status |
 |---|---|
@@ -216,7 +216,7 @@ client.callContract({
 
 ## 📱 PUKY Mobile Wallet
 
-Available as an Android APK at `/apk/base.apk`. Features:
+Available as an Android APK at `/apk/puky.apk`. Features:
 - Multi-RPC failover (Railway + Render + local)
 - Real-time GitHub APK update checker
 - Send/receive SAYN, stake, unstake
@@ -225,7 +225,16 @@ Available as an Android APK at `/apk/base.apk`. Features:
 
 ## 🤝 Contributing
 
-See `ABOUT.md` for full project vision. PRs welcome on `phase14` branch.
+See `ABOUT.md` for full project vision. PRs welcome on `phase19` branch.
+
+### Phase 19 Updates
+- **P2P Sync Engine overhaul**: Real-time fork resolutions, rapid multi-block syncing, strict 5s block time.
+- **PUKY Mobile Wallet Improvements**:
+  - Implemented dynamic PhonePe style bottom navigation.
+  - Added dedicated Profile/Vault section and real-time wallet balances syncing.
+  - Enhanced UI responsiveness (auto-closing mobile menus).
+  - Renamed downloadable APK to `puky.apk`.
+  - Added integrated block search parameters in Explorer.
 
 ---
 

@@ -1,5 +1,5 @@
 // ── Config ───────────────────────────────────────────────────────────────
-const ANDROID_APK_URL = '/apk/base.apk';
+const ANDROID_APK_URL = '/apk/puky.apk';
 const FAUCET_SITE_URL = 'https://sayman-faucet-site.vercel.app/';
 const FAUCET_API_URL = 'https://sayman-faucet.onrender.com';
 const WALLET_WEB_URL = 'https://sayman-wallet-manager.vercel.app/';
@@ -237,7 +237,7 @@ const DOCS_DATA = {
       <ul>
         <li><code>faucet/</code> — deployed at <a href="${FAUCET_API_URL}" target="_blank">${FAUCET_API_URL}</a></li>
         <li><code>faucet-site/</code> — deployed at <a href="${FAUCET_SITE_URL}" target="_blank">${FAUCET_SITE_URL}</a></li>
-        <li><code>apk/base.apk</code> — Android wallet binary at <code>/apk/base.apk</code></li>
+        <li><code>apk/puky.apk</code> — Android wallet binary at <code>/apk/puky.apk</code></li>
       </ul>
 
       <div class="note">

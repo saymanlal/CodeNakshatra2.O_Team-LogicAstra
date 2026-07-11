@@ -6,6 +6,24 @@ const POLL  = 5000;
 const PG_SZ = 20;
 
 // ── State ─────────────────────────────────────────────────────────────────────
+window.copyToClipboard = function(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check" style="color:var(--success, #10b981);"></i>';
+    setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check" style="color:var(--success, #10b981);"></i>';
+    setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+  });
+};
+
 let explorerPage   = 1;
 let explorerTotal  = 0;
 let networkConfig  = null;
@@ -317,8 +335,8 @@ function renderExplorerRows(blocks) {
     return `
       <tr onclick="showBlockDetail(${b.index})">
         <td>#${b.index}</td>
-        <td class="mono">${(b.hash || '').slice(0, 20)}…</td>
-        <td class="mono" onclick="event.stopPropagation();showValidatorDetail('${b.validator || ''}')">${(b.validator || '—').slice(0, 16)}…</td>
+        <td class="mono">${(b.hash || '').slice(0, 20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${b.hash || ''}')"><i class="fas fa-copy"></i></button></td>
+        <td class="mono" onclick="event.stopPropagation();showValidatorDetail('${b.validator || ''}')">${(b.validator || '—').slice(0, 16)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${b.validator || ''}')"><i class="fas fa-copy"></i></button></td>
         <td>${b.transactions?.length ?? 0}</td>
         <td>${gas.toLocaleString()} gas</td>
         <td>${fmtTime(b.timestamp)}</td>
@@ -476,7 +494,7 @@ function renderValidatorList(validators) {
 
   tbody.innerHTML = validators.map(v => `
     <tr onclick="showValidatorDetail('${v.address || ''}')">
-      <td class="mono">${(v.address || '').slice(0, 20)}…</td>
+      <td class="mono">${(v.address || '').slice(0, 20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${v.address || ''}')"><i class="fas fa-copy"></i></button></td>
       <td>${sayn(v.stake ?? 0)} <span style="font-size:10px;color:var(--mono-500)">(${(v.stake ?? 0).toLocaleString()} bu)</span></td>
       <td style="font-size:11px;color:var(--mono-500)">${(v.stake ?? 0).toLocaleString()}</td>
       <td>${v.percentage ?? 0}%</td>
@@ -618,8 +636,8 @@ function renderContracts(contracts) {
 
   tbody.innerHTML = contracts.map(c => `
     <tr onclick="showContractDetail('${c.address || ''}')">
-      <td class="mono">${(c.address || '').slice(0, 20)}…</td>
-      <td class="mono">${(c.creator || '').slice(0, 20)}…</td>
+      <td class="mono">${(c.address || '').slice(0, 20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${c.address || ''}')"><i class="fas fa-copy"></i></button></td>
+      <td class="mono">${(c.creator || '').slice(0, 20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${c.creator || ''}')"><i class="fas fa-copy"></i></button></td>
       <td>${(c.code?.length ?? 0).toLocaleString()} bytes</td>
     </tr>
   `).join('');
@@ -745,12 +763,17 @@ async function showContractDetail(address) {
 
       setEl('c-meta-name', contract.name || 'UnnamedContract');
       setEl('c-meta-version', contract.version || '1.0.0');
-      setEl('c-meta-creator', contract.creator ? (contract.creator.slice(0, 30) + '…') : '—');
+      
+      const creatorEl = document.getElementById('c-meta-creator');
+      if (creatorEl) creatorEl.innerHTML = contract.creator ? (contract.creator.slice(0, 30) + '… <button class="copy-data-btn" onclick="copyToClipboard(this, \'' + contract.creator + '\')"><i class="fas fa-copy"></i></button>') : '—';
+      
       setEl('c-meta-created', contract.createdAt ? fmtTime(contract.createdAt) : '—');
       setEl('c-meta-block', contract.blockIndex !== undefined && contract.blockIndex !== null ? `#${contract.blockIndex}` : '—');
 
       setEl('c-tech-size', contract.code ? (contract.code.length.toLocaleString() + ' bytes') : '0 bytes');
-      setEl('c-tech-hash', contract.codeHash ? (contract.codeHash.slice(0, 16) + '…') : '—');
+      
+      const hashEl = document.getElementById('c-tech-hash');
+      if (hashEl) hashEl.innerHTML = contract.codeHash ? (contract.codeHash.slice(0, 16) + '… <button class="copy-data-btn" onclick="copyToClipboard(this, \'' + contract.codeHash + '\')"><i class="fas fa-copy"></i></button>') : '—';
       
       const methods = contract.abi && Array.isArray(contract.abi) 
         ? contract.abi.map(m => typeof m === 'string' ? m : (m.name || 'anonymous')).join(', ')
@@ -819,7 +842,8 @@ async function loadNetwork() {
     setEl('net-height',    d.blockHeight ?? 0);
     setEl('net-blocktime', Math.round(d.averageBlockTime || 5000));
     setEl('net-mempool',   d.mempool     ?? 0);
-    setEl('net-node-id',   (d.nodeId  || '').slice(0, 32) + '…');
+    const netNodeEl = document.getElementById('net-node-id');
+    if (netNodeEl) netNodeEl.innerHTML = (d.nodeId || '').slice(0, 32) + '… <button class="copy-data-btn" onclick="copyToClipboard(this, \'' + (d.nodeId || '') + '\')"><i class="fas fa-copy"></i></button>';
     setEl('net-mode',      (d.mode    || '—').toUpperCase());
     setEl('net-network',   d.network  || '—');
     setEl('net-chain',     d.chainId  || '—');
@@ -861,7 +885,7 @@ function renderPeers(peers) {
 
   peerDiv.innerHTML = peers.map(p => `
     <div class="peer-row">
-      <div><strong>Node ID:</strong> ${(p.nodeId || '—').slice(0, 20)}…</div>
+      <div><strong>Node ID:</strong> ${(p.nodeId || '—').slice(0, 20)}… <button class="copy-data-btn" onclick="copyToClipboard(this, '${p.nodeId || ''}')"><i class="fas fa-copy"></i></button></div>
       <div><strong>Height:</strong> ${p.chainHeight ?? '—'}</div>
       <div><strong>Last seen:</strong> ${fmtTimeAgo(p.lastSeen)}</div>
     </div>
