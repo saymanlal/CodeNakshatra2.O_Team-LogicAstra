@@ -47,6 +47,19 @@ export class P2PServer {
     this.pendingPeerRequests = new Map();
     this.disconnectTimes = new Map();
     this.urlToNodeId = new Map();
+
+    // ── LEADER ELECTION ─────────────────────────────────────────────
+    // PRIMARY node = sayman.onrender.com — the designated block producer.
+    // Standby nodes only produce if primary is unreachable (> PRIMARY_TIMEOUT ms silent).
+    this.isPrimaryNode = false;       // set in listen() based on RENDER_EXTERNAL_URL
+    this.primaryAlive = false;        // true when we recently heard a leader_heartbeat
+    this.primaryLastSeen = 0;
+    this.PRIMARY_TIMEOUT = 20_000;   // treat primary as dead after 20s of silence
+    this.leaderHeartbeatInterval = null;
+
+    // ── SINGLE PEER SYNC CONTROL ───────────────────────────────────
+    this.syncingFromPeerId = null;
+    this.lastSyncRequestTime = 0;
   }
 
   // ─── Server startup ─────────────────────────────────────────────────────────
@@ -62,6 +75,23 @@ export class P2PServer {
       } else {
         console.log('⚠️ P2P disabled — API-only mode');
         return;
+      }
+
+      // ── Determine leader role ─────────────────────────────────────
+      // PRIMARY_NODE_URL env var (e.g. "sayman.onrender.com") identifies the
+      // designated block producer. If this node's public URL matches, it is primary.
+      const renderUrl = (process.env.RENDER_EXTERNAL_URL || '').toLowerCase();
+      const primaryCfg = (process.env.PRIMARY_NODE_URL || 'sayman.onrender.com').toLowerCase();
+      if (primaryCfg === 'self' || (renderUrl && renderUrl.includes(primaryCfg))) {
+        this.isPrimaryNode = true;
+        console.log('👑 This node is the PRIMARY (designated block producer)');
+      } else if (!primaryCfg || primaryCfg === 'none') {
+        // No leader configured — all nodes produce (original behaviour)
+        this.isPrimaryNode = true;
+        console.log('🔄 No leader configured — this node produces blocks');
+      } else {
+        this.isPrimaryNode = false;
+        console.log('🔄 This node is a STANDBY validator (produces only if primary is unreachable)');
       }
 
       this.wss.on('connection', (ws, req) => {
@@ -81,6 +111,9 @@ export class P2PServer {
 
       // ── Start heartbeat pings ─────────────────────────────────────
       this._startHeartbeat();
+
+      // ── Start leader heartbeat ────────────────────────────────────
+      this._startLeaderHeartbeat();
 
     } catch (err) {
       console.error('❌ P2P startup failed:', err.message);
@@ -132,6 +165,8 @@ export class P2PServer {
           }
         }
       }
+      // Trigger sync verification to recover from any stalled syncs
+      this.checkAndTriggerSync();
     }, 45_000);
   }
 
@@ -340,7 +375,9 @@ export class P2PServer {
     console.log(`👤 Inbound peer ${peerId} (total: ${this.peers.size})`);
     this._registerHandlers(ws, peerId);
     this._sendHandshake(ws);
-    this._requestBlocks(ws);
+    // NOTE: Do NOT call _requestBlocks here.
+    // The handshake response will carry peer's chainHeight, and _handleHandshake
+    // will trigger sync from the BEST available peer — not from every peer.
   }
 
   _handleOutboundConnection(ws, url) {
@@ -358,7 +395,9 @@ export class P2PServer {
     console.log(`👤 Outbound peer ${peerId} → ${url} (total: ${this.peers.size})`);
     this._registerHandlers(ws, peerId);
     this._sendHandshake(ws);
-    this._requestBlocks(ws);
+    // NOTE: Do NOT call _requestBlocks here.
+    // The handshake response will carry peer's chainHeight, and _handleHandshake
+    // will trigger sync from the BEST available peer — not from every peer.
   }
 
   // ─── Shared per-socket event registration ────────────────────────────────────
@@ -438,6 +477,10 @@ export class P2PServer {
 
       case 'pong':
         // just update lastSeen (already done above)
+        break;
+
+      case 'leader_heartbeat':
+        this._handleLeaderHeartbeat(msg, peerId);
         break;
 
       default:
@@ -602,20 +645,29 @@ export class P2PServer {
     // Update peer's chain height so dashboard always shows accurate values
     peer.chainHeight = msg.chainHeight || peer.chainHeight || 0;
 
-    // If peer is ahead, sync
-    if (msg.chainHeight > this.blockchain.chain.length) {
-      console.log(`📥 Peer is ahead (${msg.chainHeight} > ${this.blockchain.chain.length}). Syncing...`);
-      this._requestBlocks(peer.ws);
-    } else if (msg.chainHeight < this.blockchain.chain.length) {
-      // Peer is behind — help them catch up by sending our latest blocks
-      this._send(peer.ws, {
-        type: 'get_blocks',
-        fromIndex: Math.max(0, msg.chainHeight - 1),
-      });
+    const localHeight = this.blockchain.chain.length;
+    const peerHeight  = msg.chainHeight || 0;
+
+    if (peerHeight > localHeight) {
+      // Coordinate and trigger sync from the single best peer, avoiding multi-peer redundant downloads
+      this.checkAndTriggerSync();
+    } else if (peerHeight < localHeight) {
+      // Peer is behind — push our chain to help them catch up quickly.
+      const fromIndex = Math.max(0, peerHeight);
+      console.log(`📤 Peer is ${localHeight - peerHeight} blocks behind. Helping peer catch up from #${fromIndex}...`);
+      this._send(peer.ws, { type: 'get_blocks', fromIndex });
+    } else {
+      // Same height — verify tip hashes match to detect silent forks.
+      const ourTip = this.blockchain.chain[localHeight - 1];
+      if (msg.tipHash && ourTip && msg.tipHash !== ourTip.hash) {
+        console.warn(`⚠️ Same height (${localHeight}) but tip hash mismatch — possible fork. Requesting sync...`);
+        this._send(peer.ws, { type: 'get_blocks', fromIndex: Math.max(0, localHeight - 10) });
+      }
     }
   }
 
   _sendHandshake(ws) {
+    const lastBlock = this.blockchain.chain[this.blockchain.chain.length - 1];
     this._send(ws, {
       type: 'handshake',
       nodeId: this.nodeId,
@@ -623,6 +675,7 @@ export class P2PServer {
       chainId: this.blockchain.chainId,
       timestamp: Date.now(),
       publicUrl: getPublicP2PUrl(),
+      tipHash: lastBlock ? lastBlock.hash : null,
     });
   }
 
@@ -707,11 +760,58 @@ export class P2PServer {
 
   // ─── Block request / response ────────────────────────────────────────────────
 
+  _findPeerByWs(ws) {
+    for (const peer of this.peers.values()) {
+      if (peer.ws === ws) return peer;
+    }
+    return null;
+  }
+
   _requestBlocks(ws) {
+    const peer = this._findPeerByWs(ws);
+    if (peer) {
+      this.syncingFromPeerId = peer.id;
+      this.lastSyncRequestTime = Date.now();
+    }
     this._send(ws, {
       type: 'get_blocks',
       fromIndex: this.blockchain.chain.length,
     });
+  }
+
+  checkAndTriggerSync() {
+    const now = Date.now();
+    const localHeight = this.blockchain.chain.length;
+
+    // Check if we are currently syncing from a valid peer and the timeout hasn't elapsed
+    if (this.syncingFromPeerId) {
+      const activeSyncPeer = this.peers.get(this.syncingFromPeerId);
+      if (activeSyncPeer && activeSyncPeer.ws.readyState === WebSocket.OPEN && (now - this.lastSyncRequestTime) < 15000) {
+        // Already active sync ongoing with a healthy peer, don't trigger another parallel request
+        return;
+      }
+      // Stalled or disconnected peer - reset sync state
+      this.syncingFromPeerId = null;
+    }
+
+    // Find the single peer with the longest chain
+    let bestPeer = null;
+    let maxChainHeight = localHeight;
+
+    for (const peer of this.peers.values()) {
+      if (peer.ws.readyState === WebSocket.OPEN && peer.chainHeight > maxChainHeight) {
+        maxChainHeight = peer.chainHeight;
+        bestPeer = peer;
+      }
+    }
+
+    if (bestPeer) {
+      const gap = maxChainHeight - localHeight;
+      console.log(`📥 Initiating sync with best peer ${bestPeer.id.slice(0, 8)} (${gap} blocks ahead, target height: ${maxChainHeight})`);
+      this.syncingFromPeerId = bestPeer.id;
+      this.lastSyncRequestTime = now;
+      this._requestBlocks(bestPeer.ws);
+    }
   }
 
   _handleGetBlocks(msg, peerId) {
@@ -719,12 +819,19 @@ export class P2PServer {
     if (!peer) return;
 
     const from = msg.fromIndex || 0;
-    const BATCH = 500; // Increased to 500 for fast block sharing and catching up
+    const ourHeight = this.blockchain.chain.length;
+    const gap = ourHeight - from;
+
+    // Adaptive batch sizing:
+    //   gap > 100  → 1000 blocks per batch (fast catch-up, prevents data loss)
+    //   gap <= 100 → 100 blocks per batch  (fine-grained, avoids conflicts near tip)
+    const BATCH = gap > 100 ? 1000 : 100;
     const blocks = this.blockchain.chain.slice(from, from + BATCH);
 
     if (!blocks.length) return;
 
     const batch = blocks.map(b => b.toJSON ? b.toJSON() : b);
+    console.log(`📤 Sending ${batch.length} blocks to peer ${peerId.slice(0,8)} (gap=${gap}, from=#${from})`);
     this._send(peer.ws, { type: 'blocks', blocks: batch });
   }
 
@@ -825,10 +932,18 @@ export class P2PServer {
         }
       }
 
-      // If we received a substantial batch (100+ blocks), request the next batch to speed up syncing
-      if (peer && blocks.length >= 100) {
-        console.log(`📥 Received substantial batch (${blocks.length} blocks). Requesting next batch...`);
-        this._requestBlocks(peer.ws);
+      // Pipeline: immediately request next batch if we're still behind peer.
+      // This prevents data loss — we keep pulling until fully caught up.
+      if (peer && peer.ws.readyState === 1 /* OPEN */) {
+        const remaining = (peer.chainHeight || 0) - this.blockchain.chain.length;
+        if (remaining > 0) {
+          console.log(`📥 Still ${remaining} blocks behind peer ${peerId.slice(0,8)}. Requesting next batch...`);
+          this._requestBlocks(peer.ws);
+        } else {
+          this.syncingFromPeerId = null;
+        }
+      } else {
+        this.syncingFromPeerId = null;
       }
     } catch (err) {
       console.error('❌ _processBlocksBatch error:', err.message);
@@ -896,6 +1011,71 @@ export class P2PServer {
     }
   }
 
+  // ─── Leader Election ─────────────────────────────────────────────────────────
+  //
+  // PRIMARY node (sayman.onrender.com) is the designated block producer.
+  // Standby nodes monitor the primary via leader_heartbeat every 4s.
+  // If primary is silent for > PRIMARY_TIMEOUT ms, standbys step up.
+  // When primary recovers, it fast-syncs all missed blocks, then resumes.
+
+  _startLeaderHeartbeat() {
+    if (this.isPrimaryNode) {
+      // Primary broadcasts its heartbeat every 4s so standbys know it's alive.
+      this.leaderHeartbeatInterval = setInterval(() => {
+        this.broadcast({
+          type: 'leader_heartbeat',
+          nodeId: this.nodeId,
+          height: this.blockchain.chain.length,
+          timestamp: Date.now(),
+          isPrimary: true,
+        });
+      }, 4_000);
+      console.log('👑 Primary heartbeat broadcaster started (4s interval)');
+    } else {
+      // Standby: check primary liveness every 5s.
+      this.leaderHeartbeatInterval = setInterval(() => {
+        const elapsed = Date.now() - this.primaryLastSeen;
+        const wasPrimaryAlive = this.primaryAlive;
+        this.primaryAlive = this.primaryLastSeen > 0 && elapsed < this.PRIMARY_TIMEOUT;
+
+        if (wasPrimaryAlive && !this.primaryAlive) {
+          console.warn(`⚠️ PRIMARY silent for ${Math.round(elapsed / 1000)}s — STANDBY taking over block production`);
+        } else if (!wasPrimaryAlive && this.primaryAlive) {
+          console.log('✅ PRIMARY is back online — stepping down from block production');
+        }
+      }, 5_000);
+    }
+  }
+
+  _handleLeaderHeartbeat(msg, peerId) {
+    if (!msg.isPrimary) return;
+    const peer = this.peers.get(peerId);
+    // Only trust heartbeats from the configured primary host.
+    const primaryHost = (process.env.PRIMARY_NODE_URL || 'sayman.onrender.com').toLowerCase();
+    const peerUrl = (peer && peer.url || '').toLowerCase();
+    // Accept if peer URL contains the primary host, or if primary is self (no filter)
+    const trusted = !peerUrl || peerUrl.includes(primaryHost) || primaryHost === 'none';
+    if (!trusted) return;
+
+    this.primaryLastSeen = Date.now();
+    this.primaryAlive = true;
+
+    // If primary is ahead, immediately request missing blocks.
+    if (peer && msg.height > this.blockchain.chain.length) {
+      console.log(`👑 Primary at height ${msg.height}, we are at ${this.blockchain.chain.length}. Syncing...`);
+      this._requestBlocks(peer.ws);
+    }
+  }
+
+  // Returns whether this node is currently allowed to produce blocks.
+  // Primary: always. Standby: only when primary is silent/dead.
+  canProduceBlocks() {
+    if (this.isPrimaryNode) return true;
+    // If no PRIMARY_NODE_URL configured, all nodes produce (backwards-compatible).
+    if (!process.env.PRIMARY_NODE_URL) return true;
+    return !this.primaryAlive;
+  }
+
   // ─── Public API ──────────────────────────────────────────────────────────────
 
   connectToPeerLegacy(url) { this.connectToPeer(url); }
@@ -932,8 +1112,10 @@ export class P2PServer {
   getNetworkStats() {
     return {
       ...this.getStats(),
-      mode: 'validator',
+      mode: this.isPrimaryNode ? 'primary-validator' : 'standby-validator',
       discovered: this.discoveredPeers.size,
+      isPrimary: this.isPrimaryNode,
+      primaryAlive: this.primaryAlive,
     };
   }
 
@@ -944,6 +1126,10 @@ export class P2PServer {
 
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+    }
+
+    if (this.leaderHeartbeatInterval) {
+      clearInterval(this.leaderHeartbeatInterval);
     }
 
     for (const [url, timer] of this.reconnectTimers.entries()) {

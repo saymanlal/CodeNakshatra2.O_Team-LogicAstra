@@ -43,6 +43,11 @@ class ContractEngine {
     this.events    = [];          // global event log (in-memory)
   }
 
+  clear() {
+    this.contracts.clear();
+    this.events = [];
+  }
+
   // ─── Deploy ────────────────────────────────────────────────────────────────
 
   /**
