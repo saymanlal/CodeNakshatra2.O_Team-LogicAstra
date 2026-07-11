@@ -630,14 +630,15 @@ function renderContracts(contracts) {
   if (!tbody) return;
 
   if (!contracts.length) {
-    tbody.innerHTML = `<tr><td colspan="3" style="padding:calc(var(--grid)*3);text-align:center;color:var(--mono-400);font-size:12px;">No contracts found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="padding:calc(var(--grid)*3);text-align:center;color:var(--mono-400);font-size:12px;">No contracts found.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = contracts.map(c => `
     <tr onclick="showContractDetail('${c.address || ''}')">
-      <td class="mono">${(c.address || '').slice(0, 20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${c.address || ''}')"><i class="fas fa-copy"></i></button></td>
-      <td class="mono">${(c.creator || '').slice(0, 20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${c.creator || ''}')"><i class="fas fa-copy"></i></button></td>
+      <td class="mono" style="font-size:11px;">${c.address || '—'} <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${c.address || ''}')"><i class="fas fa-copy"></i></button></td>
+      <td class="mono">${(c.creator || '').slice(0, 15)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${c.creator || ''}')"><i class="fas fa-copy"></i></button></td>
+      <td>${c.blockIndex !== undefined && c.blockIndex !== null ? `#${c.blockIndex}` : '—'}</td>
       <td>${(c.code?.length ?? 0).toLocaleString()} bytes</td>
     </tr>
   `).join('');

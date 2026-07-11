@@ -277,9 +277,16 @@
             const baseEndpoints = networkEndpoints[currentNetwork];
             endpoints = Array.isArray(baseEndpoints) ? baseEndpoints : [baseEndpoints].filter(Boolean);
         }
+
+        // Always try the PRIMARY endpoint (sayman.onrender.com = index 0) first.
+        // Only move to a standby peer if primary is unreachable.
+        // This keeps all reads canonical and prevents stale data from lagging peers.
+        const orderedIndices = [];
+        orderedIndices.push(0); // primary always first
+        for (let i = 1; i < endpoints.length; i++) orderedIndices.push(i);
         
-        for (let i = 0; i < endpoints.length; i++) {
-            const idx = (activeEndpointIndex + i) % endpoints.length;
+        for (const idx of orderedIndices) {
+            if (idx >= endpoints.length) continue;
             const base = endpoints[idx];
             
             let url = base;
@@ -291,7 +298,7 @@
             
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
                 
                 const res = await window.fetch(url, {
                     ...options,
@@ -303,10 +310,10 @@
                     activeEndpointIndex = idx;
                     return res;
                 }
-                console.warn(`⚠️ Peer ${base} returned status ${res.status}. Trying next...`);
+                console.warn(`⚠️ Peer ${base} returned status ${res.status}. Trying next peer...`);
             } catch (err) {
                 lastError = err;
-                console.warn(`⚠️ Failed to connect to peer ${base}: ${err.message}. Trying next...`);
+                console.warn(`⚠️ Failed to connect to ${base}: ${err.message}. Falling back to next peer...`);
             }
         }
         throw lastError;

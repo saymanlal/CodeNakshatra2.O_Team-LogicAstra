@@ -56,6 +56,10 @@ export class P2PServer {
     this.primaryLastSeen = 0;
     this.PRIMARY_TIMEOUT = 20_000;   // treat primary as dead after 20s of silence
     this.leaderHeartbeatInterval = null;
+
+    // ── SINGLE PEER SYNC CONTROL ───────────────────────────────────
+    this.syncingFromPeerId = null;
+    this.lastSyncRequestTime = 0;
   }
 
   // ─── Server startup ─────────────────────────────────────────────────────────
@@ -161,6 +165,8 @@ export class P2PServer {
           }
         }
       }
+      // Trigger sync verification to recover from any stalled syncs
+      this.checkAndTriggerSync();
     }, 45_000);
   }
 
@@ -369,7 +375,9 @@ export class P2PServer {
     console.log(`👤 Inbound peer ${peerId} (total: ${this.peers.size})`);
     this._registerHandlers(ws, peerId);
     this._sendHandshake(ws);
-    this._requestBlocks(ws);
+    // NOTE: Do NOT call _requestBlocks here.
+    // The handshake response will carry peer's chainHeight, and _handleHandshake
+    // will trigger sync from the BEST available peer — not from every peer.
   }
 
   _handleOutboundConnection(ws, url) {
@@ -387,7 +395,9 @@ export class P2PServer {
     console.log(`👤 Outbound peer ${peerId} → ${url} (total: ${this.peers.size})`);
     this._registerHandlers(ws, peerId);
     this._sendHandshake(ws);
-    this._requestBlocks(ws);
+    // NOTE: Do NOT call _requestBlocks here.
+    // The handshake response will carry peer's chainHeight, and _handleHandshake
+    // will trigger sync from the BEST available peer — not from every peer.
   }
 
   // ─── Shared per-socket event registration ────────────────────────────────────
@@ -639,10 +649,8 @@ export class P2PServer {
     const peerHeight  = msg.chainHeight || 0;
 
     if (peerHeight > localHeight) {
-      const gap = peerHeight - localHeight;
-      console.log(`📥 Peer is ${gap} blocks ahead (peer=${peerHeight}, us=${localHeight}). Syncing...`);
-      // For crash-recovery: send get_blocks with exact fromIndex so we don't miss any block.
-      this._send(peer.ws, { type: 'get_blocks', fromIndex: localHeight });
+      // Coordinate and trigger sync from the single best peer, avoiding multi-peer redundant downloads
+      this.checkAndTriggerSync();
     } else if (peerHeight < localHeight) {
       // Peer is behind — push our chain to help them catch up quickly.
       const fromIndex = Math.max(0, peerHeight);
@@ -752,11 +760,58 @@ export class P2PServer {
 
   // ─── Block request / response ────────────────────────────────────────────────
 
+  _findPeerByWs(ws) {
+    for (const peer of this.peers.values()) {
+      if (peer.ws === ws) return peer;
+    }
+    return null;
+  }
+
   _requestBlocks(ws) {
+    const peer = this._findPeerByWs(ws);
+    if (peer) {
+      this.syncingFromPeerId = peer.id;
+      this.lastSyncRequestTime = Date.now();
+    }
     this._send(ws, {
       type: 'get_blocks',
       fromIndex: this.blockchain.chain.length,
     });
+  }
+
+  checkAndTriggerSync() {
+    const now = Date.now();
+    const localHeight = this.blockchain.chain.length;
+
+    // Check if we are currently syncing from a valid peer and the timeout hasn't elapsed
+    if (this.syncingFromPeerId) {
+      const activeSyncPeer = this.peers.get(this.syncingFromPeerId);
+      if (activeSyncPeer && activeSyncPeer.ws.readyState === WebSocket.OPEN && (now - this.lastSyncRequestTime) < 15000) {
+        // Already active sync ongoing with a healthy peer, don't trigger another parallel request
+        return;
+      }
+      // Stalled or disconnected peer - reset sync state
+      this.syncingFromPeerId = null;
+    }
+
+    // Find the single peer with the longest chain
+    let bestPeer = null;
+    let maxChainHeight = localHeight;
+
+    for (const peer of this.peers.values()) {
+      if (peer.ws.readyState === WebSocket.OPEN && peer.chainHeight > maxChainHeight) {
+        maxChainHeight = peer.chainHeight;
+        bestPeer = peer;
+      }
+    }
+
+    if (bestPeer) {
+      const gap = maxChainHeight - localHeight;
+      console.log(`📥 Initiating sync with best peer ${bestPeer.id.slice(0, 8)} (${gap} blocks ahead, target height: ${maxChainHeight})`);
+      this.syncingFromPeerId = bestPeer.id;
+      this.lastSyncRequestTime = now;
+      this._requestBlocks(bestPeer.ws);
+    }
   }
 
   _handleGetBlocks(msg, peerId) {
@@ -884,7 +939,11 @@ export class P2PServer {
         if (remaining > 0) {
           console.log(`📥 Still ${remaining} blocks behind peer ${peerId.slice(0,8)}. Requesting next batch...`);
           this._requestBlocks(peer.ws);
+        } else {
+          this.syncingFromPeerId = null;
         }
+      } else {
+        this.syncingFromPeerId = null;
       }
     } catch (err) {
       console.error('❌ _processBlocksBatch error:', err.message);

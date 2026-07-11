@@ -834,6 +834,9 @@ class Blockchain {
     }
 
     this.state.clear();
+    if (this.contracts && typeof this.contracts.clear === 'function') {
+      this.contracts.clear();
+    }
     let startIndex = 0;
 
     if (snapshot) {
