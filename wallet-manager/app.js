@@ -3174,46 +3174,58 @@
     }
 
     async function init() {
-        await loadWalletEnv();
-        await discoverPeersDynamically();
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += Math.random() * 8 + 2;
-            if (progress > 90) {
-                clearInterval(interval);
-                progress = 90;
-                updateProgress(progress);
-            } else {
-                updateProgress(Math.min(progress, 90));
-            }
-        }, 200);
-
+        // 1. Load state from localStorage immediately
         loadState();
-        dom.networkSelect.value = currentNetwork;
+        if (dom.networkSelect) {
+            dom.networkSelect.value = currentNetwork;
+        }
 
-        setTimeout(async () => {
-            // NOTE: No demo wallet is auto-created anymore.
-            // If wallets.length === 0, the UI simply shows the
-            // empty state and the user creates/imports a real wallet.
-
-            if (!activeWallet && wallets.length > 0) {
-                activeWallet = wallets[0];
+        // 2. Start progress bar immediately
+        let progress = 0;
+        updateProgress(0);
+        
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15 + 10; // faster loader
+            if (progress >= 100) {
+                clearInterval(progressInterval);
+                progress = 100;
+                updateProgress(100);
+                setTimeout(() => {
+                    if (dom.loading) {
+                        dom.loading.classList.add('hidden');
+                        dom.loading.style.display = 'none'; // Ensure it doesn't block interactions
+                    }
+                }, 200);
+            } else {
+                updateProgress(Math.min(progress, 99));
             }
+        }, 80); // updates every 80ms, so it takes ~500ms - 800ms total loader time! Very fast.
 
-            updateProgress(100);
-            setTimeout(() => {
-                dom.loading.classList.add('hidden');
-            }, 400);
+        // 3. Render cached wallet state immediately so UI is loaded
+        if (!activeWallet && wallets.length > 0) {
+            activeWallet = wallets[0];
+        }
+        render();
 
-            await fetchNetworkConfig();
-            render();
-
-            if (activeWallet) {
-                await loadTransactionHistory();
-                await fetchBlockInfo();
+        // 4. Run network operations in the background
+        (async () => {
+            try {
+                await loadWalletEnv();
+                await discoverPeersDynamically();
+                await fetchNetworkConfig();
+                
+                if (activeWallet) {
+                    await loadTransactionHistory();
+                    await fetchBlockInfo();
+                }
+                
+                // Re-render after network sync
+                render();
+            } catch (err) {
+                console.error("Background network sync failed:", err);
             }
-
             startAutoRefresh();
+        })();
 
             // APK Update check
             async function checkForUpdates() {
@@ -3300,9 +3312,8 @@
                 document.getElementById('updateModal').classList.remove('open');
             });
 
-            console.log('🚀 PUKY Wallet Pro v3.0 initialized');
+            console.log('🚀 Vizkus Wallet Pro v3.0 initialized');
             console.log(`📊 ${wallets.length} wallets loaded on ${getNetworkName()}`);
-        }, 600);
 
         const scanModal = document.getElementById('scanQrModal');
         const observer = new MutationObserver(() => {
