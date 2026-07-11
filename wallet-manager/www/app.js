@@ -1381,7 +1381,7 @@
         }
     });
 
-    dom.qrPayCancelBtn.addEventListener('click', () => {
+    dom.qrPayCancelBtn?.addEventListener('click', () => {
         stopQrPayScanner();
         closeModal('qrPayModal');
     });
@@ -2468,15 +2468,15 @@
 
     dom.walletSearch.addEventListener('input', renderWalletList);
 
-    dom.mobileMenuBtn.addEventListener('click', (e) => {
+    dom.mobileMenuBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
-        dom.sidebar.classList.toggle('open');
-        dom.mobileOverlay.classList.toggle('active');
+        dom.sidebar?.classList.toggle('open');
+        dom.mobileOverlay?.classList.toggle('active');
     });
 
-    dom.mobileOverlay.addEventListener('click', () => {
-        dom.sidebar.classList.remove('open');
-        dom.mobileOverlay.classList.remove('active');
+    dom.mobileOverlay?.addEventListener('click', () => {
+        dom.sidebar?.classList.remove('open');
+        dom.mobileOverlay?.classList.remove('active');
     });
 
     // Theme loading and toggle listener
@@ -3312,7 +3312,7 @@
                 document.getElementById('updateModal').classList.remove('open');
             });
 
-            console.log('🚀 Vizkus Wallet Pro v3.0 initialized');
+            console.log('🚀 PUKY Wallet Pro v3.0 initialized');
             console.log(`📊 ${wallets.length} wallets loaded on ${getNetworkName()}`);
 
         const scanModal = document.getElementById('scanQrModal');
