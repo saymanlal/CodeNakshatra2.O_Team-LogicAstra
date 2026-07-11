@@ -222,10 +222,19 @@ class StateEngine {
       state:   {},
       createdAt: Date.now(),
       codeHash,
-      blockIndex: meta.blockIndex || null
+      blockIndex: meta.blockIndex || null,
+      feePolicy: meta.feePolicy || 'user',
+      sponsorBalance: meta.sponsorBalance || 0
     });
 
     this.updateStateTree(address, codeHash);
+  }
+
+  setContractMeta(address, key, value) {
+    const contract = this.contracts.get(address);
+    if (contract) {
+      contract[key] = value;
+    }
   }
 
   getContract(address) {
