@@ -517,8 +517,8 @@
                 loadTransactionHistory();
                 fetchBlockInfo();
                 if (window.innerWidth <= 768) {
-                    dom.sidebar.classList.remove('open');
-                    dom.mobileOverlay.classList.remove('active');
+                    dom.sidebar?.classList.remove('open');
+                    dom.mobileOverlay?.classList.remove('active');
                 }
                 showToast(`Selected: ${activeWallet ? activeWallet.name : ''}`, 'success');
             });
@@ -566,7 +566,7 @@
             dom.detailLocked.textContent = '0.00';
             dom.detailNonce.textContent = '0';
             dom.detailBlock.textContent = '0';
-            dom.detailNetwork.textContent = getNetworkName();
+            if (dom.detailNetwork) dom.detailNetwork.textContent = getNetworkName();
             dom.detailTxList.innerHTML = '<div class="empty-state"><i class="fas fa-wallet"></i><p>Select a wallet to view transactions</p></div>';
             return;
         }
@@ -602,7 +602,7 @@
 
         dom.detailNonce.textContent = w.nonce || 0;
         dom.detailBlock.textContent = currentBlock || '0';
-        dom.detailNetwork.textContent = getNetworkName();
+        if (dom.detailNetwork) dom.detailNetwork.textContent = getNetworkName();
 
         renderTransactionHistory();
     }
@@ -1388,7 +1388,7 @@
 
     dom.networkSelect.addEventListener('change', async function() {
         currentNetwork = this.value;
-        dom.detailNetwork.textContent = getNetworkName();
+        if (dom.detailNetwork) dom.detailNetwork.textContent = getNetworkName();
         showLoading('Switching network...');
         try {
             await fetchNetworkConfig();
@@ -2517,12 +2517,18 @@
 
     function openModal(id) {
         const el = document.getElementById(id);
-        if (el) el.classList.add('open');
+        if (el) {
+            el.classList.add('open');
+            el.classList.add('active');
+        }
     }
 
     function closeModal(id) {
         const el = document.getElementById(id);
-        if (el) el.classList.remove('open');
+        if (el) {
+            el.classList.remove('open');
+            el.classList.remove('active');
+        }
         if (id === 'scanQrModal') stopQrScanner();
         if (id === 'qrPayModal') stopQrPayScanner();
     }
@@ -2534,6 +2540,7 @@
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
                 overlay.classList.remove('open');
+                overlay.classList.remove('active');
                 if (overlay.id === 'scanQrModal') stopQrScanner();
                 if (overlay.id === 'qrPayModal') stopQrPayScanner();
             }
@@ -3174,32 +3181,52 @@
     }
 
     async function init() {
+        // Fallback: unconditionally hide loader after 1s to prevent any stuck UI
+        setTimeout(() => {
+            if (dom.loading && dom.loading.style.display !== 'none') {
+                console.log('⏰ Loader timeout fallback triggered');
+                dom.loading.classList.add('hidden');
+                dom.loading.style.display = 'none';
+            }
+        }, 1000);
+
         // 1. Load state from localStorage immediately
-        loadState();
-        if (dom.networkSelect) {
-            dom.networkSelect.value = currentNetwork;
+        try {
+            loadState();
+            if (dom.networkSelect) {
+                dom.networkSelect.value = currentNetwork;
+            }
+        } catch (e) {
+            console.error("Error loading state:", e);
         }
 
         // 2. Start progress bar immediately
         let progress = 0;
-        updateProgress(0);
-        
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 15 + 10; // faster loader
-            if (progress >= 100) {
-                clearInterval(progressInterval);
-                progress = 100;
-                updateProgress(100);
-                setTimeout(() => {
-                    if (dom.loading) {
-                        dom.loading.classList.add('hidden');
-                        dom.loading.style.display = 'none'; // Ensure it doesn't block interactions
-                    }
-                }, 200);
-            } else {
-                updateProgress(Math.min(progress, 99));
+        try {
+            updateProgress(0);
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 20 + 15; // faster progress
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    progress = 100;
+                    updateProgress(100);
+                    setTimeout(() => {
+                        if (dom.loading) {
+                            dom.loading.classList.add('hidden');
+                            dom.loading.style.display = 'none'; // Ensure it doesn't block interactions
+                        }
+                    }, 100); // reduced delay
+                } else {
+                    updateProgress(Math.min(progress, 99));
+                }
+            }, 50); // faster check interval (50ms)
+        } catch (e) {
+            console.error("Error in progress loader:", e);
+            if (dom.loading) {
+                dom.loading.classList.add('hidden');
+                dom.loading.style.display = 'none';
             }
-        }, 80); // updates every 80ms, so it takes ~500ms - 800ms total loader time! Very fast.
+        }
 
         // 3. Render cached wallet state immediately so UI is loaded
         if (!activeWallet && wallets.length > 0) {

@@ -40,8 +40,8 @@
 <!-- ── LOADING SCREEN ── -->
 <div id="loadingOverlay">
     <div class="loader-wrapper">
-        <div class="loader-icon-wrap">
-            <img src="logo.svg" alt="PUKY" />
+        <div class="loader-icon-wrap" style="overflow: hidden;">
+            <img src="puky-icon.jpg" alt="PUKY" style="width: 100%; height: 100%; object-fit: cover;" />
         </div>
         <p class="loader-title" style="display: none;">PUKY Wallet</p>
         <p class="loader-sub" style="display: none;">Universal Crypto Vault • By PUKY Groups</p>
@@ -391,6 +391,10 @@
                         <div>
                             <div style="font-size:0.6rem;color:var(--text-3);text-transform:uppercase;">Block</div>
                             <div style="font-size:0.82rem;font-weight:700;" id="detailBlock">0</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.6rem;color:var(--text-3);text-transform:uppercase;">Network</div>
+                            <div style="font-size:0.82rem;font-weight:700;" id="detailNetwork">—</div>
                         </div>
                     </div>
                 </div>
