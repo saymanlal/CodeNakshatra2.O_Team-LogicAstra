@@ -28,7 +28,7 @@ export default {
   p2pPort:      parseInt(process.env.P2P_PORT) || null,
 
   // ─── Block production ────────────────────────────────────────────────────
-  blockTime:    1000,                        // 1 second
+  blockTime:    5000,                        // 5 seconds
 
   // 0.5 SAYN per block = 50,000,000 base units
   // Testnet is intentionally generous so developers get tokens fast.

@@ -659,3 +659,23 @@ footer a i {
     font-size: 16px;
   }
 }
+
+/* ── Copy Data Button ── */
+.copy-data-btn {
+  background: transparent;
+  border: none;
+  color: var(--mono-500, #888888);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 0.75rem;
+  margin-left: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.copy-data-btn:hover {
+  color: var(--mono-1000, #ffffff);
+  background: var(--mono-800, #2d2d2d);
+}

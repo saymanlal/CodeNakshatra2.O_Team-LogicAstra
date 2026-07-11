@@ -58,7 +58,7 @@ export default {
   p2pPort:      parseInt(process.env.P2P_PORT) || null,
 
   // ─── Block production ────────────────────────────────────────────────────
-  blockTime:    2000,
+  blockTime:    5000,
 
   // blockReward is dynamic via getBlockReward(height) — this is the Year 1 value.
   // blockchain.js should call getBlockReward(block.index) when minting reward tx.

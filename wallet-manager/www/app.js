@@ -509,6 +509,10 @@
                 render();
                 loadTransactionHistory();
                 fetchBlockInfo();
+                if (window.innerWidth <= 768) {
+                    dom.sidebar.classList.remove('open');
+                    dom.mobileOverlay.classList.remove('active');
+                }
                 showToast(`Selected: ${activeWallet ? activeWallet.name : ''}`, 'success');
             });
         });
@@ -962,7 +966,7 @@
                 <div class="form-group">
                     <label><i class="fas fa-hashtag"></i> Transaction ID</label>
                     <input type="text" value="${txIdDisplay}" readonly style="font-family:monospace;font-size:0.7rem;" />
-                    <a href="${explorerUrl}/tx/${tx.txId || tx.hash}" target="_blank" style="font-size:0.65rem;color:var(--accent);">View on Explorer →</a>
+                    <a href="${explorerUrl}/?page=explorer&search=${tx.txId || tx.hash}" target="_blank" style="font-size:0.65rem;color:var(--accent);">View on Explorer →</a>
                 </div>
 
                 ${tx.data ? `
@@ -994,7 +998,7 @@
                     <div class="form-group">
                         <label><i class="fas fa-cube"></i> Block Number</label>
                         <input type="text" value="${blockDisplay}" readonly style="font-weight:600;color:var(--accent);" />
-                        <a href="${explorerUrl}/block/${blockDisplay}" target="_blank" style="font-size:0.65rem;color:var(--accent);">View Block →</a>
+                        <a href="${explorerUrl}/?page=explorer&search=${blockDisplay}" target="_blank" style="font-size:0.65rem;color:var(--accent);">View Block →</a>
                     </div>
                 </div>
 
@@ -2984,12 +2988,33 @@
 
     function startAutoRefresh() {
         if (refreshInterval) clearInterval(refreshInterval);
-        refreshInterval = setInterval(() => {
+        refreshInterval = setInterval(async () => {
             if (activeWallet) {
                 loadTransactionHistory();
                 fetchBlockInfo();
             }
-        }, 2000); //snappy 2 second refresh
+            
+            // Fetch balances for all wallets on current network
+            let updated = false;
+            for (let w of wallets) {
+                if (w.networkType === getNetworkType() && w.id !== (activeWallet ? activeWallet.id : null)) {
+                    try {
+                        const res = await apiFetch(`/address/${w.address}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.balance !== undefined) {
+                                w.balance = isFinite(Number(data.balance)) ? Number(data.balance) : 0;
+                                updated = true;
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+            if (updated) {
+                saveState();
+                render();
+            }
+        }, 5000); // 5 second refresh for all wallets
     }
 
     function updateEstGasFee() {
@@ -3193,7 +3218,7 @@
                     if (res.ok) {
                         const data = await res.json();
                         const latestSha = data.sha;
-                        const relativeUrl = data.download_url || '/apk/base.apk';
+                        const relativeUrl = data.download_url || '/apk/puky.apk';
                         const downloadUrl = relativeUrl.startsWith('http') ? relativeUrl : (nodeUrl + relativeUrl);
 
                         const installedSha = localStorage.getItem('installed_apk_sha');
@@ -3218,7 +3243,7 @@
                 // 2. Fallback to GitHub
                 if (!githubRepo) return;
                 try {
-                    const url = `https://api.github.com/repos/${githubRepo}/contents/apk/base.apk?ref=${githubBranch}`;
+                    const url = `https://api.github.com/repos/${githubRepo}/contents/apk/puky.apk?ref=${githubBranch}`;
                     const res = await window.fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
                     if (res.ok) {
                         const data = await res.json();

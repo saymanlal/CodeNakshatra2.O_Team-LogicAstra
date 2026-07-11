@@ -37,7 +37,7 @@ export default {
   p2pPort:      parseInt(process.env.P2P_PORT) || null,
 
   // ─── Block production ────────────────────────────────────────────────────
-  blockTime:    1000,
+  blockTime:    5000,
 
   // 0.5 SAYN/block = 50,000,000 base units
   blockReward:  50_000_000,
