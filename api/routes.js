@@ -575,12 +575,9 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
         mode: 'api' 
       };
       
-      let avgBlockTime = config.blockTime;
-      if (blockchain.chain.length > 10) {
-        const recent = blockchain.chain.slice(-10);
-        const timeDiff = recent[recent.length - 1].timestamp - recent[0].timestamp;
-        avgBlockTime = timeDiff / 9;
-      }
+      // Always use the configured block time — computing from timestamps is misleading
+      // because during fast-sync, blocks arrive in bursts giving ~1001ms instead of 5s.
+      const avgBlockTime = config.blockTime;
       
       res.json({
         network: stats.network,

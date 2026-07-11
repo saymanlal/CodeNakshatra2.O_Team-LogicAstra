@@ -216,6 +216,13 @@ function startMining(mode) {
           return;
         }
 
+        // ── Leader election: standby nodes yield to the primary ───────
+        // Primary (sayman.onrender.com) always produces.
+        // Standbys only produce when primary has been silent for > 20s.
+        if (!p2pServer.canProduceBlocks()) {
+          return; // Primary is alive — yield
+        }
+
         // Skip block production if we are behind any connected peer
         let maxPeerHeight = 0;
         for (const peer of p2pServer.peers.values()) {
