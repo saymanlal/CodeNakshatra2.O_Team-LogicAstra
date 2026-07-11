@@ -9,6 +9,7 @@ import Blockchain from './core/blockchain.js';
 import { P2PServer } from './p2p/server.js';
 import { setupRoutes } from './api/routes.js';
 import { loadConfig } from './config/index.js';
+import { submitRollupToL1 } from './core/rollup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -119,8 +120,8 @@ async function startServer() {
     }
 
     console.log('\n╔════════════════════════════════════════╗');
-    console.log('║   SAYMAN BLOCKCHAIN - PHASE 7          ║');
-    console.log('║   Public Network + Real P2P            ║');
+    console.log('║   SAYMAN BLOCKCHAIN - PHASE 14         ║');
+    console.log('║   Multi-Layer + NFT + Custom Tokens    ║');
     console.log('╚════════════════════════════════════════╝\n');
     console.log(`🌐 NETWORK: ${networkFlag.toUpperCase()}`);
     console.log(`🔧 MODE: ${mode.toUpperCase()}`);
@@ -148,6 +149,11 @@ async function startServer() {
 
     setupRoutes(app, blockchain, p2pServer, config);
 
+    // Explorer SPA routing fallbacks for blocks, txs, and contracts
+    app.get(['/block/:id', '/tx/:hash', '/contract/:address'], (req, res) => {
+      res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
+    });
+
     app.get('/health', (_req, res) => {
       res.status(200).json({
         status: 'ok',
@@ -166,7 +172,7 @@ async function startServer() {
       console.log(`📚 Docs: http://localhost:${PORT}/docs`);
       console.log(`🔗 Mode: ${mode.toUpperCase()}`);
 
-      if (mode === 'validator' || mode === 'full' || mode === 'fullnode' || mode === 'observer') {
+      if (mode === 'validator' || mode === 'full' || mode === 'fullnode' || mode === 'observer' || mode === 'sequencer') {
         try {
           p2pServer.listen(config.p2pPort ? null : server);
         } catch (err) {
@@ -183,9 +189,9 @@ async function startServer() {
         startBootstrapPinger(config.bootstrapPeers);
       }
 
-      if (mode === 'validator') {
-        console.log('\n⛏️ Starting block production...');
-        startMining();
+      if (mode === 'validator' || mode === 'sequencer') {
+        console.log(`\n⛏️ Starting block production in ${mode.toUpperCase()} mode...`);
+        startMining(mode);
       }
     });
 
@@ -198,18 +204,59 @@ async function startServer() {
   }
 }
 
-function startMining() {
+function startMining(mode) {
   const config = blockchain.config;
+  const startupTime = Date.now();
 
   miningInterval = setInterval(async () => {
     try {
-      if (p2pServer && p2pServer.isSyncing) {
+      if (p2pServer) {
         // Skip block production while syncing from peers to prevent forks
-        return;
+        if (p2pServer.isSyncing) {
+          return;
+        }
+
+        // ── Leader election: standby nodes yield to the primary ───────
+        // Primary (sayman.onrender.com) always produces.
+        // Standbys only produce when primary has been silent for > 20s.
+        if (!p2pServer.canProduceBlocks()) {
+          return; // Primary is alive — yield
+        }
+
+        // Skip block production if we are behind any connected peer
+        let maxPeerHeight = 0;
+        for (const peer of p2pServer.peers.values()) {
+          if (peer.chainHeight > maxPeerHeight) {
+            maxPeerHeight = peer.chainHeight;
+          }
+        }
+        if (maxPeerHeight > blockchain.chain.length) {
+          console.log(`[Miner] Skipping block production: local height (${blockchain.chain.length}) is behind peer height (${maxPeerHeight})`);
+          return;
+        }
+
+        // If bootstrap peers are configured, wait to connect to at least one peer
+        // to avoid producing blocks in isolation, with a 30-second startup grace period
+        if (config.bootstrapPeers?.length > 0 && p2pServer.peers.size === 0) {
+          const elapsed = Date.now() - startupTime;
+          if (elapsed < 30_000) {
+            console.log(`[Miner] Waiting to connect to bootstrap peers before starting block production...`);
+            return;
+          }
+        }
       }
+
       const block = await blockchain.createBlock();
-      if (block && p2pServer) {
-        p2pServer.broadcastBlock(block);
+      if (block) {
+        if (p2pServer) {
+          p2pServer.broadcastBlock(block);
+        }
+        // If this node is running as a sequencer (L2 Rollup node), submit commitment to L1
+        if (mode === 'sequencer' && block.index > 0 && block.index % 5 === 0) {
+          submitRollupToL1(block, config).catch(err => {
+            console.error('[Rollup] Error submitting to L1:', err.message);
+          });
+        }
       }
     } catch (err) {
       console.error('Mining error:', err.message);

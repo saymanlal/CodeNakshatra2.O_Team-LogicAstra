@@ -43,6 +43,11 @@ class ContractEngine {
     this.events    = [];          // global event log (in-memory)
   }
 
+  clear() {
+    this.contracts.clear();
+    this.events = [];
+  }
+
   // ─── Deploy ────────────────────────────────────────────────────────────────
 
   /**
@@ -50,9 +55,10 @@ class ContractEngine {
    * @param {object|string} payload - { name, version, abi, code, feePolicy? } or raw string
    * @param {number} timestamp
    * @param {object} gasTracker
+   * @param {number|null} blockIndex
    * @returns {string} contractAddress
    */
-  deploy(from, payload, timestamp, gasTracker) {
+  deploy(from, payload, timestamp, gasTracker, blockIndex = null) {
     let name, version, abi, code, feePolicy;
 
     if (typeof payload === 'string') {
@@ -76,7 +82,7 @@ class ContractEngine {
       throw new Error(`Invalid feePolicy: ${feePolicy}. Must be 'user', 'sponsor', or 'free'`);
     }
 
-    const contractAddress = this._generateAddress(from, timestamp);
+    const contractAddress = payload.existingAddress || this._generateAddress(from, timestamp);
     const codeHash        = crypto.createHash('sha256').update(code).digest('hex');
 
     // Charge gas: base deploy cost + 1 gas unit per 10 bytes of code
@@ -95,6 +101,7 @@ class ContractEngine {
       state:       {},              // persistent state — key/value store
       sponsorBalance: 0,           // base units available for 'sponsor' policy
       createdAt:   timestamp,
+      blockIndex,
     };
 
     // Save to in-memory cache
@@ -102,7 +109,7 @@ class ContractEngine {
 
     // Save to persistent state store
     this.state.deployContract(contractAddress, code, from, {
-      name, version, abi, codeHash, feePolicy,
+      name, version, abi, codeHash, feePolicy, blockIndex
     });
 
     console.log(
@@ -227,17 +234,57 @@ class ContractEngine {
           globalThis.generateAddress = function(seed) { return __bridge.generateAddress(seed); };
           globalThis.require = function(cond, msg) { if (!cond) throw new Error(msg || 'Requirement failed'); };
 
-          // Clean standard prototypes to prevent sandbox escape via constructor traversal
-          const safeGlobals = ['Object', 'Function', 'Array', 'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Error', 'Map', 'Set', 'JSON', 'Math', 'Promise'];
-          for (const name of safeGlobals) {
-            const ctor = globalThis[name];
-            if (ctor && ctor.prototype) {
-              Object.defineProperty(ctor.prototype, 'constructor', {
-                get: function() { return undefined; },
-                set: function() {},
-                configurable: false
-              });
-            }
+          // Secure prototype chain walking (dynamically cleaning all prototypes)
+          const clean = (obj) => {
+            if (!obj) return;
+            try {
+              if (obj.prototype) {
+                Object.defineProperty(obj.prototype, 'constructor', {
+                  get: () => undefined,
+                  set: () => {},
+                  configurable: false
+                });
+              }
+            } catch (e) {}
+          };
+
+          // Clean all globals on globalThis
+          for (const key of Object.getOwnPropertyNames(globalThis)) {
+            try {
+              clean(globalThis[key]);
+            } catch (e) {}
+          }
+
+          // Clean hidden or implicit prototype constructors
+          try {
+            const asyncFn = (async () => {}).constructor;
+            clean(asyncFn);
+            const genFn = (function* () {}).constructor;
+            clean(genFn);
+            const asyncGenFn = (async function* () {}).constructor;
+            clean(asyncGenFn);
+            const typedArray = Object.getPrototypeOf(Uint8Array);
+            clean(typedArray);
+            const arrayIterator = Object.getPrototypeOf([][Symbol.iterator]());
+            if (arrayIterator) clean(arrayIterator.constructor);
+          } catch (e) {}
+
+          // Clean main standard prototypes
+          const prototypesToClean = [
+            Object.prototype, Function.prototype, Array.prototype, String.prototype,
+            Number.prototype, Boolean.prototype, Date.prototype, RegExp.prototype,
+            Error.prototype, Map.prototype, Set.prototype, Promise.prototype
+          ];
+          for (const proto of prototypesToClean) {
+            try {
+              if (proto) {
+                Object.defineProperty(proto, 'constructor', {
+                  get: () => undefined,
+                  set: () => {},
+                  configurable: false
+                });
+              }
+            } catch (e) {}
           }
 
           delete globalThis.__bridge;
@@ -256,16 +303,17 @@ class ContractEngine {
           });
           for (const _cls of _classes) {
             try {
+              // Bind helpers to prototype so constructor has access
+              globalThis[_cls].prototype.getState  = getState;
+              globalThis[_cls].prototype.setState  = setState;
+              globalThis[_cls].prototype.emit      = emit;
+              globalThis[_cls].prototype.transfer  = transfer;
+              globalThis[_cls].prototype.getBalance = getBalance;
+              globalThis[_cls].prototype.require   = require;
+              globalThis[_cls].prototype.msg       = msg;
+
               const _inst = new globalThis[_cls]();
               if (typeof _inst['${method}'] === 'function') {
-                // Give instance access to state helpers via 'this'
-                _inst.getState  = getState;
-                _inst.setState  = setState;
-                _inst.emit      = emit;
-                _inst.transfer  = transfer;
-                _inst.getBalance = getBalance;
-                _inst.require   = require;
-                _inst.msg       = msg;
                 __returnValue   = _inst['${method}'](args);
                 return;
               }
@@ -370,16 +418,57 @@ class ContractEngine {
           globalThis.hash = function(data) { return __bridge.hash(data); };
           globalThis.require = function(cond, msg) { if (!cond) throw new Error(msg || 'Requirement failed'); };
 
-          const safeGlobals = ['Object', 'Function', 'Array', 'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Error', 'Map', 'Set', 'JSON', 'Math', 'Promise'];
-          for (const name of safeGlobals) {
-            const ctor = globalThis[name];
-            if (ctor && ctor.prototype) {
-              Object.defineProperty(ctor.prototype, 'constructor', {
-                get: function() { return undefined; },
-                set: function() {},
-                configurable: false
-              });
-            }
+          // Secure prototype chain walking (dynamically cleaning all prototypes)
+          const clean = (obj) => {
+            if (!obj) return;
+            try {
+              if (obj.prototype) {
+                Object.defineProperty(obj.prototype, 'constructor', {
+                  get: () => undefined,
+                  set: () => {},
+                  configurable: false
+                });
+              }
+            } catch (e) {}
+          };
+
+          // Clean all globals on globalThis
+          for (const key of Object.getOwnPropertyNames(globalThis)) {
+            try {
+              clean(globalThis[key]);
+            } catch (e) {}
+          }
+
+          // Clean hidden or implicit prototype constructors
+          try {
+            const asyncFn = (async () => {}).constructor;
+            clean(asyncFn);
+            const genFn = (function* () {}).constructor;
+            clean(genFn);
+            const asyncGenFn = (async function* () {}).constructor;
+            clean(asyncGenFn);
+            const typedArray = Object.getPrototypeOf(Uint8Array);
+            clean(typedArray);
+            const arrayIterator = Object.getPrototypeOf([][Symbol.iterator]());
+            if (arrayIterator) clean(arrayIterator.constructor);
+          } catch (e) {}
+
+          // Clean main standard prototypes
+          const prototypesToClean = [
+            Object.prototype, Function.prototype, Array.prototype, String.prototype,
+            Number.prototype, Boolean.prototype, Date.prototype, RegExp.prototype,
+            Error.prototype, Map.prototype, Set.prototype, Promise.prototype
+          ];
+          for (const proto of prototypesToClean) {
+            try {
+              if (proto) {
+                Object.defineProperty(proto, 'constructor', {
+                  get: () => undefined,
+                  set: () => {},
+                  configurable: false
+                });
+              }
+            } catch (e) {}
           }
 
           delete globalThis.__bridge;
@@ -396,11 +485,15 @@ class ContractEngine {
           });
           for (const _cls of _classes) {
             try {
+              // Bind helpers to prototype so constructor has access
+              globalThis[_cls].prototype.getState   = getState;
+              globalThis[_cls].prototype.setState   = setState;
+              globalThis[_cls].prototype.emit       = emit;
+              globalThis[_cls].prototype.require    = require;
+              globalThis[_cls].prototype.msg        = msg;
+
               const _inst = new globalThis[_cls]();
               if (typeof _inst['${method}'] === 'function') {
-                _inst.getState = getState; _inst.setState = setState;
-                _inst.emit = emit; _inst.require = require;
-                _inst.msg = msg;
                 __returnValue = _inst['${method}'](args);
                 return;
               }

@@ -1,4 +1,4 @@
-# Sayman Phase 6 - Complete Installation Guide
+# Sayman Phase 19 - Complete Installation Guide
 
 ## Prerequisites
 
@@ -93,7 +93,7 @@ cd ..
 Verify:
 ```bash
 sayman --version
-# Should show: 6.0.0
+# Should show: 16.0.0
 ```
 
 ---
@@ -108,8 +108,8 @@ npm run testnet
 **Output:**
 ```
 ╔════════════════════════════════════════╗
-║   SAYMAN BLOCKCHAIN - PHASE 6          ║
-║   Gas Model + Anti-Spam + CLI          ║
+║   SAYMAN BLOCKCHAIN - PHASE 19         ║
+║   Pipelined Parallel Execution         ║
 ╚════════════════════════════════════════╝
 
 🌐 NETWORK: TESTNET
@@ -578,7 +578,7 @@ rm -rf ~/.sayman/
 
 ### Learn More
 
-1. Read `README-PHASE6.md` for detailed features
+1. Read `README.md` for detailed features
 2. Check `docs/NETWORK_INFO.md` for network details
 3. Review smart contract examples
 4. Explore API endpoints
@@ -601,14 +601,14 @@ rm -rf ~/.sayman/
 
 ## Support
 
-- **Documentation**: README-PHASE6.md
+- **Documentation**: README.md
 - **Network Info**: `npm run docs`
 - **CLI Help**: `sayman --help`
 - **Issues**: GitHub Issues
 
 ---
 
-**Congratulations! You've successfully installed Sayman Phase 6.**
+**Congratulations! You've successfully installed Sayman Phase 19.**
 
 Start exploring with:
 ```bash

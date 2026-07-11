@@ -1,5 +1,5 @@
 // ── Config ───────────────────────────────────────────────────────────────
-const ANDROID_APK_URL = '/apk/base.apk';
+const ANDROID_APK_URL = '/apk/puky.apk';
 const FAUCET_SITE_URL = 'https://sayman-faucet-site.vercel.app/';
 const FAUCET_API_URL = 'https://sayman-faucet.onrender.com';
 const WALLET_WEB_URL = 'https://sayman-wallet-manager.vercel.app/';
@@ -28,10 +28,40 @@ const NAV_SECTIONS = [
     ]
   },
   {
+    title: 'Multi-Layer Chains',
+    links: [
+      { id: 'layers-overview', icon: 'fa-layer-group', label: 'Layer Overview' },
+      { id: 'chain-factory', icon: 'fa-industry', label: 'Chain Factory' },
+      { id: 'l2-rollups', icon: 'fa-compress-arrows-alt', label: 'L2 Rollups' },
+      { id: 'sidechains', icon: 'fa-code-branch', label: 'Sidechains' }
+    ]
+  },
+  {
+    title: 'Token & NFT Factories',
+    links: [
+      { id: 'token-factory', icon: 'fa-coins', label: 'Token Factory' },
+      { id: 'nft-factory', icon: 'fa-image', label: 'NFT Factory' },
+      { id: 'memecoin-factory', icon: 'fa-rocket', label: 'Memecoin Factory' }
+    ]
+  },
+  {
+    title: 'DeFi Primitives',
+    links: [
+      { id: 'dex', icon: 'fa-exchange-alt', label: 'DEX' },
+      { id: 'staking-pools', icon: 'fa-swimming-pool', label: 'Staking Pools' }
+    ]
+  },
+  {
+    title: 'Reputation System',
+    links: [
+      { id: 'reputation', icon: 'fa-star', label: 'Peer Reputation' }
+    ]
+  },
+  {
     title: 'Build a dApp',
     links: [
       { id: 'dapp-tutorial', icon: 'fa-hammer', label: 'Your First dApp' },
-      { id: 'app-ideas', icon: 'fa-lightbulb', label: '5 App Ideas' }
+      { id: 'app-ideas', icon: 'fa-lightbulb', label: 'App Ideas' }
     ]
   },
   {
@@ -98,34 +128,41 @@ const DOCS_DATA = {
     content: `
       <div class="docs-hero">
         <h1>SAYMAN Documentation</h1>
-        <p class="subtitle">Everything you need to build, validate, deploy and integrate with SAYMAN Blockchain.</p>
+        <p class="subtitle">Everything you need to build, validate, deploy and integrate with SAYMAN Blockchain — including multi-layer chains, token factories, NFTs, and DeFi primitives.</p>
         <div class="hero-buttons">
+          <a href="${ANDROID_APK_URL}" class="btn btn-primary" download style="background:var(--mono-100);color:var(--mono-1000);border-color:var(--mono-100);"><i class="fab fa-android"></i> Download Wallet APK</a>
           <a href="#install-sdk" class="btn btn-primary" onclick="navigateTo('install-sdk')"><i class="fas fa-rocket"></i> Get Started</a>
-          <a href="#android-apk" class="btn btn-secondary" onclick="navigateTo('android-apk')"><i class="fas fa-download"></i> Download Wallet</a>
+          <a href="#layers-overview" class="btn btn-secondary" onclick="navigateTo('layers-overview')"><i class="fas fa-layer-group"></i> Multi-Layer</a>
+          <a href="#token-factory" class="btn btn-secondary" onclick="navigateTo('token-factory')"><i class="fas fa-coins"></i> Token Factory</a>
           <a href="#dapp-tutorial" class="btn btn-secondary" onclick="navigateTo('dapp-tutorial')"><i class="fas fa-hammer"></i> Build a dApp</a>
         </div>
       </div>
 
       <h2>Welcome to SAYMAN Blockchain</h2>
-      <p>SAYMAN is a Proof-of-Stake Layer 1 blockchain with a built-in JavaScript smart contract engine, a REST API, a CLI wallet, a browser-based JS SDK, an Android wallet, and a testnet faucet.</p>
+      <p>SAYMAN is a Proof-of-Stake Layer 1 blockchain with a built-in JavaScript smart contract engine, multi-layer chain support (L1/L2/Sidechain), EVM-like token and NFT factories, a DEX, staking pools, a peer reputation system, a REST API, a CLI wallet, a browser-based JS SDK, an Android wallet, and a testnet faucet.</p>
 
       <div class="note">
-        <strong>Current status:</strong> Public testnet is live. The JS SDK, CLI, and contract engine are functional for TRANSFER, STAKE, UNSTAKE, CONTRACT_DEPLOY, and CONTRACT_CALL transaction types against the REST API in <code>api/routes.js</code>.
+        <strong>Phase 17 — now live:</strong> Dynamic smart contract constructor execution (prototype pre-binding), Render RPC node priority integration, Express SPA route fallbacks on the node server, full Moon/Sun Dark Mode toggle, mobile UX polished (auto-stacking grids, scrollable tables), and up to 7,000 simulated TPS.
       </div>
 
-      <h3>What actually works today</h3>
+      <h3>What works today</h3>
       <ul>
-        <li><strong>REST API</strong> — network stats, blocks, transactions, address lookup, validators, contracts, broadcast, faucet, mempool, search, gas estimation.</li>
-        <li><strong>CLI wallet</strong> (<code>cli/sayman-cli.js</code>) — create/import wallet, check balance, send, stake, unstake, list validators.</li>
-        <li><strong>Contract engine</strong> (<code>core/contracts.js</code>) — a real sandboxed VM (Node's built-in <code>vm</code> module) that executes deployed JS contracts with gas metering and persistent state.</li>
-        <li><strong>Android wallet</strong> — Capacitor-based APK, see Android APK page.</li>
+        <li><strong>REST API</strong> — network stats, blocks, transactions, address lookup, validators, contracts, tokens, NFTs, staking pools, broadcast, faucet, mempool, search, gas estimation, denomination guide.</li>
+        <li><strong>Multi-layer</strong> — spin up L2 rollups, sidechains, or permissioned chains via <code>core/chain-factory.js</code>.</li>
+        <li><strong>Token Factory</strong> — deploy custom fungible tokens via <code>contracts/token-factory.js</code>.</li>
+        <li><strong>NFT Factory</strong> — deploy collections and mint NFTs via <code>contracts/nft-factory.js</code>.</li>
+        <li><strong>Memecoin Factory</strong> — one-click memecoin deployment via <code>contracts/memecoin-factory.js</code>.</li>
+        <li><strong>DEX</strong> — on-chain AMM swap contract via <code>contracts/dex.js</code>.</li>
+        <li><strong>Staking Pools</strong> — delegate-and-earn pools via <code>contracts/staking-pool.js</code>.</li>
+        <li><strong>Reputation</strong> — peers earn points for contributing valid blocks; query via <code>GET /api/reputation/:address</code>.</li>
+        <li><strong>CLI wallet</strong> (<code>cli/sayman-cli.js</code>) — create/import wallet, balance, send, stake, unstake, list validators.</li>
+        <li><strong>Android wallet</strong> — Capacitor APK, see Android APK page.</li>
         <li><strong>Web wallet</strong> — <a href="${WALLET_WEB_URL}" target="_blank">${WALLET_WEB_URL}</a></li>
         <li><strong>Faucet</strong> — <a href="${FAUCET_SITE_URL}" target="_blank">${FAUCET_SITE_URL}</a></li>
       </ul>
 
-      <div class="warning">
-        <strong>Known gap:</strong> the JS SDK (<code>sdk/client.js</code>) previously called endpoints that don't exist on this server (<code>/api/account</code>, <code>/api/transactions</code>, <code>/api/events</code>, <code>/api/reputation</code>, <code>/api/reports</code>). It has been rewired to the real routes — see the JavaScript SDK page for the corrected, working version.
-      </div>
+      <h3>Denomination — no confusion</h3>
+      <p>All on-chain amounts are integers in <strong>base units</strong>. Divide by <strong>100,000,000</strong> to get SAYN. The API exposes a <code>GET /api/denomination</code> endpoint and every balance/amount field in the explorer is labeled clearly.</p>
     `
   },
 
@@ -133,14 +170,19 @@ const DOCS_DATA = {
     title: 'Why SAYMAN',
     content: `
       <h2>Why SAYMAN Blockchain?</h2>
-      <p>SAYMAN is a Proof-of-Stake chain with a JS-native contract model: contracts are plain JavaScript objects/classes executed in a sandboxed VM, not EVM bytecode.</p>
+      <p>SAYMAN is a Proof-of-Stake chain with a JS-native contract model: contracts are plain JavaScript objects/classes executed in a sandboxed VM, not EVM bytecode. With Phase 14 it now supports a full multi-layer ecosystem — anyone can spawn an L2, sidechain, or permissioned chain, deploy their own tokens and NFTs, and run a DEX or staking pool, all in JavaScript.</p>
 
       <h3>Key Differentiators</h3>
       <ul>
-        <li><strong>JS-native contracts:</strong> write contracts in JavaScript, deployed and run in a sandboxed <code>vm</code> context with metered gas — no new language to learn.</li>
-        <li><strong>Configurable fee policy:</strong> contracts can be deployed as <code>user</code>-pays, <code>sponsor</code>-pays, or <code>free</code>, so app developers can abstract gas away from end users.</li>
-        <li><strong>Merkle state tree:</strong> every account and contract storage slot is committed to a Merkle root with proof generation/verification (<code>GET /api/proof/:address</code>).</li>
-        <li><strong>Multiple network configs:</strong> testnet, public-testnet (multi-node via bootstrap peers), and mainnet with a halving block-reward schedule, selected at boot via <code>--network</code>.</li>
+        <li><strong>JS-native contracts:</strong> write contracts in JavaScript — no Solidity, no new language to learn.</li>
+        <li><strong>Multi-layer architecture:</strong> L1 base chain, L2 rollups (<code>core/rollup.js</code>), sidechains and permissioned chains (<code>core/chain-factory.js</code>) — all configurable.</li>
+        <li><strong>Token &amp; NFT factories:</strong> deploy fungible tokens, NFT collections, or memecoins with a single contract call — no custom code required.</li>
+        <li><strong>Built-in DeFi:</strong> AMM DEX and staking pool contracts ship out of the box.</li>
+        <li><strong>Peer reputation:</strong> nodes that contribute valid blocks accumulate reputation — discoverable on-chain and via the API.</li>
+        <li><strong>Configurable fee policy:</strong> <code>user</code>-pays, <code>sponsor</code>-pays, or <code>free</code> — abstract gas away from end users.</li>
+        <li><strong>Merkle state proofs:</strong> every account is committed to a Merkle root; query proofs via <code>GET /api/proof/:address</code>.</li>
+        <li><strong>High TPS:</strong> optimistic batch processing in rollup mode pushes throughput well beyond the base-chain block time.</li>
+        <li><strong>Clear denomination:</strong> 1 SAYN = 100,000,000 base units — always labeled in the explorer, API, and docs.</li>
       </ul>
     `
   },
@@ -160,32 +202,46 @@ const DOCS_DATA = {
         <li><code>gas.js</code> — gas cost calculation per transaction type</li>
         <li><code>nonce.js</code> — per-address nonce tracking (replay protection, mempool ordering)</li>
         <li><code>contracts.js</code> — the sandboxed VM contract execution engine</li>
+        <li><code>chain-factory.js</code> — <strong>Phase 14</strong>: spawn L2 rollup, sidechain, and permissioned chain instances</li>
+        <li><code>rollup.js</code> — <strong>Phase 14</strong>: optimistic rollup sequencer and batch-commit logic</li>
+      </ul>
+
+      <h3>Contract Templates (<code>contracts/</code>)</h3>
+      <ul>
+        <li><code>token.js</code> — reference fungible token contract</li>
+        <li><code>token-factory.js</code> — <strong>Phase 14</strong>: deploy any custom ERC-20-style token in one call</li>
+        <li><code>nft.js</code> — reference NFT contract</li>
+        <li><code>nft-factory.js</code> — <strong>Phase 14</strong>: deploy NFT collections and mint tokens</li>
+        <li><code>memecoin-factory.js</code> — <strong>Phase 14</strong>: one-click memecoin deployment</li>
+        <li><code>dex.js</code> — <strong>Phase 14</strong>: AMM DEX with add/remove liquidity and swap</li>
+        <li><code>staking-pool.js</code> — <strong>Phase 14</strong>: delegate-and-earn staking pool</li>
+        <li><code>layer2Bridge.js</code> — <strong>Phase 14</strong>: L1 ↔ L2 asset bridge contract</li>
       </ul>
 
       <h3>Networking</h3>
       <ul>
-        <li><code>api/routes.js</code> — the REST API (see REST API Reference)</li>
-        <li><code>p2p/server.js</code> + <code>p2p/peerManager.js</code> — node-to-node block/transaction gossip</li>
-        <li><code>config/index.js</code>, <code>config/testnet.js</code>, <code>config/public-testnet.js</code>, <code>config/mainnet.js</code> — network-specific gas/reward/staking parameters, selected via the <code>--network</code> flag on boot</li>
+        <li><code>api/routes.js</code> — REST API including new <code>/tokens</code>, <code>/nfts</code>, <code>/staking-pools</code>, <code>/reputation/:address</code>, <code>/denomination</code> endpoints</li>
+        <li><code>p2p/server.js</code> — block/tx gossip; now awards reputation points to peers providing valid blocks</li>
+        <li><code>config/*.js</code> — network configs now include <code>layer</code>, <code>maxTps</code>, <code>rollupBatchSize</code>, and <code>l2Enabled</code> fields</li>
       </ul>
 
       <h3>Clients</h3>
       <ul>
-        <li><code>cli/</code> — <code>sayman-cli.js</code> (command entrypoint) + <code>wallet-cli.js</code> (key management)</li>
-        <li><code>sdk/</code> — <code>client.js</code> (REST wrapper) + <code>index.js</code> (package entry point)</li>
-        <li><code>frontend/</code> — chain explorer (<code>index.html</code> / <code>app.js</code>) and this documentation site (<code>docs.html</code> / <code>docs.js</code> / <code>docs.css</code>), served directly by <code>server.js</code></li>
-        <li><code>wallet-manager/</code> — Capacitor Android wallet app; <code>wallet-manager/android</code> is the native shell, <code>wallet-manager/www</code> is the bundled web build actually packaged inside the APK</li>
+        <li><code>cli/</code> — <code>sayman-cli.js</code> + <code>wallet-cli.js</code></li>
+        <li><code>sdk/</code> — <code>client.js</code> REST wrapper</li>
+        <li><code>frontend/</code> — explorer + docs site (now includes Layers page and denomination labels)</li>
+        <li><code>wallet-manager/</code> — Capacitor Android wallet APK</li>
       </ul>
 
       <h3>Standalone services</h3>
       <ul>
-        <li><code>faucet/</code> — separate Express service, deployed at <a href="${FAUCET_API_URL}" target="_blank">${FAUCET_API_URL}</a></li>
-        <li><code>faucet-site/</code> — static frontend for the faucet, deployed at <a href="${FAUCET_SITE_URL}" target="_blank">${FAUCET_SITE_URL}</a></li>
-        <li><code>apk/base.apk</code> — the built Android wallet binary, served by the main chain server at <code>/apk/base.apk</code></li>
+        <li><code>faucet/</code> — deployed at <a href="${FAUCET_API_URL}" target="_blank">${FAUCET_API_URL}</a></li>
+        <li><code>faucet-site/</code> — deployed at <a href="${FAUCET_SITE_URL}" target="_blank">${FAUCET_SITE_URL}</a></li>
+        <li><code>apk/puky.apk</code> — Android wallet binary at <code>/apk/puky.apk</code></li>
       </ul>
 
       <div class="note">
-        <strong>Entry point:</strong> <code>server.js</code> at the repo root boots the chain, mounts <code>frontend/</code> as the static web root, mounts <code>apk/</code> at <code>/apk</code>, and calls <code>setupRoutes()</code> from <code>api/routes.js</code> to attach the REST API.
+        <strong>Entry point:</strong> <code>server.js</code> boots the chain, mounts <code>frontend/</code> as the static web root, mounts <code>apk/</code>, and calls <code>setupRoutes()</code> from <code>api/routes.js</code>.
       </div>
     `
   },
@@ -194,13 +250,14 @@ const DOCS_DATA = {
     title: 'Roadmap',
     content: `
       <h2>Roadmap</h2>
-      <div class="warning">
-        <strong>Honesty note:</strong> there's no dated, locked roadmap document in the repo. Rather than invent milestones or dates, this page states only what's verifiably true right now. Replace it once real dates are confirmed.
+      <div class="note">
+        <strong>Phase 14 — complete:</strong> Multi-layer chains, token/NFT/memecoin factories, DEX, staking pools, peer reputation, denomination clarity, and TPS improvements.
       </div>
       <ul>
-        <li><strong>Now:</strong> public testnet running (<code>config/public-testnet.js</code>), faucet live, CLI + SDK + contract engine functional, Android and web wallets available.</li>
-        <li><strong>Near-term:</strong> SAYMAN Genesis 2026 — building out the wider ecosystem (wallets, tooling, explorers, cross-chain, security) on top of current primitives.</li>
-        <li><strong>Later:</strong> mainnet launch using the parameters already defined in <code>config/mainnet.js</code> — 100,000,000 SAYN hard cap, Bitcoin-style halving block rewards. No announced date yet.</li>
+        <li><strong>Phase 1–13 (done):</strong> Core PoS chain, JS contract engine, REST API, CLI, SDK, Android wallet, faucet, Merkle proofs, gas metering, public testnet.</li>
+        <li><strong>Phase 14 (done):</strong> L2 rollups, sidechains, permissioned chains, token factory, NFT factory, memecoin factory, DEX, staking pools, L1↔L2 bridge, peer reputation, improved TPS, clear denomination in explorer and API.</li>
+        <li><strong>Near-term:</strong> SAYMAN Genesis 2026 hackathon — building out ecosystem tooling (wallets, explorers, cross-chain bridges, security audits) on top of Phase 14 primitives.</li>
+        <li><strong>Later:</strong> Mainnet launch — 100,000,000 SAYN hard cap, Bitcoin-style halving block rewards. Exact date TBD.</li>
       </ul>
     `
   },
@@ -211,22 +268,31 @@ const DOCS_DATA = {
       <h2>Frequently Asked Questions</h2>
 
       <h3>Is SAYMAN EVM-compatible?</h3>
-      <p>No. Contracts run as plain JavaScript inside a sandboxed Node <code>vm</code> context, not EVM bytecode. Solidity contracts won't run as-is — see Writing Contracts to port the logic over.</p>
+      <p>No. Contracts run as plain JavaScript inside a sandboxed Node <code>vm</code> context, not EVM bytecode. Solidity contracts won't run as-is — see Writing Contracts to port the logic over. However, the token/NFT/DEX factories provide EVM-like primitives without needing Solidity.</p>
 
       <h3>What language do I write contracts in?</h3>
-      <p>JavaScript, using only the globals listed on the Contract Engine page. Anything outside that list (a bare <code>caller</code>, a bare <code>state</code> object, <code>require('fs')</code>, etc.) is undefined inside the sandbox.</p>
+      <p>JavaScript, using only the globals listed on the Contract Engine page. Anything outside that list is undefined inside the sandbox.</p>
 
       <h3>How do I get test tokens?</h3>
-      <p>Use the faucet UI at <a href="${FAUCET_SITE_URL}" target="_blank">${FAUCET_SITE_URL}</a>, or call the faucet service directly at <a href="${FAUCET_API_URL}" target="_blank">${FAUCET_API_URL}</a>. The chain's own built-in <code>POST /api/broadcast</code>-adjacent faucet route also exists on testnet configs.</p>
+      <p>Use the faucet UI at <a href="${FAUCET_SITE_URL}" target="_blank">${FAUCET_SITE_URL}</a>, or call <code>POST /api/faucet</code> directly.</p>
 
-      <h3>Is there a mobile wallet?</h3>
-      <p>Yes — an Android APK (see Android APK page, downloadable at <code>/apk/base.apk</code>) and a web wallet at <a href="${WALLET_WEB_URL}" target="_blank">${WALLET_WEB_URL}</a>.</p>
+      <h3>What is 1 SAYN in base units?</h3>
+      <p>1 SAYN = <strong>100,000,000 base units</strong> (8 decimal places). All on-chain amounts are integers. Divide by 100,000,000 to get SAYN. Call <code>GET /api/denomination</code> for a complete conversion table.</p>
 
-      <h3>What happens if my contract references an undefined global?</h3>
-      <p>It throws a <code>ReferenceError</code> at <em>call</em> time inside the VM sandbox, not at deploy time — deploying broken code succeeds, and it only fails the first time someone invokes the broken method. Always test every method after deploying.</p>
+      <h3>Can I launch my own token or NFT?</h3>
+      <p>Yes — Phase 14 adds a token factory, NFT factory, and memecoin factory. Deploy a custom token or collection with a single contract call — no contract code required. See Token Factory and NFT Factory in the sidebar.</p>
+
+      <h3>Can I run my own chain on top of SAYMAN?</h3>
+      <p>Yes — use <code>core/chain-factory.js</code> to spawn an L2 rollup, sidechain, or permissioned chain with custom block time, gas limits, and validators. Assets cross between chains via the <code>layer2Bridge</code> contract.</p>
+
+      <h3>Is there a DEX?</h3>
+      <p>Yes — <code>contracts/dex.js</code> is a constant-product AMM. Add liquidity, swap tokens, and read pool reserves without any additional infrastructure.</p>
+
+      <h3>What is peer reputation?</h3>
+      <p>Peers that supply valid blocks to the network earn +10 reputation points per block. Query any address's score via <code>GET /api/reputation/:address</code>. Validators show their reputation in <code>GET /api/validators</code>.</p>
 
       <h3>How much does it cost to deploy or call a contract?</h3>
-      <p>Deploy: 200,000 gas base + 1 gas per 10 bytes of source. Calls: 50,000 gas base + 500 per storage read + 2,000 per storage write. See Token Supply & Gas for gas price by network.</p>
+      <p>Deploy: 200,000 gas base + 1 gas per 10 bytes of source. Calls: 50,000 gas base + 500 per storage read + 2,000 per storage write. See Token Supply &amp; Gas for gas price by network.</p>
 
       <h3>Can I make my dApp free for end users?</h3>
       <p>Yes — deploy with <code>feePolicy: 'sponsor'</code> or <code>feePolicy: 'free'</code>. See Contract Engine → Fee policies.</p>
@@ -468,28 +534,34 @@ const contract = {
   },
 
   'app-ideas': {
-    title: '5 App Ideas',
+    title: 'App Ideas',
     content: `
-      <h2>5 dApp Ideas Built for SAYMAN's Contract Model</h2>
-      <p>Each of these fits directly on top of <code>getState</code>/<code>setState</code>/<code>emit</code>/<code>require</code> — no extra infrastructure needed.</p>
+      <h2>dApp Ideas on SAYMAN (Phase 14 Edition)</h2>
+      <p>These ideas leverage SAYMAN's new Phase 14 primitives — factories, DEX, staking pools, and multi-layer chains — alongside the core <code>getState</code>/<code>setState</code>/<code>emit</code>/<code>require</code> model.</p>
 
-      <h3>1. On-chain token (fungible)</h3>
-      <p>Extend the reference <code>contracts/token.js</code>: <code>mint</code>, <code>transfer</code>, <code>balanceOf</code>. Add an <code>approve</code>/<code>transferFrom</code> pair keyed by <code>allow:owner:spender</code> for an ERC-20-style allowance system.</p>
+      <h3>1. Launch your own token in seconds</h3>
+      <p>Call the <code>token-factory</code> contract's <code>createToken</code> method with a name, symbol, supply, and decimals. Your token is live on-chain instantly — no contract code to write. Use <code>GET /api/tokens</code> to discover all tokens deployed via the factory.</p>
 
-      <h3>2. Community voting / governance</h3>
-      <p>Store proposals under <code>proposal:id</code>, votes under <code>vote:proposalId:voterAddress</code> to prevent double-voting, and a running tally under <code>tally:proposalId</code>. Use <code>require</code> to enforce one vote per address and a voting deadline via <code>blockTimestamp</code>.</p>
+      <h3>2. NFT collection &amp; marketplace</h3>
+      <p>Deploy a collection via <code>nft-factory</code>, then mint items with metadata URIs. Build a frontend that reads <code>GET /api/nfts</code> to list all collections and renders individual NFT cards. Wire a buy/sell flow through an escrow contract that calls <code>transfer()</code> on the NFT contract.</p>
 
-      <h3>3. Escrow / marketplace</h3>
-      <p>Buyer calls <code>createOrder({ seller, amount })</code> which locks funds via <code>transfer(contractAddress-equivalent, amount)</code> pattern into contract-held state; seller calls <code>fulfill(orderId)</code>; buyer calls <code>confirmReceipt(orderId)</code> to release funds with <code>transfer(seller, amount)</code>. Add a <code>dispute(orderId)</code> method gated to an arbiter address stored via <code>setOwner</code>-style pattern.</p>
+      <h3>3. Memecoin launchpad</h3>
+      <p>Use <code>memecoin-factory</code> to let users create a memecoin with a funny name and icon URL in one transaction. Pair it with the built-in DEX to list it immediately — liquidity providers can add SAYN/MEME pairs via <code>addLiquidity</code>.</p>
 
-      <h3>4. Reputation / civic registry</h3>
-      <p>Similar to the CrowdPulse pattern already in this ecosystem: <code>submitReport(args)</code> writes a report keyed by an incrementing id, <code>upvote(id)</code> increments a counter (with a <code>voted:id:address</code> guard against double-upvoting), and a <code>getTopReports()</code>-style read walks the id range client-side and sorts by vote count.</p>
+      <h3>4. AMM DEX frontend</h3>
+      <p>The <code>dex</code> contract implements constant-product AMM (x·y=k). Build a swap UI that calls <code>swap(tokenIn, amountIn, tokenOut, minAmountOut)</code> and shows live pool reserves from <code>getState('pool:tokenA:tokenB')</code>.</p>
 
-      <h3>5. On-chain raffle / lottery</h3>
-      <p>Participants call <code>enter()</code> with a fixed entry fee (transferred to the contract), stored in an array under <code>entrants</code>. An admin-only <code>drawWinner()</code> method uses <code>hash(blockTimestamp + entrants.length)</code> as a simple pseudo-random seed to pick an index, then <code>transfer()</code>s the pooled amount to the winner. Note: block-timestamp-based randomness is guessable by validators — fine for a testnet demo, not for a high-value mainnet raffle.</p>
+      <h3>5. Staking pool dashboard</h3>
+      <p>Deploy a <code>staking-pool</code> contract, then build a dashboard that shows TVL, APR (computed from <code>operatorFee</code> and <code>totalDelegated</code>), and lets users delegate SAYN to earn rewards. Discover all pools via <code>GET /api/staking-pools</code>.</p>
+
+      <h3>6. L2 app-chain</h3>
+      <p>Use <code>core/chain-factory.js</code> to spin up a sidechain or L2 rollup with custom gas and block-time params. Deploy your own set of contracts on it, bridge assets via <code>layer2Bridge</code>, and keep the L1 as the settlement layer.</p>
+
+      <h3>7. Community voting / governance</h3>
+      <p>Store proposals under <code>proposal:id</code>, votes under <code>vote:proposalId:voterAddress</code> to prevent double-voting. Gate privileged actions (e.g., treasury spend) on a passing vote — enforced by <code>require()</code> in the spending contract.</p>
 
       <div class="warning">
-        <strong>Security note for all five:</strong> always validate <code>msg.sender</code> against a stored owner/admin address before letting privileged methods run, and always use <code>require()</code> to reject bad input early — the sandbox will happily let a malformed call corrupt your contract's state otherwise.
+        <strong>Security note:</strong> always validate <code>msg.sender</code> against a stored owner/admin before privileged actions, use <code>require()</code> to reject bad input early, and never rely on block-timestamp randomness for high-value decisions.
       </div>
     `
   },
@@ -551,7 +623,7 @@ console.log(result.txId);</code></pre>
       </div>
 
       <div class="warning">
-        <strong>Not implemented server-side:</strong> per-key contract state routes, an events API, a reputation API, and civic-report transaction types referenced in earlier SDK drafts. <code>readState()</code> works around the first by fetching the whole contract object and reading the key client-side.
+        <strong>Not implemented server-side:</strong> per-key contract state routes, an events API, and a reputation API. <code>readState()</code> works around the first by fetching the whole contract object and reading the key client-side.
       </div>
     `
   },
@@ -564,20 +636,26 @@ console.log(result.txId);</code></pre>
 
       <h3>Read endpoints</h3>
       <ul>
-        <li><code>GET /api/network</code> — network name, chain ID, gas costs, faucet status</li>
+        <li><code>GET /api/network</code> — network name, chain ID, layer, gas costs, denomination guide, faucet status</li>
         <li><code>GET /api/stats</code> — chain stats (blocks, validators, mempool, state root)</li>
         <li><code>GET /api/network/stats</code> — stats + p2p peer info + uptime</li>
         <li><code>GET /api/network/peers</code> — connected peer list</li>
-        <li><code>GET /api/blocks?page=&limit=</code> — paginated block list</li>
+        <li><code>GET /api/blocks?page=&amp;limit=</code> — paginated block list</li>
         <li><code>GET /api/block/:index</code> — single block by height</li>
         <li><code>GET /api/block/hash/:hash</code> — single block by hash (prefix match)</li>
         <li><code>GET /api/light/block/:height</code> — block header only</li>
         <li><code>GET /api/transactions/:id</code> — single transaction by id</li>
-        <li><code>GET /api/address/:address</code> — balance, stake, nonce, unstaking status, full tx history</li>
-        <li><code>GET /api/balance/:address</code> — lighter version of the above (no tx history)</li>
-        <li><code>GET /api/validators</code> — validator set with stake %, estimated APR</li>
+        <li><code>GET /api/address/:address</code> — balance, stake, nonce, reputation, unstaking status, full tx history</li>
+        <li><code>GET /api/balance/:address</code> — lighter version (no tx history)</li>
+        <li><code>GET /api/validators</code> — validator set with stake %, reputation, estimated APR</li>
+        <li><code>GET /api/reputation/:address</code> — <strong>Phase 14</strong>: peer reputation score</li>
         <li><code>GET /api/contracts</code> — full contract registry</li>
-        <li><code>GET /api/contracts/:address</code> — one contract, including its state object</li>
+        <li><code>GET /api/contracts/:address</code> — one contract including its state object</li>
+        <li><code>GET /api/tokens</code> — <strong>Phase 14</strong>: all tokens deployed via token-factory / memecoin-factory</li>
+        <li><code>GET /api/nfts</code> — <strong>Phase 14</strong>: all NFT collections deployed via nft-factory</li>
+        <li><code>GET /api/staking-pools</code> — <strong>Phase 14</strong>: all staking pool contracts</li>
+        <li><code>GET /api/denomination</code> — <strong>Phase 14</strong>: SAYN ↔ base-unit conversion guide with examples</li>
+        <li><code>GET /api/tps</code> — <strong>Phase 14</strong>: live TPS estimate with denomination info</li>
         <li><code>GET /api/mempool</code> — pending transactions</li>
         <li><code>GET /api/search/:query</code> — block index/hash, tx id, or address</li>
         <li><code>GET /api/proof/:address</code> — Merkle proof for an account</li>
@@ -930,7 +1008,357 @@ sayman stake 1000000000   // testnet: 1,000,000,000 base units = 10 SAYN minimum
         <strong>Only the Android APK and web wallet are real right now.</strong> Windows/Mac/Linux/CLI-binary/genesis-file download cards have been left out until those artifacts actually exist and are hosted somewhere.
       </div>
     `
+  },
+
+  // ── Phase 14: Multi-Layer Chain docs ─────────────────────────────────────
+
+  'layers-overview': {
+    title: 'Layer Overview',
+    content: `
+      <h2>Multi-Layer Chain Architecture</h2>
+      <p>SAYMAN now supports a full multi-layer ecosystem. The <strong>L1 base chain</strong> handles core consensus, token economics, and settlement. On top of it you can run <strong>L2 rollups</strong> for high-throughput batch processing, <strong>sidechains</strong> with custom parameters, and <strong>permissioned chains</strong> for private/enterprise networks.</p>
+
+      <h3>Layer Types</h3>
+      <ul>
+        <li><strong>L1</strong> — The root chain. Handles PoS consensus, validator rewards, and global state root. Configured via <code>config/mainnet.js</code> or <code>config/testnet.js</code>.</li>
+        <li><strong>L2 Rollup</strong> — Batches many transactions off-chain and commits a single batch proof to L1 every N blocks (<code>rollupBatchSize</code>). Dramatically increases effective TPS. Implemented in <code>core/rollup.js</code>.</li>
+        <li><strong>Sidechain</strong> — An independent chain with its own validators, gas params, and block time, connected to L1 via the <code>layer2Bridge</code> contract. Good for app-specific chains.</li>
+        <li><strong>Permissioned Chain</strong> — Like a sidechain but with a whitelist of validators. Good for enterprise or consortium use cases.</li>
+      </ul>
+
+      <h3>TPS</h3>
+      <p>Base L1 targets ~100–500 TPS depending on block time and gas limits. L2 rollup mode achieves significantly higher throughput by batching. Query live TPS from <code>GET /api/tps</code>.</p>
+
+      <div class="tip">
+        <strong>Which layer should I use?</strong> Start on L1 testnet. If you need higher throughput or custom gas, spawn an L2 or sidechain via the Chain Factory.
+      </div>
+    `
+  },
+
+  'chain-factory': {
+    title: 'Chain Factory',
+    content: `
+      <h2>Chain Factory (<code>core/chain-factory.js</code>)</h2>
+      <p>The <code>ChainFactory</code> class lets any developer spawn a new chain — L2, sidechain, or permissioned — on top of SAYMAN's L1 without touching the core codebase.</p>
+
+      <h3>Supported templates</h3>
+      <ul>
+        <li><code>'l2-rollup'</code> — optimistic rollup with batch commits</li>
+        <li><code>'sidechain'</code> — independent chain with L1 bridge</li>
+        <li><code>'permissioned'</code> — validator-whitelist chain</li>
+      </ul>
+
+      <h3>Usage</h3>
+      <pre><code>import ChainFactory from './core/chain-factory.js';
+
+const factory = new ChainFactory(l1Blockchain, l1Config);
+
+// Spawn an L2 rollup
+const l2 = await factory.createChain('l2-rollup', {
+  name: 'MyRollup',
+  chainId: 1001,
+  blockTime: 2000,      // 2 s blocks
+  rollupBatchSize: 50,  // commit every 50 blocks
+  parentChainId: 1
+});
+
+console.log(l2.chainId, l2.layer); // 1001, 2</code></pre>
+
+      <h3>Chain config fields (Phase 14)</h3>
+      <ul>
+        <li><code>layer</code> — 1 for L1, 2 for L2/sidechain</li>
+        <li><code>l2Enabled</code> — enable rollup mode</li>
+        <li><code>rollupBatchSize</code> — blocks per batch commit</li>
+        <li><code>maxTps</code> — target TPS cap</li>
+        <li><code>parentChainId</code> — L1 chain ID for bridge</li>
+        <li><code>validators</code> — whitelist (permissioned chains only)</li>
+      </ul>
+    `
+  },
+
+  'l2-rollups': {
+    title: 'L2 Rollups',
+    content: `
+      <h2>L2 Rollups (<code>core/rollup.js</code>)</h2>
+      <p>SAYMAN's optimistic rollup sequencer batches transactions off-chain and submits a single state-root commit to L1 every <code>rollupBatchSize</code> blocks. This lets the rollup chain run at much higher block frequency without bloating L1.</p>
+
+      <h3>How it works</h3>
+      <ol>
+        <li>The rollup node collects transactions in its local mempool.</li>
+        <li>Every <code>rollupBatchSize</code> blocks, <code>RollupEngine.processBatch()</code> computes a batch state root and submits it via a <code>ROLLUP_COMMIT</code> transaction to L1.</li>
+        <li>L1 validators confirm the batch; the rollup is considered finalized.</li>
+        <li>Assets cross between L1 and L2 via the <code>layer2Bridge</code> contract (lock on L1, mint on L2; burn on L2, unlock on L1).</li>
+      </ol>
+
+      <h3>Sequencer mode</h3>
+      <pre><code>node server.js --network testnet --mode sequencer --rollup-batch-size 50</code></pre>
+
+      <div class="note">
+        <strong>Fraud proofs:</strong> full fraud-proof verification is on the roadmap. Current implementation uses optimistic acceptance — suitable for testnet and trusted-validator scenarios.
+      </div>
+    `
+  },
+
+  'sidechains': {
+    title: 'Sidechains',
+    content: `
+      <h2>Sidechains</h2>
+      <p>A sidechain is an independent SAYMAN chain with its own validator set, gas parameters, and block time. It connects to L1 via the <code>layer2Bridge</code> contract for two-way asset transfers.</p>
+
+      <h3>Spawning a sidechain</h3>
+      <pre><code>const sidechain = await factory.createChain('sidechain', {
+  name: 'GameChain',
+  chainId: 2001,
+  blockTime: 1000,   // 1 s blocks
+  ticker: 'GAME',
+  faucetEnabled: true,
+  parentChainId: 1
+});</code></pre>
+
+      <h3>Bridge workflow</h3>
+      <ul>
+        <li><strong>Deposit:</strong> lock SAYN on L1 (<code>layer2Bridge.deposit()</code>) → receive wrapped SAYN on sidechain.</li>
+        <li><strong>Withdraw:</strong> burn wrapped SAYN on sidechain (<code>layer2Bridge.withdraw()</code>) → unlock SAYN on L1 after finality period.</li>
+      </ul>
+
+      <div class="tip">
+        Use a sidechain when you need a custom ticker, very fast blocks, or app-specific gas rules, and you're okay managing your own validator set.
+      </div>
+    `
+  },
+
+  // ── Phase 14: Token & NFT Factory docs ────────────────────────────────────
+
+  'token-factory': {
+    title: 'Token Factory',
+    content: `
+      <h2>Token Factory (<code>contracts/token-factory.js</code>)</h2>
+      <p>Deploy any custom ERC-20-style fungible token on SAYMAN with a single contract call — no contract code to write.</p>
+
+      <h3>Deploying the factory</h3>
+      <p>The <code>token-factory</code> contract is deployed once per network. Call <code>createToken</code> to launch your token:</p>
+      <pre><code>await client.callContract({
+  contractAddress: TOKEN_FACTORY_ADDRESS,
+  method: 'createToken',
+  args: {
+    name: 'MyToken',
+    symbol: 'MTK',
+    decimals: 8,
+    initialSupply: 1_000_000_00000000  // 1,000,000 MTK in base units
+  },
+  wallet
+});</code></pre>
+
+      <h3>Interacting with your token</h3>
+      <pre><code>// Transfer
+await client.callContract({
+  contractAddress: TOKEN_ADDRESS,
+  method: 'transfer',
+  args: { to: recipientAddress, amount: 100_00000000 },
+  wallet
+});
+
+// Balance
+const bal = await client.readState(TOKEN_ADDRESS, 'balance:' + myAddress);</code></pre>
+
+      <h3>API — list all tokens</h3>
+      <pre><code>GET /api/tokens</code></pre>
+      <p>Returns every token deployed via the factory with its contract address, name, symbol, and total supply.</p>
+
+      <div class="tip">
+        <strong>Denomination:</strong> choose your token's <code>decimals</code> at deploy time. All on-chain balances are integers in base units — divide by <code>10^decimals</code> to get the human amount.
+      </div>
+    `
+  },
+
+  'nft-factory': {
+    title: 'NFT Factory',
+    content: `
+      <h2>NFT Factory (<code>contracts/nft-factory.js</code>)</h2>
+      <p>Deploy NFT collections and mint tokens without writing any contract code.</p>
+
+      <h3>Create a collection</h3>
+      <pre><code>await client.callContract({
+  contractAddress: NFT_FACTORY_ADDRESS,
+  method: 'createCollection',
+  args: {
+    name: 'CryptoKittens',
+    symbol: 'CKT',
+    baseUri: 'https://mymeta.io/'
+  },
+  wallet
+});</code></pre>
+
+      <h3>Mint an NFT</h3>
+      <pre><code>await client.callContract({
+  contractAddress: NFT_COLLECTION_ADDRESS,
+  method: 'mint',
+  args: {
+    to: recipientAddress,
+    tokenId: 1,
+    metadataUri: 'https://mymeta.io/1.json'
+  },
+  wallet
+});</code></pre>
+
+      <h3>API — list all collections</h3>
+      <pre><code>GET /api/nfts</code></pre>
+      <p>Returns every NFT collection deployed via the factory with its address, name, symbol, and total minted.</p>
+    `
+  },
+
+  'memecoin-factory': {
+    title: 'Memecoin Factory',
+    content: `
+      <h2>Memecoin Factory (<code>contracts/memecoin-factory.js</code>)</h2>
+      <p>One-click memecoin deployment. Wraps the token factory with opinionated defaults and an optional image URL.</p>
+
+      <h3>Launch a memecoin</h3>
+      <pre><code>await client.callContract({
+  contractAddress: MEMECOIN_FACTORY_ADDRESS,
+  method: 'createMemecoin',
+  args: {
+    name: 'DoggyWow',
+    symbol: 'DOGW',
+    imageUrl: 'https://example.com/doggy.png',
+    supply: 420_690_00000000  // 420,690 tokens
+  },
+  wallet
+});</code></pre>
+
+      <h3>List memecoins</h3>
+      <pre><code>GET /api/tokens   // memecoins appear alongside other factory tokens</code></pre>
+
+      <div class="note">
+        Memecoins are just tokens with an image URL stored in the registry — all the same transfer/balance methods apply.
+      </div>
+    `
+  },
+
+  // ── Phase 14: DeFi Primitives docs ────────────────────────────────────────
+
+  'dex': {
+    title: 'DEX',
+    content: `
+      <h2>DEX — Decentralized Exchange (<code>contracts/dex.js</code>)</h2>
+      <p>SAYMAN ships with a constant-product AMM (x·y=k) DEX contract. Liquidity providers can deposit token pairs; traders can swap between any two tokens with on-chain price discovery.</p>
+
+      <h3>Add liquidity</h3>
+      <pre><code>await client.callContract({
+  contractAddress: DEX_ADDRESS,
+  method: 'addLiquidity',
+  args: {
+    tokenA: TOKEN_A_ADDRESS,
+    tokenB: TOKEN_B_ADDRESS,
+    amountA: 1000_00000000,
+    amountB: 5000_00000000
+  },
+  wallet
+});</code></pre>
+
+      <h3>Swap</h3>
+      <pre><code>await client.callContract({
+  contractAddress: DEX_ADDRESS,
+  method: 'swap',
+  args: {
+    tokenIn:      TOKEN_A_ADDRESS,
+    amountIn:     100_00000000,
+    tokenOut:     TOKEN_B_ADDRESS,
+    minAmountOut: 490_00000000   // slippage protection
+  },
+  wallet
+});</code></pre>
+
+      <h3>Read pool reserves</h3>
+      <pre><code>// via readState — no gas, no tx
+const pool = await client.readState(
+  DEX_ADDRESS,
+  'pool:' + TOKEN_A_ADDRESS + ':' + TOKEN_B_ADDRESS
+);
+console.log(pool.reserveA, pool.reserveB);</code></pre>
+
+      <div class="tip">
+        Price impact is calculated client-side from reserves. Always pass <code>minAmountOut</code> to protect against sandwich attacks.
+      </div>
+    `
+  },
+
+  'staking-pools': {
+    title: 'Staking Pools',
+    content: `
+      <h2>Staking Pools (<code>contracts/staking-pool.js</code>)</h2>
+      <p>Anyone can deploy a staking pool that lets others delegate SAYN (or custom tokens) to earn a share of rewards. The pool operator earns a configurable fee.</p>
+
+      <h3>Deploy a pool</h3>
+      <pre><code>await client.deployContract({
+  name: 'MyPool',
+  version: '1.0.0',
+  code: stakingPoolSource,  // from contracts/staking-pool.js
+  feePolicy: 'user',
+  wallet
+});
+// Then initialize:
+await client.callContract({
+  contractAddress: POOL_ADDRESS,
+  method: 'initialize',
+  args: { operatorFee: 10 },  // 10% operator fee
+  wallet
+});</code></pre>
+
+      <h3>Delegate</h3>
+      <pre><code>await client.callContract({
+  contractAddress: POOL_ADDRESS,
+  method: 'delegate',
+  args: { amount: 100_00000000 },
+  wallet
+});</code></pre>
+
+      <h3>Claim rewards</h3>
+      <pre><code>await client.callContract({
+  contractAddress: POOL_ADDRESS,
+  method: 'claimRewards',
+  args: {},
+  wallet
+});</code></pre>
+
+      <h3>Discover all pools</h3>
+      <pre><code>GET /api/staking-pools</code></pre>
+      <p>Returns every active staking pool with its address, owner, total delegated, total rewards, and operator fee.</p>
+    `
+  },
+
+  // ── Phase 14: Reputation docs ─────────────────────────────────────────────
+
+  'reputation': {
+    title: 'Peer Reputation',
+    content: `
+      <h2>Peer Reputation System</h2>
+      <p>Peers that contribute valid blocks to the network earn reputation points. Reputation is stored on-chain in the state engine and is queryable via the REST API.</p>
+
+      <h3>How points are earned</h3>
+      <ul>
+        <li>When a peer provides a valid block during P2P sync, the local node awards <strong>+10 reputation points</strong> to that peer's address.</li>
+        <li>Reputation is keyed by <code>SHA-256('peer:' + nodeId).slice(0, 40)</code> — the same format as a wallet address.</li>
+        <li>Points accumulate across blocks; there is no decay mechanism currently.</li>
+      </ul>
+
+      <h3>Query reputation</h3>
+      <pre><code>GET /api/reputation/:address
+
+// Response:
+{ "address": "abc123...", "reputation": 420 }</code></pre>
+
+      <p>The <code>GET /api/address/:address</code> endpoint also returns a <code>reputation</code> field alongside balance and stake.</p>
+
+      <h3>Validator reputation</h3>
+      <p>The <code>GET /api/validators</code> endpoint includes each validator's reputation score. High-reputation validators signal reliability to delegators.</p>
+
+      <div class="note">
+        Reputation is advisory — it does not currently affect validator selection probability, which is purely stake-weighted. Future phases may incorporate reputation into the PoS weight formula.
+      </div>
+    `
   }
+
 };
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -942,7 +1370,59 @@ document.addEventListener('DOMContentLoaded', () => {
   renderContent('overview');
   updateActiveNav('overview');
   updateTOC('overview');
+
+  // Sync theme toggle button
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) {
+    if (savedTheme === 'dark') {
+      btn.innerHTML = '<i class="fas fa-sun"></i> Theme';
+    } else {
+      btn.innerHTML = '<i class="fas fa-moon"></i> Theme';
+    }
+  }
+
+  updateHeaderInfo();
+  setInterval(updateHeaderInfo, 5000);
 });
+
+window.toggleExplorerTheme = function() {
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  if (isDark) {
+    document.documentElement.classList.remove('dark-theme');
+    localStorage.setItem('theme', 'light');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.innerHTML = '<i class="fas fa-moon"></i> Theme';
+  } else {
+    document.documentElement.classList.add('dark-theme');
+    localStorage.setItem('theme', 'dark');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.innerHTML = '<i class="fas fa-sun"></i> Theme';
+  }
+};
+
+// ── API helpers ──────────────────────────────────────────────────────────────
+const API = '/api';
+async function apiFetch(path) {
+  const res = await fetch(API + path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+function setEl(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = (value === null || value === undefined) ? '—' : value;
+}
+async function updateHeaderInfo() {
+  try {
+    const d = await apiFetch('/network/stats');
+    setEl('header-network', d.network  || '—');
+    setEl('header-chain',   d.chainId  || '—');
+    setEl('header-node',    (d.nodeId  || '').slice(0, 16) + '…');
+    setEl('header-mode',    (d.mode    || '—').toUpperCase());
+  } catch {
+    setEl('header-network', 'Connection error');
+  }
+}
 
 // ── Render Sidebar ────────────────────────────────────────────────────────
 function renderSidebar() {
@@ -1106,3 +1586,74 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('docsSidebar').classList.remove('open');
   }
 });
+
+// ── Legal Modals ─────────────────────────────────────────────────────────────
+function showLegalModal(type) {
+  const modals = {
+    terms: {
+      title: "Terms & Conditions",
+      icon: "fa-gavel",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. Decentralized Nature</strong></p>
+        <p style="margin-bottom:16px;">SAYMAN is a decentralized, peer-to-peer open-source blockchain network. There is no central administrator, company, or authority that controls the network. By using this explorer or interacting with the network, you acknowledge that you are using a decentralized protocol at your own risk.</p>
+        <p style="margin-bottom:12px;"><strong>2. User Responsibility</strong></p>
+        <p style="margin-bottom:16px;">You are solely responsible for the security of your private keys, seed phrases, and wallets. Transactions broadcast to the SAYMAN network are immutable and irreversible. The developers, contributors, and validators cannot recover lost funds, reverse transactions, or restore access to locked accounts.</p>
+        <p style="margin-bottom:12px;"><strong>3. Smart Contracts & Custom Tokens</strong></p>
+        <p style="margin-bottom:16px;">Anyone can deploy smart contracts, custom tokens, memecoins, or DEX pools. The network and its developers do not verify, endorse, or guarantee the safety or legality of user-deployed contracts. Exercise extreme caution when interacting with third-party contracts.</p>
+        <p style="margin-bottom:12px;"><strong>4. Disclaimer of Warranty</strong></p>
+        <p>The software and network are provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.</p>
+      `
+    },
+    privacy: {
+      title: "Privacy Policy",
+      icon: "fa-shield-alt",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. On-Chain Ledger Transparency</strong></p>
+        <p style="margin-bottom:16px;">SAYMAN is a public ledger blockchain. All transactions, contract deployments, validator stakes, peer connections, and on-chain activities are public, globally accessible, and immutable. Do not store any personal, confidential, or personally identifiable information (PII) on the blockchain.</p>
+        <p style="margin-bottom:12px;"><strong>2. No Data Collection</strong></p>
+        <p style="margin-bottom:16px;">This blockchain explorer does not require registration, accounts, or email sign-ups. We do not collect, sell, or track personal information, IP addresses, or browsing history.</p>
+        <p style="margin-bottom:12px;"><strong>3. Third-Party Links</strong></p>
+        <p>The dashboard and docs contain links to external wallets, verification pages, or GitHub. We are not responsible for the privacy practices of third-party platforms.</p>
+      `
+    },
+    cookies: {
+      title: "Cookies Policy",
+      icon: "fa-cookie-bite",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. Strictly Necessary Cookies</strong></p>
+        <p style="margin-bottom:16px;">This explorer interface does not use third-party tracking, profiling, or advertising cookies. We only use functional local storage (such as browser localStorage) to remember configuration choices (e.g. API endpoint base URLs or page selections).</p>
+        <p style="margin-bottom:12px;"><strong>2. Opt-out</strong></p>
+        <p>Since we do not deploy tracking or analytical cookies, there is no tracking to opt-out of. You can clear your browser's local cache at any time to remove saved network settings.</p>
+      `
+    },
+    copyright: {
+      title: "Copyright Notice",
+      icon: "fa-copyright",
+      content: `
+        <p style="margin-bottom:12px;"><strong>MIT License</strong></p>
+        <p style="margin-bottom:16px;">Copyright (c) 2026 SAYMAN Blockchain Team</p>
+        <p style="margin-bottom:16px;">Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+        <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+      `
+    }
+  };
+
+  const item = modals[type];
+  if (!item) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3><i class="fas ${item.icon}"></i> ${item.title}</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body" style="line-height: 1.6; font-size: 13px; color: var(--mono-100); padding: calc(var(--grid)*3); overflow-y: auto;">
+        ${item.content}
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}

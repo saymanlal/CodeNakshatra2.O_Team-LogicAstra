@@ -221,14 +221,29 @@ class StateEngine {
       abi:     meta.abi     || [],
       state:   {},
       createdAt: Date.now(),
-      codeHash
+      codeHash,
+      blockIndex: meta.blockIndex || null,
+      feePolicy: meta.feePolicy || 'user',
+      sponsorBalance: meta.sponsorBalance || 0
     });
 
     this.updateStateTree(address, codeHash);
   }
 
+  setContractMeta(address, key, value) {
+    const contract = this.contracts.get(address);
+    if (contract) {
+      contract[key] = value;
+    }
+  }
+
   getContract(address) {
     return this.contracts.get(address);
+  }
+
+  getContractFullState(address) {
+    const contract = this.contracts.get(address);
+    return contract ? contract.state : {};
   }
 
   getAllContracts() {
@@ -305,6 +320,7 @@ class StateEngine {
       unstaking:   Array.from(this.unstaking.entries()),
       publicKeys:  Array.from(this.publicKeys.entries()),
       contracts:   Array.from(this.contracts.entries()),
+      contractStorage: Array.from(this.contractStorage.entries()),
       // ✅ Phase 9: include reputation and events in snapshots
       reputation:  Array.from(this.reputation.entries()),
       eventLog:    this.eventLog,
@@ -319,6 +335,7 @@ class StateEngine {
     this.unstaking   = new Map(state.unstaking);
     this.publicKeys  = new Map(state.publicKeys);
     this.contracts   = new Map(state.contracts);
+    this.contractStorage = new Map(state.contractStorage || []);
     // ✅ Phase 9: restore reputation and events
     this.reputation  = new Map(state.reputation  || []);
     this.eventLog    = state.eventLog || [];

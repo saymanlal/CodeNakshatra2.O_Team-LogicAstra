@@ -50,6 +50,7 @@ export function getBlockReward(blockHeight) {
 export default {
   networkName:  'SAYMAN Mainnet',
   chainId:      'sayman-mainnet-1',
+  layer:        1,                           // Layer 1 — SAYMAN base chain
   ticker:       TICKER,
   decimals:     DECIMALS,
 
@@ -118,13 +119,11 @@ export default {
     STORAGE_READ:         500,
     STORAGE_WRITE:       2_000,
     STORAGE_BYTE:            1,
-    REPORT_CREATE:    21_000,
-    REPORT_VERIFY:    21_000,
-    REPORT_RESOLVE:   21_000,
+
     DEFAULT:          21_000,
   },
 
-  maxGasPerBlock:   50_000_000,
+  maxGasPerBlock:   100_000_000,
   maxGasPerTx:      10_000_000,
   maxExecutionTime: 5_000,
   maxInstructions:  100_000,

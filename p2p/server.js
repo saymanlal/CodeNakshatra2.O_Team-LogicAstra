@@ -2,6 +2,27 @@ import WebSocket, { WebSocketServer } from 'ws';
 import crypto from 'crypto';
 import Block from '../core/block.js';
 
+function normalizeUrl(url) {
+  if (!url) return '';
+  return url
+    .replace(/^https?:\/\//i, '')
+    .replace(/^wss?:\/\//i, '')
+    .replace(/\/p2p\/?$/i, '')
+    .replace(/\/+$/, '')
+    .toLowerCase();
+}
+
+function getPublicP2PUrl() {
+  if (process.env.PUBLIC_P2P_URL) return process.env.PUBLIC_P2P_URL;
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return process.env.RENDER_EXTERNAL_URL.replace(/^http/, 'ws') + '/p2p';
+  }
+  if (process.env.RAILWAY_STATIC_URL) {
+    return `wss://${process.env.RAILWAY_STATIC_URL}/p2p`;
+  }
+  return null;
+}
+
 export class P2PServer {
   constructor(blockchain, port = null) {
     this.blockchain = blockchain;
@@ -13,16 +34,32 @@ export class P2PServer {
     this.syncQueue = [];
 
     this.outboundUrls = new Set();
+    this.selfUrls = new Set();
     this.reconnectTimers = new Map();
+    this.reconnectDelays = new Map();
     this.RECONNECT_DELAY = 15_000;
 
     // ── AUTO DISCOVERY ──────────────────────────────────────────────
     this.bootstrapUrls = [];
     this.discoveredPeers = new Set();
     this.discoveryInterval = null;
+    this.heartbeatInterval = null;
     this.pendingPeerRequests = new Map();
     this.disconnectTimes = new Map();
     this.urlToNodeId = new Map();
+
+    // ── LEADER ELECTION ─────────────────────────────────────────────
+    // PRIMARY node = sayman.onrender.com — the designated block producer.
+    // Standby nodes only produce if primary is unreachable (> PRIMARY_TIMEOUT ms silent).
+    this.isPrimaryNode = false;       // set in listen() based on RENDER_EXTERNAL_URL
+    this.primaryAlive = false;        // true when we recently heard a leader_heartbeat
+    this.primaryLastSeen = 0;
+    this.PRIMARY_TIMEOUT = 20_000;   // treat primary as dead after 20s of silence
+    this.leaderHeartbeatInterval = null;
+
+    // ── SINGLE PEER SYNC CONTROL ───────────────────────────────────
+    this.syncingFromPeerId = null;
+    this.lastSyncRequestTime = 0;
   }
 
   // ─── Server startup ─────────────────────────────────────────────────────────
@@ -40,6 +77,23 @@ export class P2PServer {
         return;
       }
 
+      // ── Determine leader role ─────────────────────────────────────
+      // PRIMARY_NODE_URL env var (e.g. "sayman.onrender.com") identifies the
+      // designated block producer. If this node's public URL matches, it is primary.
+      const renderUrl = (process.env.RENDER_EXTERNAL_URL || '').toLowerCase();
+      const primaryCfg = (process.env.PRIMARY_NODE_URL || 'sayman.onrender.com').toLowerCase();
+      if (primaryCfg === 'self' || (renderUrl && renderUrl.includes(primaryCfg))) {
+        this.isPrimaryNode = true;
+        console.log('👑 This node is the PRIMARY (designated block producer)');
+      } else if (!primaryCfg || primaryCfg === 'none') {
+        // No leader configured — all nodes produce (original behaviour)
+        this.isPrimaryNode = true;
+        console.log('🔄 No leader configured — this node produces blocks');
+      } else {
+        this.isPrimaryNode = false;
+        console.log('🔄 This node is a STANDBY validator (produces only if primary is unreachable)');
+      }
+
       this.wss.on('connection', (ws, req) => {
         const ip = req.socket.remoteAddress;
         console.log(`🤝 Inbound peer from ${ip}`);
@@ -55,6 +109,12 @@ export class P2PServer {
       // ── Start auto-discovery ──────────────────────────────────────
       this._startDiscovery();
 
+      // ── Start heartbeat pings ─────────────────────────────────────
+      this._startHeartbeat();
+
+      // ── Start leader heartbeat ────────────────────────────────────
+      this._startLeaderHeartbeat();
+
     } catch (err) {
       console.error('❌ P2P startup failed:', err.message);
       console.log('📡 API-only mode');
@@ -67,17 +127,54 @@ export class P2PServer {
     // Every 30 seconds, try to discover new peers
     this.discoveryInterval = setInterval(() => {
       this._discoverPeers();
-    }, 30_000);
+    }, 60_000);
 
     // Initial discovery after 5 seconds
     setTimeout(() => this._discoverPeers(), 5000);
   }
 
+  // ─── Heartbeat: keep connections alive ───────────────────────────────────────
+
+  _startHeartbeat() {
+    // Send a ping to every peer every 25 seconds to keep Render/Railway connections alive.
+    // If a peer has not responded for > 180 seconds, it will be pruned by _discoverPeers.
+    this.heartbeatInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [peerId, peer] of this.peers.entries()) {
+        if (peer.ws.readyState === 1 /* OPEN */) {
+          try {
+            this._send(peer.ws, { type: 'ping', timestamp: now });
+            if (typeof peer.ws.ping === 'function') {
+              peer.ws.ping();
+            }
+          } catch (e) {
+            // ignore send errors — socket will be cleaned up naturally
+          }
+        } else if (peer.ws.readyState > 1 /* CLOSING / CLOSED */) {
+          // Socket is already dead — remove immediately
+          console.warn(`⚠️ Peer ${peerId} socket is dead (readyState=${peer.ws.readyState}). Removing.`);
+          this.peers.delete(peerId);
+          if (peer.url) {
+            this.outboundUrls.delete(peer.url);
+            if (!peer.isDuplicate && !peer.ws.isDuplicate) {
+              if (!this.disconnectTimes.has(peer.url)) {
+                this.disconnectTimes.set(peer.url, now);
+              }
+              this._scheduleReconnect(peer.url);
+            }
+          }
+        }
+      }
+      // Trigger sync verification to recover from any stalled syncs
+      this.checkAndTriggerSync();
+    }, 45_000);
+  }
+
   async _discoverPeers() {
     try {
-      // 0. Prune inactive connections (no message received for > 90 seconds)
+      // 0. Prune inactive connections (no message received for > 300 seconds)
       const now = Date.now();
-      const INACTIVE_TIMEOUT = 90_000; // 90 seconds
+      const INACTIVE_TIMEOUT = 300_000; // 300 seconds
       for (const [peerId, peer] of this.peers.entries()) {
         const inactiveDuration = now - peer.lastSeen;
         if (inactiveDuration > INACTIVE_TIMEOUT) {
@@ -100,7 +197,7 @@ export class P2PServer {
       }
 
       // 1. Ask all connected peers for their known peers
-      this._broadcast({ type: 'get_peers' });
+      this.broadcast({ type: 'get_peers' });
 
       // 2. If we have bootstrap peers, connect to them
       for (const url of this.bootstrapUrls) {
@@ -172,6 +269,7 @@ export class P2PServer {
     url = url.trim();
     if (!url) return;
 
+    if (this.selfUrls.has(url)) return;
     if (this.outboundUrls.has(url)) return;
     this.outboundUrls.add(url);
 
@@ -191,7 +289,7 @@ export class P2PServer {
       console.log(`🔗 Connecting to peer: ${url}`);
       let ws;
       try {
-        ws = new WebSocket(url);
+        ws = new WebSocket(url, { perMessageDeflate: false });
       } catch (err) {
         console.error(`❌ Bad peer URL ${url}:`, err.message);
         this._scheduleReconnect(url);
@@ -210,6 +308,7 @@ export class P2PServer {
         clearTimeout(timeout);
         console.log(`✅ Connected to peer: ${url}`);
         this.disconnectTimes.delete(url);
+        this.reconnectDelays.delete(url);
         this._handleOutboundConnection(ws, url);
       });
 
@@ -221,11 +320,17 @@ export class P2PServer {
       ws.on('close', () => {
         clearTimeout(timeout);
         console.log(`🔌 Outbound peer closed: ${url}`);
+        let isDuplicate = ws.isDuplicate;
         for (const [id, peer] of this.peers.entries()) {
           if (peer.url === url) {
+            if (peer.isDuplicate) isDuplicate = true;
             this.peers.delete(id);
             break;
           }
+        }
+        if (isDuplicate) {
+          console.log(`↔️ Not scheduling reconnect for duplicate peer connection to ${url}`);
+          return;
         }
         if (!this.disconnectTimes.has(url)) {
           this.disconnectTimes.set(url, Date.now());
@@ -238,12 +343,18 @@ export class P2PServer {
   }
 
   _scheduleReconnect(url) {
+    if (this.selfUrls.has(url)) return;
     if (this.reconnectTimers.has(url)) return;
+    
+    const currentDelay = this.reconnectDelays.get(url) || 15_000;
+    const nextDelay = Math.min(currentDelay * 2, 120_000);
+    this.reconnectDelays.set(url, nextDelay);
+
     const timer = setTimeout(() => {
       this.reconnectTimers.delete(url);
       this.outboundUrls.delete(url);
       this.connectToPeer(url);
-    }, this.RECONNECT_DELAY);
+    }, currentDelay);
     this.reconnectTimers.set(url, timer);
   }
 
@@ -264,7 +375,9 @@ export class P2PServer {
     console.log(`👤 Inbound peer ${peerId} (total: ${this.peers.size})`);
     this._registerHandlers(ws, peerId);
     this._sendHandshake(ws);
-    this._requestBlocks(ws);
+    // NOTE: Do NOT call _requestBlocks here.
+    // The handshake response will carry peer's chainHeight, and _handleHandshake
+    // will trigger sync from the BEST available peer — not from every peer.
   }
 
   _handleOutboundConnection(ws, url) {
@@ -282,7 +395,9 @@ export class P2PServer {
     console.log(`👤 Outbound peer ${peerId} → ${url} (total: ${this.peers.size})`);
     this._registerHandlers(ws, peerId);
     this._sendHandshake(ws);
-    this._requestBlocks(ws);
+    // NOTE: Do NOT call _requestBlocks here.
+    // The handshake response will carry peer's chainHeight, and _handleHandshake
+    // will trigger sync from the BEST available peer — not from every peer.
   }
 
   // ─── Shared per-socket event registration ────────────────────────────────────
@@ -302,10 +417,14 @@ export class P2PServer {
       if (peer) {
         console.log(`👋 Peer ${peerId} disconnected`);
         if (peer.url) {
-          if (!this.disconnectTimes.has(peer.url)) {
-            this.disconnectTimes.set(peer.url, Date.now());
+          if (peer.isDuplicate || ws.isDuplicate) {
+            console.log(`↔️ Not scheduling reconnect for duplicate peer connection to ${peer.url}`);
+          } else {
+            if (!this.disconnectTimes.has(peer.url)) {
+              this.disconnectTimes.set(peer.url, Date.now());
+            }
+            this._scheduleReconnect(peer.url);
           }
-          this._scheduleReconnect(peer.url);
         }
         this.peers.delete(peerId);
       }
@@ -352,6 +471,18 @@ export class P2PServer {
         this._handlePeers(msg, peerId);
         break;
 
+      case 'ping':
+        this._handlePing(msg, peerId);
+        break;
+
+      case 'pong':
+        // just update lastSeen (already done above)
+        break;
+
+      case 'leader_heartbeat':
+        this._handleLeaderHeartbeat(msg, peerId);
+        break;
+
       default:
         break;
     }
@@ -396,10 +527,24 @@ export class P2PServer {
     }
   }
 
+  // ─── Ping / Pong ─────────────────────────────────────────────────────────────
+
+  _handlePing(_msg, peerId) {
+    const peer = this.peers.get(peerId);
+    if (peer && peer.ws.readyState === 1) {
+      this._send(peer.ws, { type: 'pong', timestamp: Date.now() });
+    }
+  }
+
   _isConnected(url) {
+    const normUrl = normalizeUrl(url);
+    if (!normUrl) return false;
+
     for (const peer of this.peers.values()) {
-      if (peer.url === url && peer.ws.readyState === WebSocket.OPEN) {
-        return true;
+      if (peer.ws.readyState === WebSocket.OPEN) {
+        if (peer.url && normalizeUrl(peer.url) === normUrl) {
+          return true;
+        }
       }
     }
     const peerNodeId = this.urlToNodeId.get(url);
@@ -436,12 +581,21 @@ export class P2PServer {
     // Self-connection check
     if (msg.nodeId === this.nodeId) {
       console.log(`⚠️ Closed self-connection to node: ${msg.nodeId}`);
+      if (peer.url) {
+        this.selfUrls.add(peer.url);
+      }
       peer.ws.close();
       this.peers.delete(peerId);
       return;
     }
 
-    // Map URL to nodeId if outbound URL exists
+    // Map URL to nodeId if outbound URL exists or publicUrl is provided
+    if (msg.publicUrl) {
+      this.urlToNodeId.set(msg.publicUrl, msg.nodeId);
+      if (!peer.url) {
+        peer.url = msg.publicUrl;
+      }
+    }
     if (peer.url && msg.nodeId) {
       this.urlToNodeId.set(peer.url, msg.nodeId);
     }
@@ -462,6 +616,8 @@ export class P2PServer {
             if (otherPeer.url && !peer.url) {
               peer.url = otherPeer.url;
             }
+            otherPeer.isDuplicate = true;
+            if (otherPeer.ws) otherPeer.ws.isDuplicate = true;
             otherPeer.ws.close();
             this.peers.delete(otherId);
           } else {
@@ -469,12 +625,16 @@ export class P2PServer {
             if (peer.url && !otherPeer.url) {
               otherPeer.url = peer.url;
             }
+            peer.isDuplicate = true;
+            if (peer.ws) peer.ws.isDuplicate = true;
             peer.ws.close();
             this.peers.delete(peerId);
             return;
           }
         } else {
           console.log(`↔️ Keeping older connection ${otherId} and closing new one ${peerId}`);
+          peer.isDuplicate = true;
+          if (peer.ws) peer.ws.isDuplicate = true;
           peer.ws.close();
           this.peers.delete(peerId);
           return;
@@ -482,20 +642,40 @@ export class P2PServer {
       }
     }
 
-    // If peer is ahead, sync
-    if (msg.chainHeight > this.blockchain.chain.length) {
-      console.log(`📥 Peer is ahead (${msg.chainHeight} > ${this.blockchain.chain.length}). Syncing...`);
-      this._requestBlocks(peer.ws);
+    // Update peer's chain height so dashboard always shows accurate values
+    peer.chainHeight = msg.chainHeight || peer.chainHeight || 0;
+
+    const localHeight = this.blockchain.chain.length;
+    const peerHeight  = msg.chainHeight || 0;
+
+    if (peerHeight > localHeight) {
+      // Coordinate and trigger sync from the single best peer, avoiding multi-peer redundant downloads
+      this.checkAndTriggerSync();
+    } else if (peerHeight < localHeight) {
+      // Peer is behind — push our chain to help them catch up quickly.
+      const fromIndex = Math.max(0, peerHeight);
+      console.log(`📤 Peer is ${localHeight - peerHeight} blocks behind. Helping peer catch up from #${fromIndex}...`);
+      this._send(peer.ws, { type: 'get_blocks', fromIndex });
+    } else {
+      // Same height — verify tip hashes match to detect silent forks.
+      const ourTip = this.blockchain.chain[localHeight - 1];
+      if (msg.tipHash && ourTip && msg.tipHash !== ourTip.hash) {
+        console.warn(`⚠️ Same height (${localHeight}) but tip hash mismatch — possible fork. Requesting sync...`);
+        this._send(peer.ws, { type: 'get_blocks', fromIndex: Math.max(0, localHeight - 10) });
+      }
     }
   }
 
   _sendHandshake(ws) {
+    const lastBlock = this.blockchain.chain[this.blockchain.chain.length - 1];
     this._send(ws, {
       type: 'handshake',
       nodeId: this.nodeId,
       chainHeight: this.blockchain.chain.length,
       chainId: this.blockchain.chainId,
       timestamp: Date.now(),
+      publicUrl: getPublicP2PUrl(),
+      tipHash: lastBlock ? lastBlock.hash : null,
     });
   }
 
@@ -514,7 +694,7 @@ export class P2PServer {
           console.warn(`⚠️ Fork at block ${blockData.index}. Requesting sync from common ancestor...`);
           const peer = this.peers.get(peerId);
           if (peer) {
-            const rollbackHeight = Math.max(0, blockData.index - 50);
+            const rollbackHeight = Math.max(0, blockData.index - 1);
             this._send(peer.ws, {
               type: 'get_blocks',
               fromIndex: rollbackHeight,
@@ -580,11 +760,58 @@ export class P2PServer {
 
   // ─── Block request / response ────────────────────────────────────────────────
 
+  _findPeerByWs(ws) {
+    for (const peer of this.peers.values()) {
+      if (peer.ws === ws) return peer;
+    }
+    return null;
+  }
+
   _requestBlocks(ws) {
+    const peer = this._findPeerByWs(ws);
+    if (peer) {
+      this.syncingFromPeerId = peer.id;
+      this.lastSyncRequestTime = Date.now();
+    }
     this._send(ws, {
       type: 'get_blocks',
-      fromIndex: Math.max(0, this.blockchain.chain.length - 1),
+      fromIndex: this.blockchain.chain.length,
     });
+  }
+
+  checkAndTriggerSync() {
+    const now = Date.now();
+    const localHeight = this.blockchain.chain.length;
+
+    // Check if we are currently syncing from a valid peer and the timeout hasn't elapsed
+    if (this.syncingFromPeerId) {
+      const activeSyncPeer = this.peers.get(this.syncingFromPeerId);
+      if (activeSyncPeer && activeSyncPeer.ws.readyState === WebSocket.OPEN && (now - this.lastSyncRequestTime) < 15000) {
+        // Already active sync ongoing with a healthy peer, don't trigger another parallel request
+        return;
+      }
+      // Stalled or disconnected peer - reset sync state
+      this.syncingFromPeerId = null;
+    }
+
+    // Find the single peer with the longest chain
+    let bestPeer = null;
+    let maxChainHeight = localHeight;
+
+    for (const peer of this.peers.values()) {
+      if (peer.ws.readyState === WebSocket.OPEN && peer.chainHeight > maxChainHeight) {
+        maxChainHeight = peer.chainHeight;
+        bestPeer = peer;
+      }
+    }
+
+    if (bestPeer) {
+      const gap = maxChainHeight - localHeight;
+      console.log(`📥 Initiating sync with best peer ${bestPeer.id.slice(0, 8)} (${gap} blocks ahead, target height: ${maxChainHeight})`);
+      this.syncingFromPeerId = bestPeer.id;
+      this.lastSyncRequestTime = now;
+      this._requestBlocks(bestPeer.ws);
+    }
   }
 
   _handleGetBlocks(msg, peerId) {
@@ -592,12 +819,19 @@ export class P2PServer {
     if (!peer) return;
 
     const from = msg.fromIndex || 0;
-    const BATCH = 100;
+    const ourHeight = this.blockchain.chain.length;
+    const gap = ourHeight - from;
+
+    // Adaptive batch sizing:
+    //   gap > 100  → 1000 blocks per batch (fast catch-up, prevents data loss)
+    //   gap <= 100 → 100 blocks per batch  (fine-grained, avoids conflicts near tip)
+    const BATCH = gap > 100 ? 1000 : 100;
     const blocks = this.blockchain.chain.slice(from, from + BATCH);
 
     if (!blocks.length) return;
 
     const batch = blocks.map(b => b.toJSON ? b.toJSON() : b);
+    console.log(`📤 Sending ${batch.length} blocks to peer ${peerId.slice(0,8)} (gap=${gap}, from=#${from})`);
     this._send(peer.ws, { type: 'blocks', blocks: batch });
   }
 
@@ -634,8 +868,8 @@ export class P2PServer {
           const localBlock = this.blockchain.chain[blockData.index];
           if (localBlock && localBlock.hash !== blockData.hash) {
             console.warn(`⚠️ Fork detected at block #${blockData.index}`);
-            if (peer && peer.chainHeight > ourHeight) {
-              const rollbackHeight = Math.max(0, blockData.index - 50);
+            if (peer && peer.chainHeight > ourHeight + 5) {
+              const rollbackHeight = Math.max(0, blockData.index - 5);
               console.log(`🔄 Peer has longer chain (${peer.chainHeight} > ${ourHeight}). Rolling back local chain to #${rollbackHeight} and syncing...`);
               await this.blockchain._rollbackToHeight(rollbackHeight);
               this._send(peer.ws, {
@@ -656,6 +890,15 @@ export class P2PServer {
             imported++;
           } else {
             console.warn(`⚠️ addBlock rejected #${blockData.index}`);
+            if (peer && peer.chainHeight > ourHeight + 5) {
+              const rollbackHeight = Math.max(0, ourHeight - 5);
+              console.log(`🔄 Peer is ahead (${peer.chainHeight} > ${ourHeight}) but block #${blockData.index} was rejected. We might be on a fork. Rolling back local chain to #${rollbackHeight} and requesting sync...`);
+              await this.blockchain._rollbackToHeight(rollbackHeight);
+              this._send(peer.ws, {
+                type: 'get_blocks',
+                fromIndex: rollbackHeight,
+              });
+            }
             this.syncQueue = []; // Clear queue on rejection
             return;
           }
@@ -671,12 +914,36 @@ export class P2PServer {
       if (imported > 0) {
         console.log(`✅ Synced ${imported} blocks. New height: ${this.blockchain.chain.length}`);
         this._broadcastHandshake();
+
+        // ── Reward peer reputation for contributing blocks to our sync ────────
+        // Each peer that sends us valid blocks earns 2 reputation points per block.
+        // This incentivises honest and available peers in the network.
+        if (peer && peer.nodeId) {
+          // Map nodeId to a deterministic address using SHA-256 of nodeId
+          const crypto = await import('crypto');
+          const peerAddr = crypto.default
+            .createHash('sha256')
+            .update('peer:' + peer.nodeId)
+            .digest('hex')
+            .slice(0, 40);
+          const reputationDelta = imported * 2;
+          this.blockchain.state.increaseReputation(peerAddr, reputationDelta);
+          console.log(`⭐ Peer ${peer.nodeId.slice(0, 8)} earned +${reputationDelta} reputation for syncing ${imported} blocks`);
+        }
       }
 
-      // If we are still behind the peer, request the next batch
-      if (peer && peer.chainHeight > this.blockchain.chain.length) {
-        console.log(`📥 Still behind peer (${this.blockchain.chain.length} < ${peer.chainHeight}). Requesting next batch...`);
-        this._requestBlocks(peer.ws);
+      // Pipeline: immediately request next batch if we're still behind peer.
+      // This prevents data loss — we keep pulling until fully caught up.
+      if (peer && peer.ws.readyState === 1 /* OPEN */) {
+        const remaining = (peer.chainHeight || 0) - this.blockchain.chain.length;
+        if (remaining > 0) {
+          console.log(`📥 Still ${remaining} blocks behind peer ${peerId.slice(0,8)}. Requesting next batch...`);
+          this._requestBlocks(peer.ws);
+        } else {
+          this.syncingFromPeerId = null;
+        }
+      } else {
+        this.syncingFromPeerId = null;
       }
     } catch (err) {
       console.error('❌ _processBlocksBatch error:', err.message);
@@ -704,7 +971,11 @@ export class P2PServer {
     const data = JSON.stringify(message);
     for (const peer of this.peers.values()) {
       if (peer.ws.readyState === WebSocket.OPEN) {
-        peer.ws.send(data);
+        try {
+          peer.ws.send(data);
+        } catch (e) {
+          console.warn(`Failed to send broadcast to peer: ${e.message}`);
+        }
       }
     }
   }
@@ -713,7 +984,11 @@ export class P2PServer {
     const data = JSON.stringify(message);
     for (const [id, peer] of this.peers.entries()) {
       if (id !== excludePeerId && peer.ws.readyState === WebSocket.OPEN) {
-        peer.ws.send(data);
+        try {
+          peer.ws.send(data);
+        } catch (e) {
+          console.warn(`Failed to send broadcastExcept to peer ${id}: ${e.message}`);
+        }
       }
     }
   }
@@ -721,7 +996,11 @@ export class P2PServer {
   _broadcastHandshake() {
     for (const peer of this.peers.values()) {
       if (peer.ws.readyState === WebSocket.OPEN) {
-        this._sendHandshake(peer.ws);
+        try {
+          this._sendHandshake(peer.ws);
+        } catch (e) {
+          console.warn(`Failed to send handshake to peer: ${e.message}`);
+        }
       }
     }
   }
@@ -730,6 +1009,71 @@ export class P2PServer {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(message));
     }
+  }
+
+  // ─── Leader Election ─────────────────────────────────────────────────────────
+  //
+  // PRIMARY node (sayman.onrender.com) is the designated block producer.
+  // Standby nodes monitor the primary via leader_heartbeat every 4s.
+  // If primary is silent for > PRIMARY_TIMEOUT ms, standbys step up.
+  // When primary recovers, it fast-syncs all missed blocks, then resumes.
+
+  _startLeaderHeartbeat() {
+    if (this.isPrimaryNode) {
+      // Primary broadcasts its heartbeat every 4s so standbys know it's alive.
+      this.leaderHeartbeatInterval = setInterval(() => {
+        this.broadcast({
+          type: 'leader_heartbeat',
+          nodeId: this.nodeId,
+          height: this.blockchain.chain.length,
+          timestamp: Date.now(),
+          isPrimary: true,
+        });
+      }, 4_000);
+      console.log('👑 Primary heartbeat broadcaster started (4s interval)');
+    } else {
+      // Standby: check primary liveness every 5s.
+      this.leaderHeartbeatInterval = setInterval(() => {
+        const elapsed = Date.now() - this.primaryLastSeen;
+        const wasPrimaryAlive = this.primaryAlive;
+        this.primaryAlive = this.primaryLastSeen > 0 && elapsed < this.PRIMARY_TIMEOUT;
+
+        if (wasPrimaryAlive && !this.primaryAlive) {
+          console.warn(`⚠️ PRIMARY silent for ${Math.round(elapsed / 1000)}s — STANDBY taking over block production`);
+        } else if (!wasPrimaryAlive && this.primaryAlive) {
+          console.log('✅ PRIMARY is back online — stepping down from block production');
+        }
+      }, 5_000);
+    }
+  }
+
+  _handleLeaderHeartbeat(msg, peerId) {
+    if (!msg.isPrimary) return;
+    const peer = this.peers.get(peerId);
+    // Only trust heartbeats from the configured primary host.
+    const primaryHost = (process.env.PRIMARY_NODE_URL || 'sayman.onrender.com').toLowerCase();
+    const peerUrl = (peer && peer.url || '').toLowerCase();
+    // Accept if peer URL contains the primary host, or if primary is self (no filter)
+    const trusted = !peerUrl || peerUrl.includes(primaryHost) || primaryHost === 'none';
+    if (!trusted) return;
+
+    this.primaryLastSeen = Date.now();
+    this.primaryAlive = true;
+
+    // If primary is ahead, immediately request missing blocks.
+    if (peer && msg.height > this.blockchain.chain.length) {
+      console.log(`👑 Primary at height ${msg.height}, we are at ${this.blockchain.chain.length}. Syncing...`);
+      this._requestBlocks(peer.ws);
+    }
+  }
+
+  // Returns whether this node is currently allowed to produce blocks.
+  // Primary: always. Standby: only when primary is silent/dead.
+  canProduceBlocks() {
+    if (this.isPrimaryNode) return true;
+    // If no PRIMARY_NODE_URL configured, all nodes produce (backwards-compatible).
+    if (!process.env.PRIMARY_NODE_URL) return true;
+    return !this.primaryAlive;
   }
 
   // ─── Public API ──────────────────────────────────────────────────────────────
@@ -768,14 +1112,24 @@ export class P2PServer {
   getNetworkStats() {
     return {
       ...this.getStats(),
-      mode: 'validator',
+      mode: this.isPrimaryNode ? 'primary-validator' : 'standby-validator',
       discovered: this.discoveredPeers.size,
+      isPrimary: this.isPrimaryNode,
+      primaryAlive: this.primaryAlive,
     };
   }
 
   close() {
     if (this.discoveryInterval) {
       clearInterval(this.discoveryInterval);
+    }
+
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+
+    if (this.leaderHeartbeatInterval) {
+      clearInterval(this.leaderHeartbeatInterval);
     }
 
     for (const [url, timer] of this.reconnectTimers.entries()) {

@@ -5,9 +5,14 @@ const EC = elliptic.ec;
 const ec = new EC('secp256k1');
 
 class Wallet {
-    constructor() {
-        this.keyPair = ec.genKeyPair();
-        this.privateKey = this.keyPair.getPrivate('hex');
+    constructor(privateKeyHex = null) {
+        if (privateKeyHex) {
+            this.keyPair = ec.keyFromPrivate(privateKeyHex, 'hex');
+            this.privateKey = privateKeyHex;
+        } else {
+            this.keyPair = ec.genKeyPair();
+            this.privateKey = this.keyPair.getPrivate('hex');
+        }
         this.publicKey = this.keyPair.getPublic('hex');
         this.address = this.deriveAddress(this.publicKey);
     }

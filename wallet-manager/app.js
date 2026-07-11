@@ -34,8 +34,8 @@
             decimals: 8,
             icon: 'fa-wallet',
             color: '#4f6ef7',
-            rpc: 'https://sayman.up.railway.app/api',
-            explorer: 'https://sayman.up.railway.app',
+            rpc: 'https://sayman.onrender.com/api',
+            explorer: 'https://sayman.onrender.com',
             active: true,
             faucet: true
         },
@@ -105,9 +105,9 @@
     };
 
     const networkEndpoints = {
-        'testnet': ['https://sayman.up.railway.app/api', 'https://sayman.onrender.com/api'],
-        'public-testnet': ['https://sayman.up.railway.app/api', 'https://sayman.onrender.com/api'],
-        'mainnet': ['https://sayman.up.railway.app/api', 'https://sayman.onrender.com/api']
+        'testnet': ['https://sayman.onrender.com/api', 'https://sayman.up.railway.app/api'],
+        'public-testnet': ['https://sayman.onrender.com/api', 'https://sayman.up.railway.app/api'],
+        'mainnet': ['https://sayman.onrender.com/api', 'https://sayman.up.railway.app/api']
     };
 
     const networkNames = {
@@ -123,8 +123,8 @@
     };
 
     const faucetEndpoints = {
-        'testnet': ['https://sayman.up.railway.app/api/faucet', 'https://sayman.onrender.com/api/faucet'],
-        'public-testnet': ['https://sayman.up.railway.app/api/faucet', 'https://sayman.onrender.com/api/faucet'],
+        'testnet': ['https://sayman.onrender.com/api/faucet', 'https://sayman.up.railway.app/api/faucet'],
+        'public-testnet': ['https://sayman.onrender.com/api/faucet', 'https://sayman.up.railway.app/api/faucet'],
         'mainnet': []
     };
 
@@ -153,6 +153,7 @@
         detailNetwork: $('#detailNetwork'),
         detailTxList: $('#detailTxList'),
         networkSelect: $('#networkSelect'),
+        themeToggleBtn: $('#themeToggleBtn'),
         refreshBtn: $('#refreshBtn'),
         mobileMenuBtn: $('#mobileMenuBtn'),
         mobileOverlay: $('#mobileOverlay'),
@@ -238,7 +239,9 @@
     };
 
     let activeEndpointIndex = 0;
-    let networkDecimals = 10000;
+    let networkDecimals = 100_000_000;
+    let networkMinStake = 1_000_000_000;
+    let networkTicker = 'SAYN';
 
     function getApiBase() { 
         const eps = networkEndpoints[currentNetwork];
@@ -252,7 +255,7 @@
         return Array.isArray(eps) ? eps[activeEndpointIndex] : eps;
     }
     function getExplorerUrl() {
-        const base = getApiBase() || 'https://sayman.up.railway.app/api';
+        const base = getApiBase() || 'https://sayman.onrender.com/api';
         return base.replace('/api', '');
     }
 
@@ -274,9 +277,16 @@
             const baseEndpoints = networkEndpoints[currentNetwork];
             endpoints = Array.isArray(baseEndpoints) ? baseEndpoints : [baseEndpoints].filter(Boolean);
         }
+
+        // Always try the PRIMARY endpoint (sayman.onrender.com = index 0) first.
+        // Only move to a standby peer if primary is unreachable.
+        // This keeps all reads canonical and prevents stale data from lagging peers.
+        const orderedIndices = [];
+        orderedIndices.push(0); // primary always first
+        for (let i = 1; i < endpoints.length; i++) orderedIndices.push(i);
         
-        for (let i = 0; i < endpoints.length; i++) {
-            const idx = (activeEndpointIndex + i) % endpoints.length;
+        for (const idx of orderedIndices) {
+            if (idx >= endpoints.length) continue;
             const base = endpoints[idx];
             
             let url = base;
@@ -288,7 +298,7 @@
             
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
                 
                 const res = await window.fetch(url, {
                     ...options,
@@ -300,10 +310,10 @@
                     activeEndpointIndex = idx;
                     return res;
                 }
-                console.warn(`⚠️ Peer ${base} returned status ${res.status}. Trying next...`);
+                console.warn(`⚠️ Peer ${base} returned status ${res.status}. Trying next peer...`);
             } catch (err) {
                 lastError = err;
-                console.warn(`⚠️ Failed to connect to peer ${base}: ${err.message}. Trying next...`);
+                console.warn(`⚠️ Failed to connect to ${base}: ${err.message}. Falling back to next peer...`);
             }
         }
         throw lastError;
@@ -313,12 +323,27 @@
         try {
             const res = await apiFetch('/network');
             const data = await res.json();
-            if (data && data.decimals) {
-                networkDecimals = data.decimals;
-                console.log(`🌐 Loaded network config. Decimals: ${networkDecimals}`);
+            if (data) {
+                if (data.decimals) networkDecimals = data.decimals;
+                if (data.minStake !== undefined) networkMinStake = data.minStake;
+                if (data.ticker) networkTicker = data.ticker;
+                if (data.unstakeDelay !== undefined) UNSTAKE_LOCK_BLOCKS = data.unstakeDelay;
+                console.log(`🌐 Loaded network config. Decimals: ${networkDecimals}, minStake: ${networkMinStake}, ticker: ${networkTicker}, unstakeDelay: ${UNSTAKE_LOCK_BLOCKS}`);
+                updateDynamicNetworkUI();
             }
         } catch (e) {
             console.error('Error fetching network config:', e);
+        }
+    }
+
+    function updateDynamicNetworkUI() {
+        const minStakeHuman = networkMinStake / networkDecimals;
+        if (dom.stakeAmount) {
+            dom.stakeAmount.placeholder = `Min ${minStakeHuman} ${networkTicker}`;
+        }
+        const minDisplay = document.getElementById('stakeMinDisplay');
+        if (minDisplay) {
+            minDisplay.innerHTML = `<i class="fas fa-info-circle"></i> Minimum: ${minStakeHuman} ${networkTicker}`;
         }
     }
 
@@ -396,7 +421,7 @@
     }
 
     async function createWalletFromPrivateKey(privateKey, name, chain = 'sayman') {
-        const wallet = new SaymanWallet(privateKey);
+        const wallet = new SaymanWallet(privateKey, chain);
         await wallet.initialize();
         return {
             id: generateId(),
@@ -416,7 +441,7 @@
     }
 
     async function generateNewWallet(name, chain = 'sayman') {
-        const wallet = new SaymanWallet();
+        const wallet = new SaymanWallet(null, chain);
         await wallet.initialize();
         return {
             id: generateId(),
@@ -491,6 +516,10 @@
                 render();
                 loadTransactionHistory();
                 fetchBlockInfo();
+                if (window.innerWidth <= 768) {
+                    dom.sidebar.classList.remove('open');
+                    dom.mobileOverlay.classList.remove('active');
+                }
                 showToast(`Selected: ${activeWallet ? activeWallet.name : ''}`, 'success');
             });
         });
@@ -682,6 +711,11 @@
                         amount = parseFloat(tx.amount) || 0;
                     }
 
+                    // Remap GENESIS going TO this address as FAUCET for history display
+                    if (tx.type === 'GENESIS' && tx.data && tx.data.to === activeWallet.address) {
+                        tx = { ...tx, type: 'FAUCET' };
+                    }
+
                     if (tx.type === 'TRANSFER' && tx.data) {
                         if (tx.data.to === activeWallet.address) {
                             amount = Math.abs(amount);
@@ -694,7 +728,7 @@
                         amount = -Math.abs(amount);
                     }
 
-                    if (tx.type === 'REWARD' || tx.type === 'FAUCET') {
+                    if (tx.type === 'REWARD' || tx.type === 'FAUCET' || tx.type === 'GENESIS') {
                         amount = Math.abs(amount);
                     }
 
@@ -703,15 +737,15 @@
                     }
 
                     if (!tx.txId && !tx.hash) {
-                        tx.txId = '0x' + generateId().padStart(64, '0');
+                        tx.txId = tx.id || ('0x' + generateId().padStart(64, '0'));
                     }
 
                     if (!tx.blockNumber && !tx.block) {
-                        tx.blockNumber = currentBlock || 0;
+                        tx.blockNumber = tx.blockIndex || currentBlock || 0;
                     }
 
                     if (!tx.time) {
-                        tx.time = Date.now();
+                        tx.time = tx.timestamp || Date.now();
                     }
 
                     return { ...tx, amount: amount };
@@ -939,7 +973,7 @@
                 <div class="form-group">
                     <label><i class="fas fa-hashtag"></i> Transaction ID</label>
                     <input type="text" value="${txIdDisplay}" readonly style="font-family:monospace;font-size:0.7rem;" />
-                    <a href="${explorerUrl}/tx/${tx.txId || tx.hash}" target="_blank" style="font-size:0.65rem;color:var(--accent);">View on Explorer →</a>
+                    <a href="${explorerUrl}/?page=explorer&search=${tx.txId || tx.hash}" target="_blank" style="font-size:0.65rem;color:var(--accent);">View on Explorer →</a>
                 </div>
 
                 ${tx.data ? `
@@ -963,7 +997,7 @@
                     ` : ''}
                 ` : ''}
 
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;">
                     <div class="form-group">
                         <label><i class="fas fa-clock"></i> Timestamp</label>
                         <input type="text" value="${timeDisplay}" readonly />
@@ -971,11 +1005,11 @@
                     <div class="form-group">
                         <label><i class="fas fa-cube"></i> Block Number</label>
                         <input type="text" value="${blockDisplay}" readonly style="font-weight:600;color:var(--accent);" />
-                        <a href="${explorerUrl}/block/${blockDisplay}" target="_blank" style="font-size:0.65rem;color:var(--accent);">View Block →</a>
+                        <a href="${explorerUrl}/?page=explorer&search=${blockDisplay}" target="_blank" style="font-size:0.65rem;color:var(--accent);">View Block →</a>
                     </div>
                 </div>
 
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(90px, 1fr));gap:10px;">
                     <div class="form-group">
                         <label><i class="fas fa-gas-pump"></i> Gas Price</label>
                         <input type="text" value="${tx.gasPrice || '1'}" readonly />
@@ -1352,9 +1386,16 @@
         closeModal('qrPayModal');
     });
 
-    dom.networkSelect.addEventListener('change', function() {
+    dom.networkSelect.addEventListener('change', async function() {
         currentNetwork = this.value;
         dom.detailNetwork.textContent = getNetworkName();
+        showLoading('Switching network...');
+        try {
+            await fetchNetworkConfig();
+        } catch (e) {
+            console.error('Failed to fetch config on network change:', e);
+        }
+        hideLoading();
         render();
         if (activeWallet) {
             loadTransactionHistory();
@@ -1402,22 +1443,27 @@
         }
 
         try {
-            const amount = parseFloat(dom.stakeAmount.value);
+            const amountHuman = parseFloat(dom.stakeAmount.value);
 
-            if (!amount || amount <= 0) {
+            if (!amountHuman || amountHuman <= 0) {
                 showToast('Please enter a valid amount', 'error');
                 return;
             }
 
-            if (amount < 100) {
-                showToast('Minimum stake is 100 SAYN', 'error');
+            const minStakeHuman = networkMinStake / (networkDecimals || 100_000_000);
+            if (amountHuman < minStakeHuman) {
+                showToast(`Minimum stake is ${minStakeHuman} ${networkTicker}`, 'error');
                 return;
             }
 
             showLoading('Preparing stake...');
 
-            const wallet = new SaymanWallet(activeWallet.privateKey);
+            const wallet = new SaymanWallet(activeWallet.privateKey, activeWallet.chain);
             await wallet.initialize();
+
+            // Convert human-readable SAYN to base units (same pattern as TRANSFER)
+            const dec = networkDecimals || 100_000_000;
+            const amount = Math.round(amountHuman * dec); // base units
 
             const addressRes = await apiFetch(`/address/${wallet.address}`);
             const addressData = await addressRes.json();
@@ -1433,14 +1479,14 @@
             });
             const gas = await gasEstimate.json();
 
-            const gasLimit = gas.recommendedGasLimit || 21000;
+            const gasLimit = gas.recommendedGasLimit || 60000;
             const gasPrice = gas.minGasPrice || 1;
-            const gasFeeInSAY = (gasLimit * gasPrice) / 1e18;
+            const gasFeeBaseUnits = gasLimit * gasPrice; // base units
 
-            const totalNeeded = amount + gasFeeInSAY;
+            const totalNeeded = amount + gasFeeBaseUnits;
             if (totalNeeded > (activeWallet.balance || 0)) {
                 hideLoading();
-                showToast(`Insufficient balance. Need ${formatBalance(totalNeeded)} SAYN (${formatBalance(amount)} + ${formatBalance(gasFeeInSAY)} gas)`, 'error');
+                showToast(`Insufficient balance. Need ${formatBalance(totalNeeded)} SAYN (${formatBalance(amount)} stake + ${formatBalance(gasFeeBaseUnits)} gas)`, 'error');
                 return;
             }
 
@@ -1484,11 +1530,12 @@
                         <i class="fas fa-check-circle"></i>
                         <strong>Stake Transaction Broadcast!</strong><br>
                         <small>TX ID: ${txHash.substring(0, 16)}...</small>
-                        <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAYN</small>
+                        <br><small>Gas Fee: ${formatBalance(gasFeeBaseUnits)} SAYN</small>
                     </div>
                 `;
 
-                activeWallet.balance = (activeWallet.balance || 0) - amount - gasFeeInSAY;
+                // Update local state in base units
+                activeWallet.balance = (activeWallet.balance || 0) - amount - gasFeeBaseUnits;
                 activeWallet.stake = (activeWallet.stake || 0) + amount;
                 activeWallet.transactions.push({
                     type: 'STAKE',
@@ -1498,13 +1545,13 @@
                     blockNumber: currentBlock,
                     gasPrice: gasPrice,
                     gasLimit: gasLimit,
-                    gasFee: gasFeeInSAY,
+                    gasFee: gasFeeBaseUnits,
                     data: { from: activeWallet.address, amount }
                 });
                 saveState();
 
                 dom.stakeAmount.value = '';
-                showToast(`Staked ${formatBalance(amount)} SAYN (gas: ${formatBalance(gasFeeInSAY)} SAYN)`, 'success');
+                showToast(`Staked ${formatBalance(amount)} SAYN (gas: ${formatBalance(gasFeeBaseUnits)} SAYN)`, 'success');
 
                 setTimeout(() => {
                     loadTransactionHistory();
@@ -1543,7 +1590,7 @@
         try {
             showLoading('Preparing unstake...');
 
-            const wallet = new SaymanWallet(activeWallet.privateKey);
+            const wallet = new SaymanWallet(activeWallet.privateKey, activeWallet.chain);
             await wallet.initialize();
 
             const addressRes = await apiFetch(`/address/${wallet.address}`);
@@ -1560,9 +1607,9 @@
             });
             const gas = await gasEstimate.json();
 
-            const gasLimit = gas.recommendedGasLimit || 21000;
+            const gasLimit = gas.recommendedGasLimit || 60000;
             const gasPrice = gas.minGasPrice || 1;
-            const gasFeeInSAY = (gasLimit * gasPrice) / 1e18;
+            const gasFeeBaseUnits = gasLimit * gasPrice; // base units
 
             hideLoading();
             showLoading('Signing unstake...');
@@ -1604,7 +1651,7 @@
                 activeWallet.lockedAmount = (activeWallet.lockedAmount || 0) + unstakeAmount;
                 activeWallet.stake = 0;
                 activeWallet.lockBlock = lockBlock;
-                activeWallet.balance = (activeWallet.balance || 0) - gasFeeInSAY;
+                activeWallet.balance = (activeWallet.balance || 0) - gasFeeBaseUnits;
 
                 activeWallet.transactions.push({
                     type: 'UNSTAKE',
@@ -1615,7 +1662,7 @@
                     lockBlock: lockBlock,
                     gasPrice: gasPrice,
                     gasLimit: gasLimit,
-                    gasFee: gasFeeInSAY,
+                    gasFee: gasFeeBaseUnits,
                     data: { from: activeWallet.address }
                 });
                 saveState();
@@ -1626,7 +1673,7 @@
                         <i class="fas fa-check-circle"></i>
                         <strong>Unstake Transaction Broadcast!</strong><br>
                         <small>🔒 Tokens locked for ${lockBlocks} blocks (~${lockTimeMinutes} minutes)</small>
-                        <br><small>Gas Fee: ${formatBalance(gasFeeInSAY)} SAYN</small>
+                        <br><small>Gas Fee: ${formatBalance(gasFeeBaseUnits)} SAYN</small>
                     </div>
                 `;
 
@@ -2213,7 +2260,7 @@
         const chain = getChainConfig(wallet.chain || 'sayman');
         const displayAddress = getAddressForChain(wallet.address, wallet.chain);
         content.innerHTML = `
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:12px;">
                 <div class="form-group">
                     <label><i class="fas fa-tag"></i> Name</label>
                     <input type="text" value="${wallet.name}" readonly />
@@ -2268,7 +2315,8 @@
                         <i class="fas fa-exclamation-triangle"></i> Never share your private key!
                     </div>
                 </div>
-                <div class="form-group" style="grid-column:1/-1;text-align:center;padding-top:8px;border-top:1px solid var(--border-color);">
+                <div class="form-group" style="grid-column:1/-1;text-align:center;padding-top:8px;border-top:1px solid var(--border-color);display:flex;justify-content:center;gap:8px;">
+                    <button class="btn-primary-sm" onclick="editWallet('${wallet.id}')"><i class="fas fa-edit"></i> Edit</button>
                     <button class="btn-outline-sm" onclick="closeModal('detailsModal')"><i class="fas fa-times"></i> Close</button>
                 </div>
             </div>
@@ -2276,6 +2324,15 @@
         window._privateKey = wallet.privateKey;
         openModal('detailsModal');
     }
+
+    window.editWallet = function(id) {
+        const wallet = wallets.find(w => w.id === id);
+        if (!wallet) return;
+        activeWallet = wallet;
+        closeModal('detailsModal');
+        dom.editWalletName.value = wallet.name;
+        openModal('editWalletModal');
+    };
 
     window.togglePrivateKey = function() {
         const input = document.getElementById('privateKeyDisplay');
@@ -2422,6 +2479,38 @@
         dom.mobileOverlay.classList.remove('active');
     });
 
+    // Theme loading and toggle listener
+    function initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        setTheme(savedTheme);
+    }
+
+    function setTheme(theme) {
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark-theme');
+            document.documentElement.setAttribute('data-theme', 'dark');
+            if (dom.themeToggleBtn) {
+                dom.themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
+            }
+        } else {
+            document.documentElement.classList.remove('dark-theme');
+            document.documentElement.setAttribute('data-theme', 'light');
+            if (dom.themeToggleBtn) {
+                dom.themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+        }
+        localStorage.setItem('theme', theme);
+    }
+
+    if (dom.themeToggleBtn) {
+        dom.themeToggleBtn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            setTheme(current);
+        });
+    }
+
+    initTheme();
+
     // Removed — mobileOverlay click handler already closes the sidebar cleanly.
 // The old document-level click listener was firing before wallet-item
 // click handlers and swallowing the tap on mobile.
@@ -2479,6 +2568,10 @@
     });
 
     function updateCharts() {
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js library is not loaded. Skipping chart rendering.');
+            return;
+        }
         if (!activeWallet) {
             if (spendingChart) { spendingChart.destroy(); spendingChart = null; }
             if (monthlyChart) { monthlyChart.destroy(); monthlyChart = null; }
@@ -2586,6 +2679,13 @@
     function updateAnalytics() {
         if (!activeWallet) {
             dom.annualSummary.innerHTML = '<p class="text-muted"><i class="fas fa-info-circle"></i> Select a wallet to view analytics</p>';
+            return;
+        }
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js library is not loaded. Skipping analytics charts.');
+            dom.annualSummary.innerHTML = '<p class="text-muted"><i class="fas fa-exclamation-triangle"></i> Charts are unavailable (Chart.js offline)</p>';
+            renderHeatmap();
+            renderAnnualSummary();
             return;
         }
         renderCategoryChart();
@@ -2755,6 +2855,13 @@
     }
 
     function showToast(message, type = 'info') {
+        if (!message) {
+            if (type === 'error') message = 'An unexpected error occurred';
+            else return;
+        }
+        if (typeof message === 'object') {
+            message = message.message || message.error || JSON.stringify(message);
+        }
         const existing = document.querySelector('.toast-container');
         if (existing) existing.remove();
 
@@ -2888,12 +2995,33 @@
 
     function startAutoRefresh() {
         if (refreshInterval) clearInterval(refreshInterval);
-        refreshInterval = setInterval(() => {
+        refreshInterval = setInterval(async () => {
             if (activeWallet) {
                 loadTransactionHistory();
                 fetchBlockInfo();
             }
-        }, 2000); //snappy 2 second refresh
+            
+            // Fetch balances for all wallets on current network
+            let updated = false;
+            for (let w of wallets) {
+                if (w.networkType === getNetworkType() && w.id !== (activeWallet ? activeWallet.id : null)) {
+                    try {
+                        const res = await apiFetch(`/address/${w.address}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.balance !== undefined) {
+                                w.balance = isFinite(Number(data.balance)) ? Number(data.balance) : 0;
+                                updated = true;
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+            if (updated) {
+                saveState();
+                render();
+            }
+        }, 5000); // 5 second refresh for all wallets
     }
 
     function updateEstGasFee() {
@@ -3077,6 +3205,7 @@
                 dom.loading.classList.add('hidden');
             }, 400);
 
+            await fetchNetworkConfig();
             render();
 
             if (activeWallet) {
@@ -3088,9 +3217,40 @@
 
             // APK Update check
             async function checkForUpdates() {
+                // 1. Try active RPC node first (real-time from deployment)
+                try {
+                    const baseRpc = networkEndpoints[currentNetwork]?.[0] || 'https://sayman.onrender.com/api';
+                    const nodeUrl = baseRpc.replace('/api', '');
+                    const res = await window.fetch(`${nodeUrl}/apk/version.json`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const latestSha = data.sha;
+                        const relativeUrl = data.download_url || '/apk/puky.apk';
+                        const downloadUrl = relativeUrl.startsWith('http') ? relativeUrl : (nodeUrl + relativeUrl);
+
+                        const installedSha = localStorage.getItem('installed_apk_sha');
+                        if (!installedSha) {
+                            localStorage.setItem('installed_apk_sha', latestSha);
+                            return;
+                        }
+
+                        if (installedSha !== latestSha) {
+                            latestApkDownloadUrl = downloadUrl;
+                            latestApkSha = latestSha;
+                            document.getElementById('updateModalMessage').textContent = 'A new wallet APK update is available on the network.';
+                            document.getElementById('updateShaDisplay').textContent = `SHA: ${latestSha.substring(0, 10)}`;
+                            document.getElementById('updateModal').classList.add('open');
+                            return; // Success, skip github
+                        }
+                    }
+                } catch (err) {
+                    console.log('Node APK update check skipped/failed, trying GitHub...');
+                }
+
+                // 2. Fallback to GitHub
                 if (!githubRepo) return;
                 try {
-                    const url = `https://api.github.com/repos/${githubRepo}/contents/apk/base.apk?ref=${githubBranch}`;
+                    const url = `https://api.github.com/repos/${githubRepo}/contents/apk/puky.apk?ref=${githubBranch}`;
                     const res = await window.fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
                     if (res.ok) {
                         const data = await res.json();
@@ -3109,6 +3269,7 @@
                         if (installedSha !== latestSha) {
                             latestApkDownloadUrl = downloadUrl;
                             latestApkSha = latestSha;
+                            document.getElementById('updateModalMessage').textContent = 'A new wallet APK update has dropped in the repository.';
                             document.getElementById('updateShaDisplay').textContent = `SHA: ${latestSha.substring(0, 10)}`;
                             document.getElementById('updateModal').classList.add('open');
                         }

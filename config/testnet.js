@@ -20,6 +20,7 @@ export const DISPLAY_NAME = 'SAYMAN';
 export default {
   networkName:  'SAYMAN Testnet',
   chainId:      'sayman-testnet-1',
+  layer:        1,                             // Layer 1 — SAYMAN base chain
   ticker:       TICKER,
   decimals:     DECIMALS,                    // always pass this through config
 
@@ -89,17 +90,14 @@ export default {
     STORAGE_WRITE:       2_000,
     STORAGE_BYTE:            1,             // per byte of code stored
 
-    // Native tx types
-    REPORT_CREATE:    21_000,
-    REPORT_VERIFY:    21_000,
-    REPORT_RESOLVE:   21_000,
+
 
     // Fallback
     DEFAULT:          21_000,
   },
 
   // Block gas cap
-  maxGasPerBlock:    50_000_000,
+  maxGasPerBlock:    100_000_000,
   maxGasPerTx:       10_000_000,
   maxExecutionTime:  5_000,                 // ms per contract call
   maxInstructions:   100_000,

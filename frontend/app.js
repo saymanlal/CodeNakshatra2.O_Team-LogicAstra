@@ -6,6 +6,24 @@ const POLL  = 5000;
 const PG_SZ = 20;
 
 // ── State ─────────────────────────────────────────────────────────────────────
+window.copyToClipboard = function(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check" style="color:var(--success, #10b981);"></i>';
+    setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check" style="color:var(--success, #10b981);"></i>';
+    setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+  });
+};
+
 let explorerPage   = 1;
 let explorerTotal  = 0;
 let networkConfig  = null;
@@ -51,11 +69,88 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadExplorerEnv();
   await loadNetworkConfig();
   updateHeaderInfo();
-  showPage('dashboard');
+
+  // Sync theme toggle button
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) {
+    if (savedTheme === 'dark') {
+      btn.innerHTML = '<i class="fas fa-sun"></i> Theme';
+    } else {
+      btn.innerHTML = '<i class="fas fa-moon"></i> Theme';
+    }
+  }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const pageParam = urlParams.get('page');
+  if (pageParam && ['dashboard', 'explorer', 'validators', 'contracts', 'layers', 'network'].includes(pageParam)) {
+    showPage(pageParam);
+  } else {
+    showPage('dashboard');
+  }
+
+  // Handle path-based routing for blocks, txs, and contracts
+  const path = window.location.pathname;
+  if (path.startsWith('/block/')) {
+    const parts = path.split('/');
+    const blockIndex = parts[2];
+    if (blockIndex) {
+      showPage('explorer');
+      showBlockDetail(blockIndex);
+    }
+  } else if (path.startsWith('/tx/')) {
+    const parts = path.split('/');
+    const txHash = parts[2];
+    if (txHash) {
+      showPage('explorer');
+      apiFetch(`/search/${txHash}`).then(res => {
+        if (res && res.type === 'transaction' && res.result) {
+          showBlockDetail(res.result.blockIndex).then(() => {
+            setTimeout(() => {
+              const txElements = document.querySelectorAll('.tx-item');
+              txElements.forEach(el => {
+                if (el.textContent.includes(txHash)) {
+                  el.style.border = '1px solid var(--mono-100)';
+                  el.style.padding = 'calc(var(--grid)*1.5)';
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              });
+            }, 500);
+          });
+        } else {
+          showNotification('Transaction not found');
+        }
+      }).catch(() => {
+        showNotification('Error loading transaction');
+      });
+    }
+  } else if (path.startsWith('/contract/')) {
+    const parts = path.split('/');
+    const address = parts[2];
+    if (address) {
+      showPage('contracts');
+      showContractDetail(address);
+    }
+  }
 
   setInterval(poll, POLL);
   setInterval(updateHeaderInfo, POLL);
 });
+
+window.toggleExplorerTheme = function() {
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  if (isDark) {
+    document.documentElement.classList.remove('dark-theme');
+    localStorage.setItem('theme', 'light');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.innerHTML = '<i class="fas fa-moon"></i> Theme';
+  } else {
+    document.documentElement.classList.add('dark-theme');
+    localStorage.setItem('theme', 'dark');
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.innerHTML = '<i class="fas fa-sun"></i> Theme';
+  }
+};
 
 function poll() {
   const active = document.querySelector('.nav-btn.active');
@@ -65,6 +160,7 @@ function poll() {
     case 'explorer':   loadExplorer(explorerPage);         break;
     case 'validators': loadValidators();                   break;
     case 'contracts':  loadContracts();                    break;
+    case 'layers':     loadLayers();                       break;
     case 'network':    loadNetwork();                      break;
     case 'docs':       break;
   }
@@ -103,6 +199,7 @@ function showPage(pageId) {
     case 'explorer':   loadExplorer(1);        break;
     case 'validators': loadValidators();       break;
     case 'contracts':  loadContracts();        break;
+    case 'layers':     loadLayers();           break;
     case 'network':    loadNetwork();          break;
     case 'docs':       break;
   }
@@ -117,6 +214,8 @@ async function loadDashboard() {
       apiFetch('/validators'),
     ]);
 
+    const dec = (networkConfig && networkConfig.decimals) || 100_000_000;
+
     setEl('stat-blocks',    stats.blocks     ?? 0);
     setEl('stat-validators', valData.validators?.length ?? 0);
     setEl('stat-stake',     sayn(valData.totalStake ?? 0, false));
@@ -125,6 +224,22 @@ async function loadDashboard() {
     setEl('stat-reward',    sayn(stats.blockReward ?? 0, false));
     setEl('stat-blocktime', Math.round((stats.blockTime ?? 5000) / 1000));
     setEl('stat-apr',       valData.estimatedAPR ?? 0);
+
+    // ── TPS & Concurrency ─────────────────────────────────────────────
+    setEl('stat-tps', stats.tps ?? '0');
+    setEl('stat-parallel', (stats.parallelEfficiency ?? 1.0).toFixed(2));
+
+    // ── Denomination card — eliminate all confusion about SAYN vs base units ──
+    const ticker = (networkConfig && networkConfig.ticker) || 'SAYN';
+    setEl('stat-denom',      `1 ${ticker} = ${dec.toLocaleString()} base units`);
+    setEl('stat-denom-note', `All on-chain amounts are integers (base units). Divide by ${dec} to get ${ticker}.`);
+
+    // ── Show raw base-unit values below SAYN values for clarity ──────────────
+    const stakeRaw = document.getElementById('stat-stake-raw');
+    if (stakeRaw) stakeRaw.textContent = `${(valData.totalStake ?? 0).toLocaleString()} base units`;
+
+    const rewardRaw = document.getElementById('stat-reward-raw');
+    if (rewardRaw) rewardRaw.textContent = `${(stats.blockReward ?? 0).toLocaleString()} base units`;
 
     const blocks = (blocksData.blocks || []).sort((a, b) => b.index - a.index);
     const feed   = document.getElementById('block-feed');
@@ -220,10 +335,10 @@ function renderExplorerRows(blocks) {
     return `
       <tr onclick="showBlockDetail(${b.index})">
         <td>#${b.index}</td>
-        <td class="mono">${(b.hash || '').slice(0, 20)}…</td>
-        <td class="mono" onclick="event.stopPropagation();showValidatorDetail('${b.validator || ''}')">${(b.validator || '—').slice(0, 16)}…</td>
+        <td class="mono">${(b.hash || '').slice(0, 20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${b.hash || ''}')"><i class="fas fa-copy"></i></button></td>
+        <td class="mono" onclick="event.stopPropagation();showValidatorDetail('${b.validator || ''}')">${(b.validator || '—').slice(0, 16)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${b.validator || ''}')"><i class="fas fa-copy"></i></button></td>
         <td>${b.transactions?.length ?? 0}</td>
-        <td>${gas.toLocaleString()}</td>
+        <td>${gas.toLocaleString()} gas</td>
         <td>${fmtTime(b.timestamp)}</td>
       </tr>
     `;
@@ -289,7 +404,8 @@ async function showBlockDetail(index) {
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-user-check"></i> Validator</td><td class="mono">${block.validator || '—'}</td></tr>
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-clock"></i> Timestamp</td><td>${fmtTime(block.timestamp)}</td></tr>
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-link"></i> Chain ID</td><td>${block.chainId || '—'}</td></tr>
-            <tr class="detail-row"><td class="detail-label"><i class="fas fa-gas-pump"></i> Gas Used</td><td>${gas.toLocaleString()}</td></tr>
+            <tr class="detail-row"><td class="detail-label"><i class="fas fa-gas-pump"></i> Gas Used</td><td>${gas.toLocaleString()} gas</td></tr>
+            <tr class="detail-row"><td class="detail-label"><i class="fas fa-coins"></i> Block Fees</td><td>${sayn(block.transactions?.reduce((sum, tx) => sum + (tx.gasUsed || 0) * (tx.gasPrice || 0), 0) || 0)}</td></tr>
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-database"></i> State Root</td><td class="mono" style="word-break:break-all;">${block.stateRoot || '—'}</td></tr>
           </table>
 
@@ -305,7 +421,8 @@ async function showBlockDetail(index) {
                     ${tx.data?.from   ? `<div><strong>From:</strong> <span class="mono">${tx.data.from}</span></div>`   : ''}
                     ${tx.data?.to     ? `<div><strong>To:</strong> <span class="mono">${tx.data.to}</span></div>`     : ''}
                     ${tx.data?.amount ? `<div><strong>Amount:</strong> ${sayn(tx.data.amount)}</div>`                 : ''}
-                    ${tx.gasUsed      ? `<div><strong>Gas:</strong> ${tx.gasUsed}</div>`                              : ''}
+                    ${tx.gasUsed      ? `<div><strong>Gas Used:</strong> ${tx.gasUsed.toLocaleString()} gas</div>`   : ''}
+                    ${tx.gasUsed && tx.gasPrice ? `<div><strong>Fee:</strong> ${sayn((tx.gasUsed || 0) * (tx.gasPrice || 0))}</div>` : ''}
                   </div>
                 `).join('')
               : '<p style="color:var(--mono-400);font-size:12px;">No transactions in this block</p>'
@@ -377,9 +494,11 @@ function renderValidatorList(validators) {
 
   tbody.innerHTML = validators.map(v => `
     <tr onclick="showValidatorDetail('${v.address || ''}')">
-      <td class="mono">${(v.address || '').slice(0, 20)}…</td>
-      <td>${sayn(v.stake ?? 0)}</td>
+      <td class="mono">${(v.address || '').slice(0, 20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${v.address || ''}')"><i class="fas fa-copy"></i></button></td>
+      <td>${sayn(v.stake ?? 0)} <span style="font-size:10px;color:var(--mono-500)">(${(v.stake ?? 0).toLocaleString()} bu)</span></td>
+      <td style="font-size:11px;color:var(--mono-500)">${(v.stake ?? 0).toLocaleString()}</td>
       <td>${v.percentage ?? 0}%</td>
+      <td>${v.reputation ?? 0}</td>
       <td>${v.missedBlocks ?? 0}</td>
       <td>
         <span style="font-size:11px;padding:2px 8px;border:1px solid ${v.isActive ? '#2a7a2a' : 'var(--mono-800)'};color:${v.isActive ? '#2a7a2a' : 'var(--mono-400)'}">
@@ -451,7 +570,7 @@ async function showValidatorDetail(address) {
               <td style="padding:calc(var(--grid)*1);">#${b.index}</td>
               <td style="padding:calc(var(--grid)*1);font-family:'SF Mono',monospace;font-size:11px;">${(b.hash||'').slice(0,20)}…</td>
               <td style="padding:calc(var(--grid)*1);">${b.transactions?.length ?? 0}</td>
-              <td style="padding:calc(var(--grid)*1);">${(b.gasUsed ?? 0).toLocaleString()}</td>
+              <td style="padding:calc(var(--grid)*1);">${(b.gasUsed ?? 0).toLocaleString()} gas</td>
               <td style="padding:calc(var(--grid)*1);">${fmtTime(b.timestamp)}</td>
             </tr>
           `).join('')}
@@ -462,6 +581,20 @@ async function showValidatorDetail(address) {
     const c = document.getElementById('vd-loading');
     if (c) c.innerHTML = '<p style="color:#c00;font-size:12px;text-align:center;">Error loading validator blocks.</p>';
   }
+}
+
+// ── Layers ─────────────────────────────────────────────────────────────────────────
+async function loadLayers() {
+  try {
+    const net = await apiFetch('/network');
+    setEl('layer-level',    net.layer ? 'Layer ' + net.layer : 'Layer 1 (Main)');
+    setEl('layer-chain-id', net.chainId || '—');
+    setEl('layer-blocktime', net.blockTime || '—');
+    setEl('layer-decimals', net.decimals
+      ? `${net.decimals.toLocaleString()} (1 SAYN = ${net.decimals.toLocaleString()} base units)`
+      : '—'
+    );
+  } catch (e) { console.error('Layers:', e); }
 }
 
 // ── Contracts ─────────────────────────────────────────────────────────────────
@@ -497,17 +630,208 @@ function renderContracts(contracts) {
   if (!tbody) return;
 
   if (!contracts.length) {
-    tbody.innerHTML = `<tr><td colspan="3" style="padding:calc(var(--grid)*3);text-align:center;color:var(--mono-400);font-size:12px;">No contracts found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="padding:calc(var(--grid)*3);text-align:center;color:var(--mono-400);font-size:12px;">No contracts found.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = contracts.map(c => `
-    <tr>
-      <td class="mono">${(c.address || '').slice(0, 20)}…</td>
-      <td class="mono">${(c.creator || '').slice(0, 20)}…</td>
+    <tr onclick="showContractDetail('${c.address || ''}')">
+      <td class="mono" style="font-size:11px;">${c.address || '—'} <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${c.address || ''}')"><i class="fas fa-copy"></i></button></td>
+      <td class="mono">${(c.creator || '').slice(0, 15)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${c.creator || ''}')"><i class="fas fa-copy"></i></button></td>
+      <td>${c.blockIndex !== undefined && c.blockIndex !== null ? `#${c.blockIndex}` : '—'}</td>
       <td>${(c.code?.length ?? 0).toLocaleString()} bytes</td>
     </tr>
   `).join('');
+}
+
+// Helper to sanitize contract state for privacy, security and compliance
+function sanitizeContractState(stateObj) {
+  if (!stateObj || typeof stateObj !== 'object') return stateObj;
+  
+  const sanitized = Array.isArray(stateObj) ? [] : {};
+  const sensitiveKeys = ['secret', 'key', 'password', 'pass', 'salt', 'seed', 'pwd', 'private', 'sk', 'priv'];
+  
+  for (const [key, val] of Object.entries(stateObj)) {
+    const isSensitive = sensitiveKeys.some(sk => key.toLowerCase().includes(sk));
+    if (isSensitive) {
+      if (Array.isArray(sanitized)) {
+        sanitized.push("[REDACTED FOR SECURITY & PRIVACY]");
+      } else {
+        sanitized[key] = "[REDACTED FOR SECURITY & PRIVACY]";
+      }
+    } else if (val && typeof val === 'object') {
+      if (Array.isArray(sanitized)) {
+        sanitized.push(sanitizeContractState(val));
+      } else {
+        sanitized[key] = sanitizeContractState(val);
+      }
+    } else {
+      if (Array.isArray(sanitized)) {
+        sanitized.push(val);
+      } else {
+        sanitized[key] = val;
+      }
+    }
+  }
+  return sanitized;
+}
+
+// ── Show contract detail modal (Realtime) ──────────────────────────────────────
+async function showContractDetail(address) {
+  if (!address) return;
+
+  // Clear any existing poll interval
+  if (window.contractPollInterval) {
+    clearInterval(window.contractPollInterval);
+  }
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width: 900px; max-height: 90vh;">
+      <div class="modal-header">
+        <h3><i class="fas fa-file-contract"></i> Contract: <span class="mono" style="font-size:12px; font-weight:bold;">${address}</span></h3>
+        <button class="modal-close" id="contract-modal-close"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: calc(var(--grid)*3); height: 100%; overflow: hidden;">
+        
+        <!-- Metadata and Tech Specs Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--grid)*3); flex-shrink: 0;">
+          <div style="border: var(--border); padding: calc(var(--grid)*2); background: var(--mono-950); border-radius: 4px;">
+            <h4 style="font-size: 11px; text-transform: uppercase; color: var(--mono-400); margin-bottom: var(--grid); border-bottom: 1px solid var(--mono-900); padding-bottom: 2px;">Metadata</h4>
+            <table style="width: 100%; font-size: 11px;">
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Name:</td><td style="padding: 4px 0; border: none; font-weight: bold;" id="c-meta-name">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Version:</td><td style="padding: 4px 0; border: none; font-weight: bold;" id="c-meta-version">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Creator:</td><td style="padding: 4px 0; border: none;" class="mono" id="c-meta-creator">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Created At:</td><td style="padding: 4px 0; border: none;" id="c-meta-created">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Block:</td><td style="padding: 4px 0; border: none; font-weight: bold;" id="c-meta-block">—</td></tr>
+            </table>
+          </div>
+          <div style="border: var(--border); padding: calc(var(--grid)*2); background: var(--mono-950); border-radius: 4px;">
+            <h4 style="font-size: 11px; text-transform: uppercase; color: var(--mono-400); margin-bottom: var(--grid); border-bottom: 1px solid var(--mono-900); padding-bottom: 2px;">Tech Specs</h4>
+            <table style="width: 100%; font-size: 11px;">
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Code Size:</td><td style="padding: 4px 0; border: none;" id="c-tech-size">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Code Hash:</td><td style="padding: 4px 0; border: none;" class="mono" id="c-tech-hash">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Exposed Methods:</td><td style="padding: 4px 0; border: none;" id="c-tech-methods">—</td></tr>
+              <tr><td style="padding: 4px 0; border: none; color: var(--mono-400);">Last Update:</td><td style="padding: 4px 0; border: none;" id="c-tech-updated">—</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- Detail content with Split layout: left state (realtime), right ABI -->
+        <div style="display: flex; gap: calc(var(--grid)*3); flex: 1; overflow: hidden; min-height: 0;">
+          
+          <!-- Left: State View (Realtime & Sanitized) -->
+          <div style="flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%;">
+            <h4 style="font-size: 11px; text-transform: uppercase; color: var(--mono-400); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+              <span>On-Chain State</span>
+              <span style="font-size: 9px; padding: 2px 6px; background: #2a7a2a; color: white; border-radius: 2px; text-transform: none;"><i class="fas fa-sync fa-spin"></i> Live Realtime updates</span>
+            </h4>
+            <div style="flex: 1; border: var(--border); border-radius: 4px; overflow: auto; background: var(--mono-950); padding: calc(var(--grid)*1.5);">
+              <pre id="c-state" class="mono" style="font-size: 11px; margin: 0; white-space: pre-wrap; word-break: break-all; color: var(--mono-100);">Loading state…</pre>
+            </div>
+          </div>
+          
+          <!-- Right: Exposed Interface (ABI) View -->
+          <div style="flex: 1.2; display: flex; flex-direction: column; min-width: 0; height: 100%;">
+            <h4 style="font-size: 11px; text-transform: uppercase; color: var(--mono-400); margin-bottom: 4px;">Exposed Interface (ABI)</h4>
+            <div style="flex: 1; border: var(--border); border-radius: 4px; overflow: auto; background: var(--mono-950); padding: calc(var(--grid)*2);" id="c-abi-container">
+              <p style="color:var(--mono-400); font-size:11px;">Loading interface details…</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  const closeBtn = modal.querySelector('#contract-modal-close');
+  const cleanUp = () => {
+    clearInterval(window.contractPollInterval);
+    window.contractPollInterval = null;
+    modal.remove();
+  };
+
+  closeBtn.addEventListener('click', cleanUp);
+  modal.addEventListener('click', e => { if (e.target === modal) cleanUp(); });
+  document.body.appendChild(modal);
+
+  async function fetchAndUpdate() {
+    try {
+      const contract = await apiFetch(`/contracts/${address}`);
+      if (!contract) throw new Error('Contract not returned');
+
+      setEl('c-meta-name', contract.name || 'UnnamedContract');
+      setEl('c-meta-version', contract.version || '1.0.0');
+      
+      const creatorEl = document.getElementById('c-meta-creator');
+      if (creatorEl) creatorEl.innerHTML = contract.creator ? (contract.creator.slice(0, 30) + '… <button class="copy-data-btn" onclick="copyToClipboard(this, \'' + contract.creator + '\')"><i class="fas fa-copy"></i></button>') : '—';
+      
+      setEl('c-meta-created', contract.createdAt ? fmtTime(contract.createdAt) : '—');
+      setEl('c-meta-block', contract.blockIndex !== undefined && contract.blockIndex !== null ? `#${contract.blockIndex}` : '—');
+
+      setEl('c-tech-size', contract.code ? (contract.code.length.toLocaleString() + ' bytes') : '0 bytes');
+      
+      const hashEl = document.getElementById('c-tech-hash');
+      if (hashEl) hashEl.innerHTML = contract.codeHash ? (contract.codeHash.slice(0, 16) + '… <button class="copy-data-btn" onclick="copyToClipboard(this, \'' + contract.codeHash + '\')"><i class="fas fa-copy"></i></button>') : '—';
+      
+      const methods = contract.abi && Array.isArray(contract.abi) 
+        ? contract.abi.map(m => typeof m === 'string' ? m : (m.name || 'anonymous')).join(', ')
+        : '—';
+      setEl('c-tech-methods', methods || 'none');
+      setEl('c-tech-updated', fmtTime(Date.now()));
+
+      // Render Sanitized State (Hides secrets, keys, passwords, salts)
+      const stateEl = document.getElementById('c-state');
+      if (stateEl) {
+        if (contract.state && Object.keys(contract.state).length > 0) {
+          const sanitizedState = sanitizeContractState(contract.state);
+          stateEl.textContent = JSON.stringify(sanitizedState, null, 2);
+        } else {
+          stateEl.textContent = 'No state storage variables initialized yet.';
+        }
+      }
+
+      // Populate ABI interface list securely without revealing intellectual property
+      const abiContainer = document.getElementById('c-abi-container');
+      if (abiContainer) {
+        if (contract.abi && Array.isArray(contract.abi) && contract.abi.length > 0) {
+          abiContainer.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              ${contract.abi.map(m => {
+                const name = typeof m === 'string' ? m : (m.name || 'anonymous');
+                const inputs = m.inputs && Array.isArray(m.inputs)
+                  ? m.inputs.map(i => `${i.name || i}`).join(', ')
+                  : (m.args && Array.isArray(m.args) ? m.args.join(', ') : '');
+                const isConst = m.constant || m.stateMutability === 'view' || m.stateMutability === 'pure';
+                
+                return `
+                  <div style="border-bottom: 1px solid var(--mono-900); padding-bottom: 8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <strong class="mono" style="color:var(--mono-100); font-size:12px;">${name}(${inputs})</strong>
+                      <span style="font-size:9px; padding:2px 6px; background:${isConst ? 'var(--mono-900)' : 'var(--mono-100)'}; color:${isConst ? 'var(--mono-400)' : 'var(--mono-1000)'}; border-radius:2px; font-weight:500;">
+                        ${isConst ? 'Read-Only' : 'State-Changing'}
+                      </span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        } else {
+          abiContainer.innerHTML = '<p style="color:var(--mono-400); font-size:11px;">No ABI methods exposed.</p>';
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching contract details:', e);
+      const stateEl = document.getElementById('c-state');
+      if (stateEl) stateEl.textContent = 'Error loading contract details.';
+    }
+  }
+
+  await fetchAndUpdate();
+  window.contractPollInterval = setInterval(fetchAndUpdate, 2000);
 }
 
 // ── Network ───────────────────────────────────────────────────────────────────
@@ -519,7 +843,8 @@ async function loadNetwork() {
     setEl('net-height',    d.blockHeight ?? 0);
     setEl('net-blocktime', Math.round(d.averageBlockTime || 5000));
     setEl('net-mempool',   d.mempool     ?? 0);
-    setEl('net-node-id',   (d.nodeId  || '').slice(0, 32) + '…');
+    const netNodeEl = document.getElementById('net-node-id');
+    if (netNodeEl) netNodeEl.innerHTML = (d.nodeId || '').slice(0, 32) + '… <button class="copy-data-btn" onclick="copyToClipboard(this, \'' + (d.nodeId || '') + '\')"><i class="fas fa-copy"></i></button>';
     setEl('net-mode',      (d.mode    || '—').toUpperCase());
     setEl('net-network',   d.network  || '—');
     setEl('net-chain',     d.chainId  || '—');
@@ -561,7 +886,7 @@ function renderPeers(peers) {
 
   peerDiv.innerHTML = peers.map(p => `
     <div class="peer-row">
-      <div><strong>Node ID:</strong> ${(p.nodeId || '—').slice(0, 20)}…</div>
+      <div><strong>Node ID:</strong> ${(p.nodeId || '—').slice(0, 20)}… <button class="copy-data-btn" onclick="copyToClipboard(this, '${p.nodeId || ''}')"><i class="fas fa-copy"></i></button></div>
       <div><strong>Height:</strong> ${p.chainHeight ?? '—'}</div>
       <div><strong>Last seen:</strong> ${fmtTimeAgo(p.lastSeen)}</div>
     </div>
@@ -609,10 +934,11 @@ function fmtUptime(s) {
 
 function sayn(baseUnits, withUnit = true) {
   if (baseUnits === null || baseUnits === undefined) return '—';
-  const dec = (typeof networkConfig !== 'undefined' && networkConfig && networkConfig.decimals) || 10000;
+  const dec = (typeof networkConfig !== 'undefined' && networkConfig && networkConfig.decimals) || 100000000;
   const v = Number(baseUnits) / dec;
   const fixed = dec === 100000000 ? 8 : 4;
-  return Number.isFinite(v) ? v.toFixed(fixed) + (withUnit ? ' SAYN' : '') : '—';
+  const ticker = (typeof networkConfig !== 'undefined' && networkConfig && networkConfig.ticker) || 'SAYN';
+  return Number.isFinite(v) ? v.toFixed(fixed) + (withUnit ? ' ' + ticker : '') : '—';
 }
 
 function showNotification(msg) {
@@ -621,4 +947,75 @@ function showNotification(msg) {
   n.textContent = msg;
   document.body.appendChild(n);
   setTimeout(() => n.remove(), 3000);
+}
+
+// ── Legal Modals ─────────────────────────────────────────────────────────────
+function showLegalModal(type) {
+  const modals = {
+    terms: {
+      title: "Terms & Conditions",
+      icon: "fa-gavel",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. Decentralized Nature</strong></p>
+        <p style="margin-bottom:16px;">SAYMAN is a decentralized, peer-to-peer open-source blockchain network. There is no central administrator, company, or authority that controls the network. By using this explorer or interacting with the network, you acknowledge that you are using a decentralized protocol at your own risk.</p>
+        <p style="margin-bottom:12px;"><strong>2. User Responsibility</strong></p>
+        <p style="margin-bottom:16px;">You are solely responsible for the security of your private keys, seed phrases, and wallets. Transactions broadcast to the SAYMAN network are immutable and irreversible. The developers, contributors, and validators cannot recover lost funds, reverse transactions, or restore access to locked accounts.</p>
+        <p style="margin-bottom:12px;"><strong>3. Smart Contracts & Custom Tokens</strong></p>
+        <p style="margin-bottom:16px;">Anyone can deploy smart contracts, custom tokens, memecoins, or DEX pools. The network and its developers do not verify, endorse, or guarantee the safety or legality of user-deployed contracts. Exercise extreme caution when interacting with third-party contracts.</p>
+        <p style="margin-bottom:12px;"><strong>4. Disclaimer of Warranty</strong></p>
+        <p>The software and network are provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.</p>
+      `
+    },
+    privacy: {
+      title: "Privacy Policy",
+      icon: "fa-shield-alt",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. On-Chain Ledger Transparency</strong></p>
+        <p style="margin-bottom:16px;">SAYMAN is a public ledger blockchain. All transactions, contract deployments, validator stakes, peer connections, and on-chain activities are public, globally accessible, and immutable. Do not store any personal, confidential, or personally identifiable information (PII) on the blockchain.</p>
+        <p style="margin-bottom:12px;"><strong>2. No Data Collection</strong></p>
+        <p style="margin-bottom:16px;">This blockchain explorer does not require registration, accounts, or email sign-ups. We do not collect, sell, or track personal information, IP addresses, or browsing history.</p>
+        <p style="margin-bottom:12px;"><strong>3. Third-Party Links</strong></p>
+        <p>The dashboard and docs contain links to external wallets, verification pages, or GitHub. We are not responsible for the privacy practices of third-party platforms.</p>
+      `
+    },
+    cookies: {
+      title: "Cookies Policy",
+      icon: "fa-cookie-bite",
+      content: `
+        <p style="margin-bottom:12px;"><strong>1. Strictly Necessary Cookies</strong></p>
+        <p style="margin-bottom:16px;">This explorer interface does not use third-party tracking, profiling, or advertising cookies. We only use functional local storage (such as browser localStorage) to remember configuration choices (e.g. API endpoint base URLs or page selections).</p>
+        <p style="margin-bottom:12px;"><strong>2. Opt-out</strong></p>
+        <p>Since we do not deploy tracking or analytical cookies, there is no tracking to opt-out of. You can clear your browser's local cache at any time to remove saved network settings.</p>
+      `
+    },
+    copyright: {
+      title: "Copyright Notice",
+      icon: "fa-copyright",
+      content: `
+        <p style="margin-bottom:12px;"><strong>MIT License</strong></p>
+        <p style="margin-bottom:16px;">Copyright (c) 2026 SAYMAN Blockchain Team</p>
+        <p style="margin-bottom:16px;">Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+        <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+      `
+    }
+  };
+
+  const item = modals[type];
+  if (!item) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3><i class="fas ${item.icon}"></i> ${item.title}</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body" style="line-height: 1.6; font-size: 13px; color: var(--mono-100); padding: calc(var(--grid)*3); overflow-y: auto;">
+        ${item.content}
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
 }
