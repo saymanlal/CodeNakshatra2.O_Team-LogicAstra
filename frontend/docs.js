@@ -1,5 +1,5 @@
 // ── Config ───────────────────────────────────────────────────────────────
-const ANDROID_APK_URL = '/apk/puky.apk';
+const ANDROID_APK_URL = 'https://raw.githubusercontent.com/saymanlal/sayman-wallet-manager/main/apk/puky.apk';
 const FAUCET_SITE_URL = 'https://sayman-faucet-site.vercel.app/';
 const FAUCET_API_URL = 'https://sayman-faucet.onrender.com';
 const WALLET_WEB_URL = 'https://sayman-wallet-manager.vercel.app/';
