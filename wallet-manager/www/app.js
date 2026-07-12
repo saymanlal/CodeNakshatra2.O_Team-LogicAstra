@@ -1,6 +1,41 @@
 (function() {
     'use strict';
 
+    // Safe localStorage polyfill to avoid crashes in restricted WebView environments
+    const safeStorage = {
+        getItem(key) {
+            try {
+                return localStorage.getItem(key);
+            } catch (e) {
+                console.warn('Storage read blocked, using fallback memory storage:', e);
+                return this.fallback[key] || null;
+            }
+        },
+        setItem(key, value) {
+            try {
+                localStorage.setItem(key, value);
+            } catch (e) {
+                console.warn('Storage write blocked, using fallback memory storage:', e);
+                this.fallback[key] = String(value);
+            }
+        },
+        removeItem(key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                delete this.fallback[key];
+            }
+        },
+        clear() {
+            try {
+                localStorage.clear();
+            } catch (e) {
+                this.fallback = {};
+            }
+        },
+        fallback: {}
+    };
+
     let wallets = [];
     let activeWallet = null;
     let currentNetwork = 'testnet';
@@ -184,7 +219,6 @@
         editWalletBtn: $('#editWalletBtn'),
         saveWalletNameBtn: $('#saveWalletNameBtn'),
         deleteWalletBtn: $('#deleteWalletBtn'),
-        faucetBtn: $('#faucetBtn'),
         claimFaucetBtn: $('#claimFaucetBtn'),
         createWalletBtn: $('#createWalletBtn'),
         importPrivateKeyBtn: $('#importPrivateKeyBtn'),
@@ -193,6 +227,7 @@
         privateKeyArea: $('#privateKeyArea'),
         newWalletName: $('#newWalletName'),
         jsonFileInput: $('#jsonFileInput'),
+        jsonPasteInput: $('#jsonPasteInput'),
         importJsonConfirmBtn: $('#importJsonConfirmBtn'),
         jsonImportStatus: $('#jsonImportStatus'),
         uploadQrBtn: $('#uploadQrBtn'),
@@ -402,13 +437,13 @@
                 activeWalletId: activeWallet ? activeWallet.id : null,
                 network: currentNetwork,
             };
-            localStorage.setItem('puky_wallet_state', JSON.stringify(data));
+            safeStorage.setItem('puky_wallet_state', JSON.stringify(data));
         } catch (e) {}
     }
 
     function loadState() {
         try {
-            const raw = localStorage.getItem('puky_wallet_state');
+            const raw = safeStorage.getItem('puky_wallet_state');
             if (!raw) return false;
             const data = JSON.parse(raw);
             wallets = data.wallets || [];
@@ -558,8 +593,8 @@
         const w = activeWallet;
         if (!w) {
             dom.detailName.textContent = 'Select a Wallet';
-            dom.detailStatus.className = 'detail-status';
-            dom.detailStatus.innerHTML = '<i class="fas fa-circle"></i> Inactive';
+            dom.detailStatus.className = 'badge badge-info';
+            dom.detailStatus.innerHTML = 'Inactive';
             dom.detailAddress.textContent = '0x0000000000000000000000000000000000000000';
             dom.detailBalance.textContent = '0.00';
             dom.detailStaked.textContent = '0.00';
@@ -575,8 +610,8 @@
         const displayAddress = getAddressForChain(w.address, w.chain);
 
         dom.detailName.textContent = `${w.name} (${chain.symbol})`;
-        dom.detailStatus.className = 'detail-status active';
-        dom.detailStatus.innerHTML = `<i class="fas fa-circle" style="color:${chain.color};"></i> ${chain.name}`;
+        dom.detailStatus.className = 'badge badge-success';
+        dom.detailStatus.innerHTML = `${chain.name}`;
         dom.detailAddress.textContent = displayAddress;
         dom.detailBalance.textContent = formatBalance(w.balance || 0);
         dom.detailStaked.textContent = formatBalance(w.stake || 0);
@@ -960,7 +995,7 @@
 
         content.innerHTML = `
             <div style="display:flex;flex-direction:column;gap:10px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--border-color);flex-wrap:wrap;gap:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;">
                     <span class="tx-type-badge ${typeClass}" style="font-size:0.8rem;padding:4px 14px;">
                         <i class="fas ${isPositive ? 'fa-arrow-down' : 'fa-arrow-up'}"></i>
                         ${tx.type || 'Transfer'}
@@ -1033,8 +1068,8 @@
                 </div>
                 ` : ''}
 
-                <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border-color);flex-wrap:wrap;">
-                    <button class="btn-outline-sm" onclick="closeModal('txDetailModal')"><i class="fas fa-times"></i> Close</button>
+                <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap;">
+                    <button class="btn btn-outline btn-sm" onclick="closeModal('txDetailModal')"><i class="fas fa-times"></i> Close</button>
                 </div>
             </div>
         `;
@@ -1074,22 +1109,26 @@
 
         try {
             if (navigator.permissions) {
-                const result = await navigator.permissions.query({ name: 'camera' });
-                if (result.state === 'denied') {
-                    dom.qrPayResult.innerHTML = `
-                        <div class="error-message">
-                            <i class="fas fa-exclamation-circle"></i> Camera permission denied. Please enable in settings.
-                            <button class="btn-outline-sm" onclick="location.reload()" style="margin-top:8px;">
-                                <i class="fas fa-sync-alt"></i> Retry
-                            </button>
-                        </div>
-                    `;
-                    return;
+                try {
+                    const result = await navigator.permissions.query({ name: 'camera' });
+                    if (result.state === 'denied') {
+                        dom.qrPayResult.innerHTML = `
+                            <div class="result-box error">
+                                <i class="fas fa-exclamation-circle"></i> Camera permission denied. Please enable in settings.
+                            </div>
+                        `;
+                        isQrPayScanning = false;
+                        return;
+                    }
+                } catch (permErr) {
+                    // Some WebViews (Capacitor) don't support the 'camera' permission
+                    // query name and throw a TypeError — ignore and fall through to start().
                 }
             }
 
             if (typeof Html5Qrcode === 'undefined') {
-                dom.qrPayResult.innerHTML = `<div class="error-message">QR scanner library not loaded.</div>`;
+                dom.qrPayResult.innerHTML = `<div class="result-box error">QR scanner library not loaded.</div>`;
+                isQrPayScanning = false;
                 return;
             }
 
@@ -1102,7 +1141,7 @@
             };
 
             dom.qrPayResult.innerHTML = `
-                <div style="padding:8px;color:var(--text-secondary);">
+                <div class="result-box info">
                     <i class="fas fa-spinner fa-spin"></i> Requesting camera access...
                 </div>
             `;
@@ -1112,7 +1151,7 @@
             }, config, onQrPayScanSuccess, onQrPayScanError);
 
             dom.qrPayResult.innerHTML = `
-                <div style="padding:8px;color:var(--success);">
+                <div class="result-box success">
                     <i class="fas fa-check-circle"></i> Scan recipient's QR code
                 </div>
             `;
@@ -1120,14 +1159,8 @@
         } catch (err) {
             isQrPayScanning = false;
             dom.qrPayResult.innerHTML = `
-                <div class="error-message">
+                <div class="result-box error">
                     <i class="fas fa-exclamation-circle"></i> ${err.message || 'Camera access denied.'}
-                    <button class="btn-outline-sm" onclick="location.reload()" style="margin-top:8px;">
-                        <i class="fas fa-sync-alt"></i> Retry
-                    </button>
-                    <button class="btn-outline-sm" onclick="document.getElementById('qrFileInput').click()" style="margin-top:8px;">
-                        <i class="fas fa-upload"></i> Upload Image
-                    </button>
                 </div>
             `;
             console.error('QR Pay Scanner error:', err);
@@ -1138,7 +1171,7 @@
         if (decodedText && decodedText.length === 40) {
             dom.qrPayAddress.value = decodedText;
             dom.qrPayResult.innerHTML = `
-                <div class="success-message" style="margin-top:8px;">
+                <div class="result-box success">
                     <i class="fas fa-check-circle"></i> Address detected! Enter amount and send.
                 </div>
             `;
@@ -1150,16 +1183,16 @@
                     dom.qrPayAddress.value = data.address;
                     if (data.amount) dom.qrPayAmount.value = data.amount;
                     dom.qrPayResult.innerHTML = `
-                        <div class="success-message" style="margin-top:8px;">
+                        <div class="result-box success">
                             <i class="fas fa-check-circle"></i> Payment details loaded!
                         </div>
                     `;
                     dom.qrPayAmount.focus();
                 } else {
-                    dom.qrPayResult.innerHTML = `<div class="error-message">Invalid QR code</div>`;
+                    dom.qrPayResult.innerHTML = `<div class="result-box error">Invalid QR code</div>`;
                 }
             } catch (e) {
-                dom.qrPayResult.innerHTML = `<div class="error-message">Invalid QR code</div>`;
+                dom.qrPayResult.innerHTML = `<div class="result-box error">Invalid QR code</div>`;
             }
         }
 
@@ -1236,7 +1269,7 @@
                 const txHash = '0x' + generateId().padStart(64, '0');
                 if (resultContainer) {
                     resultContainer.innerHTML = `
-                        <div class="success-message">
+                        <div class="result-box success">
                             <i class="fas fa-check-circle"></i>
                             <strong>Simulated transaction broadcasted on ${activeWallet.chain}!</strong><br>
                             <small>TX ID: ${txHash.substring(0, 16)}...</small>
@@ -1315,7 +1348,7 @@
                 const txHash = result.txId || '0x' + generateId().padStart(64, '0');
                 if (resultContainer) {
                     resultContainer.innerHTML = `
-                        <div class="success-message">
+                        <div class="result-box success">
                             <i class="fas fa-check-circle"></i>
                             <strong>Transaction Sent!</strong><br>
                             <small>TX ID: ${txHash.substring(0, 16)}...</small>
@@ -1361,12 +1394,12 @@
         const amount = parseFloat(dom.qrPayAmount.value);
 
         if (!to) {
-            dom.qrPayResult.innerHTML = `<div class="error-message">Please scan a QR code first</div>`;
+            dom.qrPayResult.innerHTML = `<div class="result-box error">Please scan a QR code first</div>`;
             return;
         }
 
         if (!amount || amount <= 0) {
-            dom.qrPayResult.innerHTML = `<div class="error-message">Please enter a valid amount</div>`;
+            dom.qrPayResult.innerHTML = `<div class="result-box error">Please enter a valid amount</div>`;
             return;
         }
 
@@ -1434,6 +1467,15 @@
             dom.sendGasPrice.value = '';
             dom.sendGasLimit.value = '';
         }
+    });
+
+    dom.clearSendBtn?.addEventListener('click', () => {
+        dom.sendTo.value = '';
+        dom.sendAmount.value = '';
+        dom.sendGasPrice.value = '';
+        dom.sendGasLimit.value = '';
+        dom.sendResult.innerHTML = '';
+        updateEstGasFee();
     });
 
     dom.stakeBtn.addEventListener('click', async () => {
@@ -1526,7 +1568,7 @@
             if (result.success) {
                 const txHash = result.txId || '0x' + generateId().padStart(64, '0');
                 dom.stakeResult.innerHTML = `
-                    <div class="success-message">
+                    <div class="result-box success">
                         <i class="fas fa-check-circle"></i>
                         <strong>Stake Transaction Broadcast!</strong><br>
                         <small>TX ID: ${txHash.substring(0, 16)}...</small>
@@ -1669,7 +1711,7 @@
                 render();
 
                 dom.stakeResult.innerHTML = `
-                    <div class="success-message">
+                    <div class="result-box success">
                         <i class="fas fa-check-circle"></i>
                         <strong>Unstake Transaction Broadcast!</strong><br>
                         <small>🔒 Tokens locked for ${lockBlocks} blocks (~${lockTimeMinutes} minutes)</small>
@@ -1694,8 +1736,6 @@
         }
     });
 
-    dom.faucetBtn.addEventListener('click', () => openModal('faucetModal'));
-
     dom.claimFaucetBtn.addEventListener('click', async () => {
         if (!activeWallet) {
             showToast('Please select a wallet first', 'error');
@@ -1704,19 +1744,19 @@
 
         const chainConfig = getChainConfig(activeWallet.chain || 'sayman');
         if (!chainConfig.faucet) {
-            dom.faucetResult.innerHTML = `<div class="error-message">Faucet not available for ${chainConfig.name} (${chainConfig.symbol})</div>`;
+            dom.faucetResult.innerHTML = `<div class="result-box error">Faucet not available for ${chainConfig.name} (${chainConfig.symbol})</div>`;
             showToast(`Faucet not available for ${chainConfig.symbol}`, 'error');
             return;
         }
 
         const faucetUrl = getFaucetUrl();
         if (!faucetUrl) {
-            dom.faucetResult.innerHTML = `<div class="error-message">Faucet not available on ${getNetworkName()}</div>`;
+            dom.faucetResult.innerHTML = `<div class="result-box error">Faucet not available on ${getNetworkName()}</div>`;
             return;
         }
 
         try {
-            dom.faucetResult.innerHTML = '<div style="padding:8px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Requesting faucet...</div>';
+            dom.faucetResult.innerHTML = '<div class="result-box info"><i class="fas fa-spinner fa-spin"></i> Requesting faucet...</div>';
 
             const res = await apiFetch(faucetUrl, {
                 method: 'POST',
@@ -1745,7 +1785,7 @@
                 loadTransactionHistory();
 
                 dom.faucetResult.innerHTML = `
-                    <div class="success-message">
+                    <div class="result-box success">
                         <i class="fas fa-check-circle"></i>
                         <strong>${faucetAmount} ${symbol} credited!</strong><br>
                         <small>TX ID: ${txHash.substring(0, 16)}...</small>
@@ -1760,14 +1800,56 @@
                 }, 800);
             } else {
                 const errorMsg = data.error || 'Faucet request failed';
-                dom.faucetResult.innerHTML = `<div class="error-message">${errorMsg}</div>`;
+                dom.faucetResult.innerHTML = `<div class="result-box error">${errorMsg}</div>`;
                 showToast(errorMsg, 'error');
             }
         } catch (error) {
-            dom.faucetResult.innerHTML = `<div class="error-message">${error.message}</div>`;
+            dom.faucetResult.innerHTML = `<div class="result-box error">${error.message}</div>`;
             showToast(error.message, 'error');
         }
     });
+
+    function showBackupModal(content, filename) {
+        let backupModal = document.getElementById('backupModal');
+        if (!backupModal) {
+            backupModal = document.createElement('div');
+            backupModal.id = 'backupModal';
+            backupModal.className = 'modal-overlay';
+            backupModal.innerHTML = `
+                <div class="modal">
+                    <div class="modal-handle"></div>
+                    <div class="modal-header">
+                        <h3><i class="fas fa-file-export"></i> Backup Wallet JSON</h3>
+                        <button class="modal-close" onclick="document.getElementById('backupModal').classList.remove('active');"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted mb-12">Copy the JSON below and save it as a text file to backup your wallet.</p>
+                        <textarea id="backupTextarea" readonly style="width:100%; height:200px; font-family:monospace; font-size:0.75rem; padding:8px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-input); color:var(--text); margin-bottom:12px; resize:none;"></textarea>
+                        <button class="btn btn-primary full-width" id="copyBackupBtn">
+                            <i class="fas fa-copy"></i> Copy JSON to Clipboard
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(backupModal);
+
+            document.getElementById('copyBackupBtn').addEventListener('click', () => {
+                const ta = document.getElementById('backupTextarea');
+                ta.select();
+                ta.setSelectionRange(0, 99999);
+                try {
+                    navigator.clipboard.writeText(ta.value);
+                    showToast('JSON copied to clipboard!', 'success');
+                } catch(err) {
+                    document.execCommand('copy');
+                    showToast('JSON copied!', 'success');
+                }
+            });
+        }
+        
+        document.getElementById('backupTextarea').value = content;
+        backupModal.classList.add('active');
+    }
 
     function downloadFile(content, filename, mimeType = 'application/json') {
         try {
@@ -1786,10 +1868,15 @@
                 window.URL.revokeObjectURL(url);
             }, 100);
 
+            if (window.Capacitor || window.location.protocol === 'file:') {
+                showBackupModal(content, filename);
+            }
+
             return true;
         } catch (e) {
             console.error('Download failed:', e);
-            return false;
+            showBackupModal(content, filename);
+            return true;
         }
     }
 
@@ -1866,15 +1953,23 @@
 
     dom.importJsonConfirmBtn.addEventListener('click', async () => {
         const file = dom.jsonFileInput.files[0];
-        if (!file) {
-            dom.jsonImportStatus.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-circle"></i> Please select a file.</div>';
+        const pastedText = dom.jsonPasteInput ? dom.jsonPasteInput.value.trim() : '';
+
+        if (!file && !pastedText) {
+            dom.jsonImportStatus.innerHTML = '<div class="result-box error"><i class="fas fa-exclamation-circle"></i> Please select a file or paste JSON text.</div>';
             return;
         }
 
-        dom.jsonImportStatus.innerHTML = '<div style="padding:8px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Importing...</div>';
+        dom.jsonImportStatus.innerHTML = '<div class="result-box info"><i class="fas fa-spinner fa-spin"></i> Importing...</div>';
 
         try {
-            const text = await file.text();
+            let text = '';
+            if (file) {
+                text = await file.text();
+            } else {
+                text = pastedText;
+            }
+            
             const data = JSON.parse(text);
 
             let imported = 0;
@@ -1909,21 +2004,21 @@
                 activeWallet = wallets[wallets.length - 1];
                 saveState();
                 render();
-                dom.jsonImportStatus.innerHTML = `<div class="success-message"><i class="fas fa-check-circle"></i> Imported ${imported} wallet(s)!</div>`;
+                dom.jsonImportStatus.innerHTML = `<div class="result-box success"><i class="fas fa-check-circle"></i> Imported ${imported} wallet(s)!</div>`;
                 dom.jsonFileInput.value = '';
+                if (dom.jsonPasteInput) dom.jsonPasteInput.value = '';
                 setTimeout(() => closeModal('importJsonModal'), 1500);
                 showToast(`Imported ${imported} wallet(s)!`, 'success');
             } else {
-                throw new Error('No valid wallets found in file');
+                throw new Error('No valid wallets found in input data');
             }
         } catch (err) {
-            dom.jsonImportStatus.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
+            dom.jsonImportStatus.innerHTML = `<div class="result-box error"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
         }
     });
 
     dom.importQrBtn.addEventListener('click', () => {
         openModal('scanQrModal');
-        setTimeout(startQrScanner, 500);
     });
 
     dom.scanQrNavBtn.addEventListener('click', () => {
@@ -1936,6 +2031,7 @@
 
     async function startQrScanner() {
         if (isScanning) return;
+        isScanning = true;
 
         try {
             if (html5QrCode) {
@@ -1954,8 +2050,9 @@
             dom.scanResult.innerHTML = '';
 
             if (typeof Html5Qrcode === 'undefined') {
+                isScanning = false;
                 dom.scanResult.innerHTML = `
-                    <div class="error-message">
+                    <div class="result-box error">
                         <i class="fas fa-exclamation-circle"></i> QR scanner library not loaded.
                     </div>
                 `;
@@ -1970,10 +2067,9 @@
                 aspectRatio: 1.0,
             };
 
-            isScanning = true;
-            dom.stopScanBtn.style.display = 'inline-flex';
+            if (dom.stopScanBtn) dom.stopScanBtn.classList.remove('hidden');
             dom.scanResult.innerHTML = `
-                <div style="padding:8px;color:var(--text-secondary);">
+                <div class="result-box info">
                     <i class="fas fa-spinner fa-spin"></i> Starting camera...
                 </div>
             `;
@@ -1983,20 +2079,17 @@
             }, config, onQrScanSuccess, onQrScanError);
 
             dom.scanResult.innerHTML = `
-                <div style="padding:8px;color:var(--success);">
+                <div class="result-box success">
                     <i class="fas fa-check-circle"></i> Camera active. Scan a QR code.
                 </div>
             `;
 
         } catch (err) {
             isScanning = false;
-            dom.stopScanBtn.style.display = 'none';
+            if (dom.stopScanBtn) dom.stopScanBtn.classList.add('hidden');
             dom.scanResult.innerHTML = `
-                <div class="error-message">
+                <div class="result-box error">
                     <i class="fas fa-exclamation-circle"></i> ${err.message || 'Camera access denied.'}
-                    <button class="btn-outline-sm" onclick="document.getElementById('qrFileInput').click()" style="margin-top:8px;">
-                        <i class="fas fa-upload"></i> Upload Image
-                    </button>
                 </div>
             `;
             console.error('QR Scanner error:', err);
@@ -2011,7 +2104,7 @@
             openModal('qrPayModal');
             dom.qrPayAddress.value = decodedText;
             dom.qrPayResult.innerHTML = `
-                <div class="success-message" style="margin-top:8px;">
+                <div class="result-box success">
                     <i class="fas fa-check-circle"></i> Address detected! Enter amount and send.
                 </div>
             `;
@@ -2024,7 +2117,7 @@
                     dom.qrPayAddress.value = data.address;
                     if (data.amount) dom.qrPayAmount.value = data.amount;
                     dom.qrPayResult.innerHTML = `
-                        <div class="success-message" style="margin-top:8px;">
+                        <div class="result-box success">
                             <i class="fas fa-check-circle"></i> Payment details loaded!
                         </div>
                     `;
@@ -2058,15 +2151,15 @@
             html5QrCode = null;
         }
         isScanning = false;
-        dom.stopScanBtn.style.display = 'none';
+        if (dom.stopScanBtn) dom.stopScanBtn.classList.add('hidden');
         if (dom.qrScanner) {
             dom.qrScanner.innerHTML = '';
         }
     }
 
-    dom.stopScanBtn.addEventListener('click', () => {
+    dom.stopScanBtn?.addEventListener('click', () => {
         stopQrScanner();
-        dom.scanResult.innerHTML = '<div style="padding:8px;color:var(--text-muted);">Scanner stopped</div>';
+        dom.scanResult.innerHTML = '<div class="result-box info">Scanner stopped</div>';
     });
 
     dom.uploadQrBtn.addEventListener('click', () => dom.qrFileInput.click());
@@ -2076,7 +2169,7 @@
         if (!file) return;
 
         try {
-            dom.scanResult.innerHTML = '<div style="padding:8px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Processing image...</div>';
+            dom.scanResult.innerHTML = '<div class="result-box info"><i class="fas fa-spinner fa-spin"></i> Processing image...</div>';
 
             stopQrScanner();
 
@@ -2095,15 +2188,12 @@
             }
 
             dom.scanResult.innerHTML = `
-                <div class="error-message">
+                <div class="result-box error">
                     <i class="fas fa-exclamation-circle"></i> Could not decode QR from image.
-                    <button class="btn-outline-sm" onclick="document.getElementById('qrFileInput').click()" style="margin-top:8px;">
-                        <i class="fas fa-upload"></i> Try Another
-                    </button>
                 </div>
             `;
         } catch (err) {
-            dom.scanResult.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
+            dom.scanResult.innerHTML = `<div class="result-box error"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
         }
         dom.qrFileInput.value = '';
     });
@@ -2220,13 +2310,13 @@
         if (!activeWallet) return;
         const newName = dom.editWalletName.value.trim();
         if (!newName) {
-            dom.editResult.innerHTML = '<div class="error-message">Name cannot be empty</div>';
+            dom.editResult.innerHTML = '<div class="result-box error">Name cannot be empty</div>';
             return;
         }
         activeWallet.name = newName;
         saveState();
         render();
-        dom.editResult.innerHTML = '<div class="success-message">Wallet name updated!</div>';
+        dom.editResult.innerHTML = '<div class="result-box success">Wallet name updated!</div>';
         setTimeout(() => {
             closeModal('editWalletModal');
             dom.editResult.innerHTML = '';
@@ -2281,7 +2371,7 @@
                     <label><i class="fas fa-address-book"></i> Address</label>
                     <div style="display:flex;gap:6px;">
                         <input type="text" value="${displayAddress}" readonly style="flex:1;font-family:monospace;font-size:0.7rem;" />
-                        <button class="btn-outline-sm" onclick="copyToClipboard('${wallet.address}','Address copied!')"><i class="fas fa-copy"></i></button>
+                        <button class="btn btn-outline btn-sm" onclick="copyToClipboard('${wallet.address}','Address copied!')"><i class="fas fa-copy"></i></button>
                     </div>
                 </div>
                 <div class="form-group">
@@ -2302,22 +2392,22 @@
                 </div>
                 <div class="form-group" style="grid-column:1/-1;">
                     <label><i class="fas fa-key"></i> Public Key</label>
-                    <textarea readonly style="width:100%;height:50px;font-family:monospace;font-size:0.65rem;padding:6px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-input);">${wallet.publicKey}</textarea>
+                    <textarea readonly style="width:100%;height:50px;font-family:monospace;font-size:0.65rem;padding:6px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);">${wallet.publicKey}</textarea>
                 </div>
                 <div class="form-group" style="grid-column:1/-1;">
                     <label><i class="fas fa-key"></i> Private Key</label>
                     <div style="display:flex;gap:6px;">
                         <input type="password" value="${wallet.privateKey}" readonly style="flex:1;font-family:monospace;font-size:0.7rem;" id="privateKeyDisplay" />
-                        <button class="btn-outline-sm" onclick="togglePrivateKey()"><i class="fas fa-eye"></i></button>
-                        <button class="btn-outline-sm" onclick="copyToClipboard('${wallet.privateKey}','Private key copied!')"><i class="fas fa-copy"></i></button>
+                        <button class="btn btn-outline btn-sm" onclick="togglePrivateKey()"><i class="fas fa-eye"></i></button>
+                        <button class="btn btn-outline btn-sm" onclick="copyToClipboard('${wallet.privateKey}','Private key copied!')"><i class="fas fa-copy"></i></button>
                     </div>
-                    <div style="margin-top:6px;padding:6px 10px;background:var(--error-light);border:1px solid var(--error);border-radius:var(--radius-sm);font-size:0.7rem;color:var(--error);">
+                    <div style="margin-top:6px;padding:6px 10px;background:rgba(255,77,109,0.1);border:1px solid var(--danger);border-radius:var(--radius-sm);font-size:0.7rem;color:var(--danger);">
                         <i class="fas fa-exclamation-triangle"></i> Never share your private key!
                     </div>
                 </div>
-                <div class="form-group" style="grid-column:1/-1;text-align:center;padding-top:8px;border-top:1px solid var(--border-color);display:flex;justify-content:center;gap:8px;">
-                    <button class="btn-primary-sm" onclick="editWallet('${wallet.id}')"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn-outline-sm" onclick="closeModal('detailsModal')"><i class="fas fa-times"></i> Close</button>
+                <div class="form-group" style="grid-column:1/-1;text-align:center;padding-top:8px;border-top:1px solid var(--border);display:flex;justify-content:center;gap:8px;">
+                    <button class="btn btn-primary btn-sm" onclick="editWallet('${wallet.id}')"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-outline btn-sm" onclick="closeModal('detailsModal')"><i class="fas fa-times"></i> Close</button>
                 </div>
             </div>
         `;
@@ -2337,13 +2427,13 @@
     window.togglePrivateKey = function() {
         const input = document.getElementById('privateKeyDisplay');
         if (input) {
-            const icon = input.parentElement.querySelector('.btn-outline-sm i');
+            const icon = input.parentElement.querySelector('button i');
             if (input.type === 'password') {
                 input.type = 'text';
-                icon.className = 'fas fa-eye-slash';
+                if (icon) icon.className = 'fas fa-eye-slash';
             } else {
                 input.type = 'password';
-                icon.className = 'fas fa-eye';
+                if (icon) icon.className = 'fas fa-eye';
             }
         }
     };
@@ -2421,11 +2511,11 @@
 
     dom.applyFilterBtn.addEventListener('click', () => {
         if (dom.txDateFilter.value === 'custom') {
-            dom.txDateFrom.style.display = 'inline-block';
-            dom.txDateTo.style.display = 'inline-block';
+            dom.txDateFrom.classList.remove('hidden');
+            dom.txDateTo.classList.remove('hidden');
         } else {
-            dom.txDateFrom.style.display = 'none';
-            dom.txDateTo.style.display = 'none';
+            dom.txDateFrom.classList.add('hidden');
+            dom.txDateTo.classList.add('hidden');
         }
         renderTransactionHistory();
         showToast('Filters applied', 'success');
@@ -2436,26 +2526,31 @@
         dom.txDateFilter.value = 'all';
         dom.txDateFrom.value = '';
         dom.txDateTo.value = '';
-        dom.txDateFrom.style.display = 'none';
-        dom.txDateTo.style.display = 'none';
+        dom.txDateFrom.classList.add('hidden');
+        dom.txDateTo.classList.add('hidden');
         renderTransactionHistory();
         showToast('Filters reset', 'success');
     });
 
     dom.txDateFilter.addEventListener('change', function() {
         if (this.value === 'custom') {
-            dom.txDateFrom.style.display = 'inline-block';
-            dom.txDateTo.style.display = 'inline-block';
+            dom.txDateFrom.classList.remove('hidden');
+            dom.txDateTo.classList.remove('hidden');
         } else {
-            dom.txDateFrom.style.display = 'none';
-            dom.txDateTo.style.display = 'none';
+            dom.txDateFrom.classList.add('hidden');
+            dom.txDateTo.classList.add('hidden');
         }
     });
 
-    document.querySelectorAll('.period-btn').forEach(btn => {
+    // Period buttons — spending chart (7D/30D/90D/1Y) and monthly chart (6M/1Y/2Y)
+    // share the .period-btn class but live in separate .period-row containers,
+    // so each click only toggles siblings within its own row.
+    document.querySelectorAll('.period-btn[data-period]').forEach(btn => {
         btn.addEventListener('click', function() {
-            const parent = this.closest('.chart-periods');
-            parent.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+            const parent = this.closest('.period-row');
+            if (parent) {
+                parent.querySelectorAll('.period-btn[data-period]').forEach(b => b.classList.remove('active'));
+            }
             this.classList.add('active');
 
             const period = parseInt(this.dataset.period);
@@ -2463,6 +2558,17 @@
                 chartPeriod = period;
                 updateCharts();
             }
+        });
+    });
+
+    document.querySelectorAll('.period-btn[data-period2]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const parent = this.closest('.period-row');
+            if (parent) {
+                parent.querySelectorAll('.period-btn[data-period2]').forEach(b => b.classList.remove('active'));
+            }
+            this.classList.add('active');
+            renderMonthlyChart();
         });
     });
 
@@ -2481,7 +2587,7 @@
 
     // Theme loading and toggle listener
     function initTheme() {
-        const savedTheme = localStorage.getItem('theme') || 'light';
+        const savedTheme = safeStorage.getItem('theme') || 'light';
         setTheme(savedTheme);
     }
 
@@ -2499,7 +2605,7 @@
                 dom.themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
             }
         }
-        localStorage.setItem('theme', theme);
+        safeStorage.setItem('theme', theme);
     }
 
     if (dom.themeToggleBtn) {
@@ -2511,22 +2617,18 @@
 
     initTheme();
 
-    // Removed — mobileOverlay click handler already closes the sidebar cleanly.
-// The old document-level click listener was firing before wallet-item
-// click handlers and swallowing the tap on mobile.
-
     function openModal(id) {
         const el = document.getElementById(id);
         if (el) {
-            el.classList.add('open');
             el.classList.add('active');
         }
+        if (id === 'scanQrModal') setTimeout(startQrScanner, 300);
+        if (id === 'qrPayModal') setTimeout(startQrPayScanner, 300);
     }
 
     function closeModal(id) {
         const el = document.getElementById(id);
         if (el) {
-            el.classList.remove('open');
             el.classList.remove('active');
         }
         if (id === 'scanQrModal') stopQrScanner();
@@ -2539,10 +2641,7 @@
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                overlay.classList.remove('open');
-                overlay.classList.remove('active');
-                if (overlay.id === 'scanQrModal') stopQrScanner();
-                if (overlay.id === 'qrPayModal') stopQrPayScanner();
+                closeModal(overlay.id);
             }
         });
     });
@@ -2550,27 +2649,7 @@
     document.querySelectorAll('.modal-close').forEach(btn => {
         btn.addEventListener('click', () => {
             const id = btn.dataset.modal;
-            if (id) {
-                closeModal(id);
-                if (id === 'scanQrModal') stopQrScanner();
-                if (id === 'qrPayModal') stopQrPayScanner();
-            }
-        });
-    });
-
-    document.querySelectorAll('.tab-btn').forEach(tab => {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-            this.classList.add('active');
-            const panel = document.getElementById('tab-' + this.dataset.tab);
-            if (panel) panel.classList.add('active');
-
-            if (this.dataset.tab === 'history') {
-                renderTransactionHistory();
-            } else if (this.dataset.tab === 'analytics') {
-                updateAnalytics();
-            }
+            if (id) closeModal(id);
         });
     });
 
@@ -2618,8 +2697,8 @@
                 datasets: [{
                     label: 'Spending',
                     data: data,
-                    backgroundColor: 'rgba(79, 110, 247, 0.5)',
-                    borderColor: '#4f6ef7',
+                    backgroundColor: 'rgba(79, 124, 255, 0.5)',
+                    borderColor: '#4f7cff',
                     borderWidth: 1,
                     borderRadius: 4,
                 }]
@@ -2662,12 +2741,12 @@
                 datasets: [{
                     label: 'Net Flow',
                     data: data,
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderColor: '#10d98a',
+                    backgroundColor: 'rgba(16, 217, 138, 0.1)',
                     fill: true,
                     tension: 0.3,
                     pointRadius: 3,
-                    pointBackgroundColor: '#10b981',
+                    pointBackgroundColor: '#10d98a',
                 }]
             },
             options: {
@@ -2729,7 +2808,7 @@
 
         if (categoryChart) { categoryChart.destroy(); }
 
-        const colors = ['#4f6ef7', '#f59e0b', '#ef4444', '#10b981', '#0891b2', '#8a94a8'];
+        const colors = ['#4f7cff', '#ffb830', '#ff4d6d', '#10d98a', '#7b5cff', '#8a92b2'];
 
         categoryChart = new Chart(ctx, {
             type: 'doughnut',
@@ -2781,8 +2860,8 @@
                 datasets: [{
                     label: 'Net Worth',
                     data: data.length > 0 ? data : [0],
-                    borderColor: '#4f6ef7',
-                    backgroundColor: 'rgba(79, 110, 247, 0.05)',
+                    borderColor: '#4f7cff',
+                    backgroundColor: 'rgba(79, 124, 255, 0.05)',
                     fill: true,
                     tension: 0.3,
                     pointRadius: 1,
@@ -2824,9 +2903,11 @@
             const count = dayMap[i] || 0;
             const intensity = count / maxCount;
             let className = 'heatmap-cell';
-            if (count > 0) className += ' has-tx';
-            if (intensity > 0.5) className += ' many-tx';
-            return `<div class="${className}" title="${day}: ${count} transactions">${day.substring(0, 1)}</div>`;
+            if (intensity > 0.75) className += ' level-4';
+            else if (intensity > 0.5) className += ' level-3';
+            else if (intensity > 0.25) className += ' level-2';
+            else if (count > 0) className += ' level-1';
+            return `<div class="${className}" title="${day}: ${count} transactions"></div>`;
         }).join('');
     }
 
@@ -2851,12 +2932,12 @@
         }
 
         container.innerHTML = sortedYears.map(year => `
-            <div class="annual-item">
-                <div class="year">${year}</div>
-                <div class="amount ${years[year].total >= 0 ? 'text-success' : 'text-error'}">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+                <div style="font-weight:700;">${year}</div>
+                <div style="font-weight:700;color:${years[year].total >= 0 ? 'var(--success)' : 'var(--danger)'};">
                     ${years[year].total >= 0 ? '+' : ''}${formatBalance(years[year].total)}
                 </div>
-                <div class="count">${years[year].count} tx</div>
+                <div class="text-muted" style="font-size:0.75rem;">${years[year].count} tx</div>
             </div>
         `).join('');
     }
@@ -2869,25 +2950,10 @@
         if (typeof message === 'object') {
             message = message.message || message.error || JSON.stringify(message);
         }
-        const existing = document.querySelector('.toast-container');
-        if (existing) existing.remove();
 
-        const container = document.createElement('div');
-        container.className = 'toast-container';
+        const toastEl = document.getElementById('globalToast');
+        if (!toastEl) return;
 
-        const toast = document.createElement('div');
-        const colors = {
-            success: 'var(--success)',
-            error: 'var(--error)',
-            warning: 'var(--warning)',
-            info: 'var(--accent)'
-        };
-        const bgColors = {
-            success: 'var(--success-light)',
-            error: 'var(--error-light)',
-            warning: 'var(--warning-light)',
-            info: 'var(--accent-light)'
-        };
         const icons = {
             success: 'fa-check-circle',
             error: 'fa-exclamation-circle',
@@ -2895,32 +2961,13 @@
             info: 'fa-info-circle'
         };
 
-        toast.className = 'toast';
-        toast.style.cssText = `
-            padding: 8px 14px;
-            background: ${bgColors[type] || bgColors.info};
-            color: ${type === 'success' ? '#065f46' : type === 'error' ? '#991b1b' : 'var(--text-primary)'};
-            border: 1px solid ${colors[type] || colors.info};
-            border-radius: 8px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            box-shadow: var(--shadow-lg);
-            font-family: var(--font);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        `;
+        toastEl.className = 'toast show' + (type === 'success' ? ' toast-success' : type === 'error' ? ' toast-error' : '');
+        toastEl.innerHTML = `<i class="fas ${icons[type] || icons.info}"></i> ${message}`;
 
-        toast.innerHTML = `<i class="fas ${icons[type] || 'fa-info-circle'}"></i> ${message}`;
-        container.appendChild(toast);
-        document.body.appendChild(container);
-
-        setTimeout(() => {
-            container.style.opacity = '0';
-            container.style.transform = 'translateX(400px)';
-            container.style.transition = 'all 0.3s ease';
-            setTimeout(() => container.remove(), 300);
-        }, 4000);
+        clearTimeout(toastEl._hideTimer);
+        toastEl._hideTimer = setTimeout(() => {
+            toastEl.classList.remove('show');
+        }, 3000);
     }
 
     window.showToast = showToast;
@@ -2959,10 +3006,11 @@
             document.body.appendChild(overlay);
         }
         overlay.innerHTML = `
-            <div style="background:var(--bg-secondary);padding:24px;border-radius:var(--radius-lg);border:1px solid var(--border-color);text-align:center;max-width:280px;">
-                <div class="loader-spinner" style="margin:0 auto 12px;width:36px;height:36px;"></div>
-                <div style="font-weight:500;font-size:0.9rem;">${message}</div>
+            <div style="background:var(--bg-card);padding:24px;border-radius:var(--radius);border:1px solid var(--border);text-align:center;max-width:280px;">
+                <div style="margin:0 auto 12px;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                <div style="font-weight:600;font-size:0.85rem;color:var(--text);">${message}</div>
             </div>
+            <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
         `;
         overlay.style.display = 'flex';
     }
@@ -2977,9 +3025,7 @@
 
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
-            stopQrScanner();
-            stopQrPayScanner();
+            document.querySelectorAll('.modal-overlay.active').forEach(m => closeModal(m.id));
         }
         if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
             e.preventDefault();
@@ -2996,8 +3042,8 @@
     });
 
     function updateProgress(percent) {
-        dom.progressBar.style.width = percent + '%';
-        dom.progressText.textContent = percent + '%';
+        if (dom.progressBar) dom.progressBar.style.width = percent + '%';
+        if (dom.progressText) dom.progressText.textContent = percent + '%';
     }
 
     function startAutoRefresh() {
@@ -3032,15 +3078,15 @@
     }
 
     function updateEstGasFee() {
-        const priceInput = dom.sendGasPrice.value;
-        const limitInput = dom.sendGasLimit.value;
+        const priceInput = dom.sendGasPrice ? dom.sendGasPrice.value : '';
+        const limitInput = dom.sendGasLimit ? dom.sendGasLimit.value : '';
         
         const wrapper = document.getElementById('estGasWrapper');
         if (wrapper) {
             if (priceInput || limitInput) {
-                wrapper.style.display = 'block';
+                wrapper.classList.remove('hidden');
             } else {
-                wrapper.style.display = 'none';
+                wrapper.classList.add('hidden');
             }
         }
 
@@ -3183,8 +3229,7 @@
     async function init() {
         // Fallback: unconditionally hide loader after 1s to prevent any stuck UI
         setTimeout(() => {
-            if (dom.loading && dom.loading.style.display !== 'none') {
-                console.log('⏰ Loader timeout fallback triggered');
+            if (dom.loading) {
                 dom.loading.classList.add('hidden');
                 dom.loading.style.display = 'none';
             }
@@ -3200,26 +3245,24 @@
             console.error("Error loading state:", e);
         }
 
-        // 2. Start progress bar immediately
+        // 2. Start progress bar immediately (purely cosmetic — loader is CSS-hidden anyway)
         let progress = 0;
         try {
             updateProgress(0);
             const progressInterval = setInterval(() => {
-                progress += Math.random() * 20 + 15; // faster progress
+                progress += Math.random() * 20 + 15;
                 if (progress >= 100) {
                     clearInterval(progressInterval);
                     progress = 100;
                     updateProgress(100);
-                    setTimeout(() => {
-                        if (dom.loading) {
-                            dom.loading.classList.add('hidden');
-                            dom.loading.style.display = 'none'; // Ensure it doesn't block interactions
-                        }
-                    }, 100); // reduced delay
+                    if (dom.loading) {
+                        dom.loading.classList.add('hidden');
+                        dom.loading.style.display = 'none';
+                    }
                 } else {
                     updateProgress(Math.min(progress, 99));
                 }
-            }, 50); // faster check interval (50ms)
+            }, 50);
         } catch (e) {
             console.error("Error in progress loader:", e);
             if (dom.loading) {
@@ -3246,7 +3289,6 @@
                     await fetchBlockInfo();
                 }
                 
-                // Re-render after network sync
                 render();
             } catch (err) {
                 console.error("Background network sync failed:", err);
@@ -3254,113 +3296,97 @@
             startAutoRefresh();
         })();
 
-            // APK Update check
-            async function checkForUpdates() {
-                // 1. Try active RPC node first (real-time from deployment)
-                try {
-                    const baseRpc = networkEndpoints[currentNetwork]?.[0] || 'https://sayman.onrender.com/api';
-                    const nodeUrl = baseRpc.replace('/api', '');
-                    const res = await window.fetch(`${nodeUrl}/apk/version.json`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        const latestSha = data.sha;
-                        const relativeUrl = data.download_url || '/apk/puky.apk';
-                        const downloadUrl = relativeUrl.startsWith('http') ? relativeUrl : (nodeUrl + relativeUrl);
+        // APK Update check
+        async function checkForUpdates() {
+            try {
+                const baseRpc = networkEndpoints[currentNetwork]?.[0] || 'https://sayman.onrender.com/api';
+                const nodeUrl = baseRpc.replace('/api', '');
+                const res = await window.fetch(`${nodeUrl}/apk/version.json`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const latestSha = data.sha;
+                    const relativeUrl = data.download_url || '/apk/puky.apk';
+                    const downloadUrl = relativeUrl.startsWith('http') ? relativeUrl : (nodeUrl + relativeUrl);
 
-                        const installedSha = localStorage.getItem('installed_apk_sha');
-                        if (!installedSha) {
-                            localStorage.setItem('installed_apk_sha', latestSha);
-                            return;
-                        }
-
-                        if (installedSha !== latestSha) {
-                            latestApkDownloadUrl = downloadUrl;
-                            latestApkSha = latestSha;
-                            document.getElementById('updateModalMessage').textContent = 'A new wallet APK update is available on the network.';
-                            document.getElementById('updateShaDisplay').textContent = `SHA: ${latestSha.substring(0, 10)}`;
-                            document.getElementById('updateModal').classList.add('open');
-                            return; // Success, skip github
-                        }
+                    const installedSha = safeStorage.getItem('installed_apk_sha');
+                    if (!installedSha) {
+                        safeStorage.setItem('installed_apk_sha', latestSha);
+                        return;
                     }
-                } catch (err) {
-                    console.log('Node APK update check skipped/failed, trying GitHub...');
-                }
 
-                // 2. Fallback to GitHub
-                if (!githubRepo) return;
-                try {
-                    const url = `https://api.github.com/repos/${githubRepo}/contents/apk/puky.apk?ref=${githubBranch}`;
-                    const res = await window.fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
-                    if (res.ok) {
-                        const data = await res.json();
-                        const latestSha = data.sha;
-                        const downloadUrl = data.download_url;
-                        
-                        // Get installed SHA from localStorage
-                        const installedSha = localStorage.getItem('installed_apk_sha');
-                        
-                        if (!installedSha) {
-                            // On first run, record the latest version to prevent annoying prompt
-                            localStorage.setItem('installed_apk_sha', latestSha);
-                            return;
-                        }
-                        
-                        if (installedSha !== latestSha) {
-                            latestApkDownloadUrl = downloadUrl;
-                            latestApkSha = latestSha;
-                            document.getElementById('updateModalMessage').textContent = 'A new wallet APK update has dropped in the repository.';
-                            document.getElementById('updateShaDisplay').textContent = `SHA: ${latestSha.substring(0, 10)}`;
-                            document.getElementById('updateModal').classList.add('open');
-                        }
+                    if (installedSha !== latestSha) {
+                        latestApkDownloadUrl = downloadUrl;
+                        latestApkSha = latestSha;
+                        const msgEl = document.getElementById('updateModalMessage');
+                        const shaEl = document.getElementById('updateShaDisplay');
+                        if (msgEl) msgEl.textContent = 'A new wallet APK update is available on the network.';
+                        if (shaEl) shaEl.textContent = `SHA: ${latestSha.substring(0, 10)}`;
+                        openModal('updateModal');
+                        return;
                     }
-                } catch (err) {
-                    console.error('Error checking for APK updates:', err);
+                    return;
                 }
+            } catch (err) {
+                console.log('Node APK update check skipped/failed, trying GitHub...');
             }
 
-            // Check immediately on startup
-            setTimeout(checkForUpdates, 3000);
+            if (!githubRepo) return;
+            try {
+                const url = `https://api.github.com/repos/${githubRepo}/contents/apk/puky.apk?ref=${githubBranch}`;
+                const res = await window.fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+                if (res.ok) {
+                    const data = await res.json();
+                    const latestSha = data.sha;
+                    const downloadUrl = data.download_url;
+                    
+                    const installedSha = safeStorage.getItem('installed_apk_sha');
+                    
+                    if (!installedSha) {
+                        safeStorage.setItem('installed_apk_sha', latestSha);
+                        return;
+                    }
+                    
+                    if (installedSha !== latestSha) {
+                        latestApkDownloadUrl = downloadUrl;
+                        latestApkSha = latestSha;
+                        const msgEl = document.getElementById('updateModalMessage');
+                        const shaEl = document.getElementById('updateShaDisplay');
+                        if (msgEl) msgEl.textContent = 'A new wallet APK update has dropped in the repository.';
+                        if (shaEl) shaEl.textContent = `SHA: ${latestSha.substring(0, 10)}`;
+                        openModal('updateModal');
+                    }
+                }
+            } catch (err) {
+                console.error('Error checking for APK updates:', err);
+            }
+        }
 
-            // Periodically check every 60 seconds (feel real-time)
-            if (updateCheckInterval) clearInterval(updateCheckInterval);
-            updateCheckInterval = setInterval(checkForUpdates, 60000);
+        setTimeout(checkForUpdates, 3000);
 
-            // Bind update buttons
-            document.getElementById('downloadUpdateBtn').addEventListener('click', () => {
+        if (updateCheckInterval) clearInterval(updateCheckInterval);
+        updateCheckInterval = setInterval(checkForUpdates, 60000);
+
+        const downloadUpdateBtn = document.getElementById('downloadUpdateBtn');
+        if (downloadUpdateBtn) {
+            downloadUpdateBtn.addEventListener('click', () => {
                 if (latestApkDownloadUrl) {
                     window.open(latestApkDownloadUrl, '_blank');
-                    localStorage.setItem('installed_apk_sha', latestApkSha);
-                    document.getElementById('updateModal').classList.remove('open');
+                    safeStorage.setItem('installed_apk_sha', latestApkSha);
+                    closeModal('updateModal');
                     showToast('Download started! Installing the updated APK completes the update.', 'success');
                 }
             });
+        }
 
-            document.getElementById('skipUpdateBtn').addEventListener('click', () => {
-                document.getElementById('updateModal').classList.remove('open');
+        const skipUpdateBtn = document.getElementById('skipUpdateBtn');
+        if (skipUpdateBtn) {
+            skipUpdateBtn.addEventListener('click', () => {
+                closeModal('updateModal');
             });
+        }
 
-            console.log('🚀 PUKY Wallet Pro v3.0 initialized');
-            console.log(`📊 ${wallets.length} wallets loaded on ${getNetworkName()}`);
-
-        const scanModal = document.getElementById('scanQrModal');
-        const observer = new MutationObserver(() => {
-            if (scanModal.classList.contains('open')) {
-                setTimeout(startQrScanner, 300);
-            } else {
-                stopQrScanner();
-            }
-        });
-        observer.observe(scanModal, { attributes: true, attributeFilter: ['class'] });
-
-        const qrPayModal = document.getElementById('qrPayModal');
-        const qrPayObserver = new MutationObserver(() => {
-            if (qrPayModal.classList.contains('open')) {
-                setTimeout(startQrPayScanner, 500);
-            } else {
-                stopQrPayScanner();
-            }
-        });
-        qrPayObserver.observe(qrPayModal, { attributes: true, attributeFilter: ['class'] });
+        console.log('🚀 PUKY Wallet initialized');
+        console.log(`📊 ${wallets.length} wallets loaded on ${getNetworkName()}`);
     }
 
     if (document.readyState === 'loading') {

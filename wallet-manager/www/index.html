@@ -8,32 +8,38 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>PUKY Wallet — SAYMAN Blockchain</title>
     <meta name="description" content="PUKY Wallet — Universal Crypto Vault for SAYMAN Blockchain. Manage, send, and stake SAYN tokens securely." />
-    <link rel="icon" type="image/svg+xml" href="logo.svg?v=2" />
-    <link rel="apple-touch-icon" href="logo.svg?v=2" />
+    <link rel="icon" type="image/svg+xml" href="logo.svg?v=3" />
+    <link rel="apple-touch-icon" href="logo.svg?v=3" />
 
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
-    <!-- External libs -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-
+    <!-- Local offline libs -->
+    <script src="elliptic.min.js"></script>
+    <script src="qrcode.min.js"></script>
+    <script src="chart.umd.min.js"></script>
+    <script src="html5-qrcode.min.js"></script>
     <!-- Theme flicker prevention -->
     <script>
-        (function() {
-            const t = localStorage.getItem('theme') || 'light';
-            if (t === 'dark') {
-                document.documentElement.classList.add('dark-theme');
-                document.documentElement.setAttribute('data-theme', 'dark');
+        (function () {
+            try {
+                const theme = localStorage.getItem('theme') || 'light';
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark-theme');
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.classList.remove('dark-theme');
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch (e) {
+                console.warn('Header theme restore failed:', e);
             }
         })();
     </script>
 
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
 
@@ -61,7 +67,7 @@
     <!-- ── TOP NAVBAR ── -->
     <nav class="navbar">
         <div class="navbar-brand">
-            <img src="logo.svg?v=2" alt="PUKY" class="navbar-icon" />
+            <img src="logo.svg?v=3" alt="PUKY" class="navbar-icon" />
             <div>
                 <span class="navbar-title">PUKY</span>
                 <span class="navbar-subtitle">SAYMAN Blockchain</span>
@@ -752,12 +758,14 @@
             <button class="modal-close" data-modal="importJsonModal"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
-            <p class="text-muted mb-12"><i class="fas fa-info-circle"></i> Upload a JSON file exported from PUKY Wallet.</p>
-            <label for="jsonFileInput" class="file-upload-label">
+            <p class="text-muted mb-12"><i class="fas fa-info-circle"></i> Choose a JSON file or paste the JSON text below:</p>
+            <label for="jsonFileInput" class="file-upload-label" style="margin-bottom:8px;">
                 <i class="fas fa-cloud-upload-alt"></i> Choose File
             </label>
             <input type="file" id="jsonFileInput" accept=".json" />
-            <button class="btn btn-primary mt-12" id="importJsonConfirmBtn">
+            <div style="margin: 8px 0; font-weight: 700; font-size: 0.7rem; text-align: center; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px;">— OR —</div>
+            <textarea id="jsonPasteInput" placeholder="Paste JSON backup content here..." style="width:100%; height:90px; font-family:monospace; font-size:0.75rem; padding:8px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-input); color:var(--text); resize:none; margin-bottom:12px;"></textarea>
+            <button class="btn btn-primary" id="importJsonConfirmBtn">
                 <i class="fas fa-check"></i> Import
             </button>
             <div id="jsonImportStatus" class="mt-8"></div>
@@ -826,15 +834,12 @@
 <!-- ── TAB SWITCHING SCRIPT ── -->
 <script>
 function switchTab(name) {
-    // Deactivate all pages and tab items
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-    // Activate the selected
     const page = document.getElementById('page-' + name);
     if (page) page.classList.add('active');
     const tab = document.getElementById('tab-' + name);
     if (tab) tab.classList.add('active');
-    // Scroll main-scroll to top
     const ms = document.querySelector('.main-scroll');
     if (ms) ms.scrollTop = 0;
 }
@@ -846,7 +851,6 @@ document.addEventListener('click', function(e) {
         const key = itabBtn.dataset.itab;
         const parentTabs = itabBtn.closest('.inner-tabs');
         if (!parentTabs) return;
-        // Deactivate sibling buttons and panels in same section
         parentTabs.querySelectorAll('.inner-tab-btn').forEach(b => b.classList.remove('active'));
         itabBtn.classList.add('active');
         const container = parentTabs.parentElement;
@@ -856,20 +860,6 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Modal close buttons
-document.addEventListener('click', function(e) {
-    const closeBtn = e.target.closest('[data-modal]');
-    if (closeBtn) {
-        const modal = document.getElementById(closeBtn.dataset.modal);
-        if (modal) modal.classList.remove('active');
-    }
-    // Close modal on overlay click
-    if (e.target.classList.contains('modal-overlay')) {
-        e.target.classList.remove('active');
-    }
-});
-
-// Navigate to wallets page from hero wallet count link
 window.addEventListener('DOMContentLoaded', function() {
     const heroBtn = document.getElementById('heroSendBtn');
     if (heroBtn) heroBtn.addEventListener('click', function() { switchTab('send'); });
@@ -891,9 +881,6 @@ window.addEventListener('DOMContentLoaded', function() {
     if (viewAll) viewAll.addEventListener('click', function(e) { e.preventDefault(); switchTab('detail'); setTimeout(()=>{ const btn=document.querySelector('[data-itab="history-tab"]'); if(btn) btn.click(); },100); });
     const settTheme = document.getElementById('settingsThemeBtn');
     if (settTheme) settTheme.addEventListener('click', function() { const tBtn = document.getElementById('themeToggleBtn'); if(tBtn) tBtn.click(); });
-    // Mobile menu btn (legacy: open wallets page)
-    const mmbtn = document.getElementById('mobileMenuBtn');
-    if (mmbtn) mmbtn.addEventListener('click', function() { switchTab('wallets'); });
 });
 </script>
 

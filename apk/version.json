@@ -1,5 +1,6 @@
 {
-  "version": "1.0.7",
-  "sha": "8c0b695d11317d2f12cc01ba0a7989457279e2f8b7aaa313b8810a9ec499d573",
-  "download_url": "/apk/puky.apk"
+  "version": "1.0.8",
+  "sha": "80662a19e893fdc1f7c6c68ec6bbd9964df5e505d2d82ca155276748358f3a76",
+  "download_url": "/apk/puky.apk",
+  "releasedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
