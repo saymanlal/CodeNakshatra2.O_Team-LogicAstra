@@ -35,20 +35,22 @@ app.get('/docs', (req, res) => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Docs Not Found</title>
+        <title>SAYMAN Documentation</title>
         <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; color: #1a1a1a; }
-          h1 { font-size: 24px; font-weight: 500; }
-          p { color: #666; }
-          a { color: #667eea; text-decoration: none; }
-          a:hover { text-decoration: underline; }
-          .code { background: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 13px; margin: 10px 0; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; color: #1a1a1a; background: #fafafa; }
+          h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+          p { color: #555; line-height: 1.6; }
+          a { color: #111; font-weight: 600; text-decoration: underline; }
+          a:hover { color: #666; }
+          .card { background: #ffffff; border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; margin: 20px 0; }
         </style>
       </head>
       <body>
-        <h1>📚 Documentation Not Found</h1>
-        <p>The documentation page could not be found. Please make sure <code>docs.html</code> exists in the <code>frontend</code> directory.</p>
-        <div class="code">frontend/docs.html</div>
+        <h1>📚 Documentation Moved</h1>
+        <p>The SAYMAN developer documentation site has been migrated to its own dedicated repository for independent hosting.</p>
+        <div class="card">
+          <p><strong>Repository:</strong> <a href="https://github.com/saymanlal/sayman-docs" target="_blank">github.com/saymanlal/sayman-docs</a></p>
+        </div>
         <p><a href="/">← Return to Explorer</a></p>
       </body>
       </html>
