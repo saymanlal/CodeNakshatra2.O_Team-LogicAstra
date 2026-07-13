@@ -38,6 +38,9 @@
   "author": "Sayman Blockchain Team",
   "license": "MIT",
   "dependencies": {
+    "@octokit/plugin-retry": "^8.1.0",
+    "@octokit/plugin-throttling": "^11.0.3",
+    "@octokit/rest": "^22.0.1",
     "cors": "^2.8.5",
     "elliptic": "^6.5.4",
     "express": "^4.18.2",

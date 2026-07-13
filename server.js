@@ -10,6 +10,7 @@ import { P2PServer } from './p2p/server.js';
 import { setupRoutes } from './api/routes.js';
 import { loadConfig } from './config/index.js';
 import { submitRollupToL1 } from './core/rollup.js';
+import { runMigration } from './core/archive/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -140,6 +141,27 @@ async function startServer() {
 
     blockchain = new Blockchain(config, dbPath);
     await blockchain.initialize();
+
+    // Archive Initialization and Migration
+    if (config.archive && config.archive.enabled) {
+      let archiveMigrationComplete = false;
+      const checkpointPath = path.resolve(config.archive.migrationCheckpoint || './data/migration-checkpoint.json');
+      if (fs.existsSync(checkpointPath)) {
+        try {
+          const checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
+          archiveMigrationComplete = !!checkpoint.migrationComplete;
+        } catch {}
+      }
+
+      if (!archiveMigrationComplete) {
+        console.log('[Archive] Starting block archive migration...');
+        await runMigration(blockchain, blockchain.archiveWriter);
+      } else {
+        console.log('[Archive] Archive migration already marked complete.');
+      }
+
+      await blockchain.archiveWriter.start();
+    }
 
     p2pServer = new P2PServer(blockchain, config.p2pPort);
 

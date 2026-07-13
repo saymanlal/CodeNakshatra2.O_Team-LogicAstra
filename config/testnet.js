@@ -108,4 +108,18 @@ export default {
 
   // ─── Supply ──────────────────────────────────────────────────────────────
   maxSupply:         0,                     // 0 = unlimited on testnet
+
+  // ─── Archive ─────────────────────────────────────────────────────────────
+  archive: {
+    enabled: true,
+    githubOwner: 'saymanlal',
+    githubRepo: 'sayman-archive',
+    githubBranch: 'main',
+    githubToken: process.env.GITHUB_TOKEN,  // MUST be env variable
+    batchSize: 1000,
+    compressionEnabled: true,
+    useCDN: true,
+    ipfsGateway: null,  // optional: 'https://ipfs.io/ipfs/',
+    migrationCheckpoint: './data/migration-checkpoint.json'
+  }
 };

@@ -135,4 +135,18 @@ export default {
   // ─── Supply ──────────────────────────────────────────────────────────────
   // 100,000,000 SAYN hard cap = 10,000,000,000,000,000 base units
   maxSupply:        10_000_000_000_000_000,
+
+  // ─── Archive ─────────────────────────────────────────────────────────────
+  archive: {
+    enabled: true,
+    githubOwner: 'saymanlal',
+    githubRepo: 'sayman-archive',
+    githubBranch: 'main',
+    githubToken: process.env.GITHUB_TOKEN,  // MUST be env variable
+    batchSize: 1000,
+    compressionEnabled: true,
+    useCDN: true,
+    ipfsGateway: null,  // optional: 'https://ipfs.io/ipfs/',
+    migrationCheckpoint: './data/migration-checkpoint.json'
+  }
 };

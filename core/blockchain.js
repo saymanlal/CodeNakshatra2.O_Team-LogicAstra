@@ -29,6 +29,7 @@ import GasCalculator from './gas.js';
 import { Level } from 'level';
 import fs from 'fs';
 import path from 'path';
+import { GithubClient, RepoManager, ArchiveWriter, ArchiveReader } from './archive/index.js';
 
 const EC  = elliptic.ec;
 const ec  = new EC('secp256k1');
@@ -63,6 +64,17 @@ class Blockchain {
 
     this.totalParallelBuckets = 0;
     this.totalParallelTransactions = 0;
+
+    // Initialize archive if enabled
+    if (this.config.archive && this.config.archive.enabled) {
+      this.githubClient = new GithubClient(this.config.archive);
+      this.repoManager = new RepoManager(this.githubClient, this.config.archive);
+      this.archiveWriter = new ArchiveWriter(this.githubClient, this.repoManager, this);
+    }
+    
+    this.archive = {
+      syncFromArchive: this.syncFromArchive.bind(this)
+    };
   }
 
   ensureSnapshotDir() {
@@ -381,6 +393,10 @@ class Blockchain {
 
       if (block.index % this.snapshotInterval === 0 && block.index > 0) {
         await this.saveSnapshot(block.index);
+      }
+
+      if (this.archiveWriter) {
+        this.archiveWriter.queueBlock(block);
       }
 
       return true;
@@ -778,7 +794,11 @@ class Blockchain {
       await this.db.put('latest_height', latestBlock.index);
     }
     // Also save the full chain asynchronously for backup compatibility
-    this.db.put('chain', this.chain.map(b => b.toJSON ? b.toJSON() : b)).catch(() => {});
+    await this.db.put('chain', this.chain.map(b => b.toJSON ? b.toJSON() : b)).catch(() => {});
+
+    if (this.archiveWriter) {
+      this.archiveWriter.flushQueue().catch(() => {});
+    }
   }
 
   async _getSavedChain() {
@@ -962,6 +982,65 @@ class Blockchain {
 
   async close() {
     await this.db.close();
+  }
+
+  async syncFromArchive() {
+    console.log('[Sync] Starting synchronization from archive...');
+    const archiveReader = new ArchiveReader(this.githubClient, this.repoManager, this.config);
+    await this.repoManager.initialize();
+    
+    // Step 1: Find the latest state snapshot height
+    let latestSnapshotInfo = null;
+    try {
+      latestSnapshotInfo = await this.githubClient.readFile('snapshots/latest.json', this.repoManager.currentRepo);
+    } catch (err) {
+      console.log('[Sync] No latest snapshot info found. Syncing blocks from genesis...');
+    }
+    
+    let startHeight = 0;
+    if (latestSnapshotInfo && latestSnapshotInfo.height !== undefined) {
+      console.log(`[Sync] Found latest state snapshot at height ${latestSnapshotInfo.height}. Downloading snapshot...`);
+      try {
+        const snapshot = await archiveReader.readStateSnapshot(latestSnapshotInfo.height);
+        this.state.importState(snapshot);
+        console.log('[Sync] Successfully imported state snapshot.');
+      } catch (err) {
+        console.error('[Sync] Failed to load state snapshot:', err.message);
+      }
+    }
+    
+    // Step 2: Download and save all block chunks
+    const batchSize = this.config.archive.batchSize || 1000;
+    let currentHeight = 0;
+    let syncCount = 0;
+    
+    while (true) {
+      const chunkStart = currentHeight;
+      const chunkEnd = chunkStart + batchSize - 1;
+      
+      try {
+        console.log(`[Sync] Fetching chunk ${chunkStart}-${chunkEnd}...`);
+        const chunk = await archiveReader.readChunk(chunkStart, chunkEnd);
+        
+        for (const blockJson of chunk.blocks) {
+          const block = await Block.fromJSON(blockJson);
+          // Save block to LevelDB
+          await this.db.put(`block:${block.index}`, blockJson);
+          if (block.index >= this.chain.length) {
+            this.chain.push(block);
+          }
+          syncCount++;
+        }
+        
+        await this.db.put('latest_height', chunk.endHeight);
+        currentHeight = chunk.endHeight + 1;
+      } catch (err) {
+        console.log(`[Sync] Finished or stopped at block height ${currentHeight}: ${err.message}`);
+        break;
+      }
+    }
+    
+    console.log(`[Sync] Synchronization complete. Sync'd ${syncCount} blocks.`);
   }
 }
 
