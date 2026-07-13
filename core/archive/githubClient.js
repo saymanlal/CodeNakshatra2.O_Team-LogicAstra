@@ -256,20 +256,52 @@ export class GithubClient {
       await this._preRequestCheck();
 
       // 1. Get Ref to find latest commit SHA
-      const refRes = await this.octokit.git.getRef({
-        owner: this.owner,
-        repo: repoName,
-        ref: `heads/${this.branch}`
-      });
-      const latestCommitSha = refRes.data.object.sha;
+      let latestCommitSha;
+      let baseTreeSha;
+      try {
+        const refRes = await this.octokit.git.getRef({
+          owner: this.owner,
+          repo: repoName,
+          ref: `heads/${this.branch}`
+        });
+        latestCommitSha = refRes.data.object.sha;
 
-      // 2. Get Commit to find Tree SHA
-      const commitRes = await this.octokit.git.getCommit({
-        owner: this.owner,
-        repo: repoName,
-        commit_sha: latestCommitSha
-      });
-      const baseTreeSha = commitRes.data.tree.sha;
+        // 2. Get Commit to find Tree SHA
+        const commitRes = await this.octokit.git.getCommit({
+          owner: this.owner,
+          repo: repoName,
+          commit_sha: latestCommitSha
+        });
+        baseTreeSha = commitRes.data.tree.sha;
+      } catch (refErr) {
+        const isEmpty = refErr.message.includes('Git Repository is empty') || 
+                        refErr.status === 409 || 
+                        refErr.status === 404 ||
+                        (refErr.message && refErr.message.toLowerCase().includes('empty'));
+        if (isEmpty) {
+          console.log(`[GitHub Client] Repository ${repoName} is empty. Initializing branch ${this.branch}...`);
+          // Create the first file directly to initialize the repository and branch
+          const firstFile = batch[0];
+          const createRes = await this.octokit.repos.createOrUpdateFileContents({
+            owner: this.owner,
+            repo: repoName,
+            path: firstFile.path,
+            message: 'Initialize repository with first archive file',
+            content: Buffer.from(typeof firstFile.content === 'object' ? JSON.stringify(firstFile.content, null, 2) : firstFile.content).toString('base64'),
+            branch: this.branch
+          });
+          console.log(`[GitHub Client] Repository initialized successfully. Commit SHA: ${createRes.data.commit.sha}`);
+          
+          // If there are more files in the batch, commit the rest using standard method
+          if (batch.length > 1) {
+            const rest = batch.slice(1);
+            return this._commitBatch(repoName, rest);
+          }
+          return;
+        } else {
+          throw refErr;
+        }
+      }
 
       // 3. Create Tree
       const tree = batch.map(file => ({
