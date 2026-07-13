@@ -1,6 +1,6 @@
 # SAYMAN Blockchain: Phase-by-Phase Roadmap Comparison
 
-This document provides a simple, high-level comparison of the development roadmap of the **SAYMAN Blockchain** and **PUKY Wallet** ecosystem from Phase 1 to Phase 19.
+This document provides a simple, high-level comparison of the development roadmap of the **SAYMAN Blockchain** and **PUKY Wallet** ecosystem from Phase 1 to Phase 20.
 
 ---
 
@@ -26,6 +26,7 @@ This document provides a simple, high-level comparison of the development roadma
 | **Phase 16** | **Sandbox Hardening** | Frozen JS prototypes in VM to prevent escapes; added PDF doc generator. |
 | **Phase 17** | **Constructor State Fix** | Fixed VM constructor execution (prototype pre-binding); added Dark Theme & SPA routing. |
 | **Phase 19** | **Pipelined Concurrency & Database Security** | Implemented parallel scheduling, snapshot-accelerated block replay (no more event-loop blocking), atomic block persistence (preventing data loss/corruption), self-connection blacklisting, and WebSocket leak fixes. |
+| **Phase 20** | **Robust Archive Recovery & Integrated Explorer** | Implemented concurrency-safe archive lock, exponential backoff (starting at 5s up to 5 min), pipelined sync checks to pause archiver during active block download, validation cache fixes, and dedicated transaction page with validator rewards filters. |
 
 ---
 
@@ -97,3 +98,11 @@ This document provides a simple, high-level comparison of the development roadma
 * **Non-Blocking Replays**: Yields execution control periodically to the event loop during replay, preventing heartbeats from timing out.
 * **Self-Connection Blacklist**: Keeps nodes from trying to connect to themselves, resolving reconnect loop spam.
 * **Socket Safety**: Patched P2P WebSocket cleanups to close connections on removal, preventing file descriptor leaks.
+
+### Phase 20: Robust Archive Recovery & Integrated Explorer
+* **Archive Lock Mutex**: Added a processing flag to prevent concurrent archive runs when blocks are queued rapidly, solving resource exhaustion.
+* **Exponential Backoff**: Introduced automatic retry backoff starting at 5 seconds and scaling up to 5 minutes for remote Github archive errors, replacing infinite failure loops.
+* **Pipelined Syncing Pause**: Pauses the archive system during active synchronization from peers to prioritize CPU, network bandwidth, and memory for blockchain catchup.
+* **Cache Safety Fix**: Prevented permanent verification failures caused by caching false results on database/system read errors.
+* **Dedicated Transaction Explorer**: Expanded explorer with a transactions view, rewards filter, and real-time statistics.
+* **Repository Cleanups**: Removed deprecated client, SDK, faucet, and faucet-site folders to isolate base chain components.

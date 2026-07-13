@@ -59,6 +59,7 @@ export class P2PServer {
 
     // ── SINGLE PEER SYNC CONTROL ───────────────────────────────────
     this.syncingFromPeerId = null;
+    this.blockchain.isSyncing = false;
     this.lastSyncRequestTime = 0;
   }
 
@@ -771,6 +772,7 @@ export class P2PServer {
     const peer = this._findPeerByWs(ws);
     if (peer) {
       this.syncingFromPeerId = peer.id;
+      this.blockchain.isSyncing = true;
       this.lastSyncRequestTime = Date.now();
     }
     this._send(ws, {
@@ -792,6 +794,7 @@ export class P2PServer {
       }
       // Stalled or disconnected peer - reset sync state
       this.syncingFromPeerId = null;
+      this.blockchain.isSyncing = false;
     }
 
     // Find the single peer with the longest chain
@@ -809,6 +812,7 @@ export class P2PServer {
       const gap = maxChainHeight - localHeight;
       console.log(`📥 Initiating sync with best peer ${bestPeer.id.slice(0, 8)} (${gap} blocks ahead, target height: ${maxChainHeight})`);
       this.syncingFromPeerId = bestPeer.id;
+      this.blockchain.isSyncing = true;
       this.lastSyncRequestTime = now;
       this._requestBlocks(bestPeer.ws);
     }
@@ -938,12 +942,21 @@ export class P2PServer {
         const remaining = (peer.chainHeight || 0) - this.blockchain.chain.length;
         if (remaining > 0) {
           console.log(`📥 Still ${remaining} blocks behind peer ${peerId.slice(0,8)}. Requesting next batch...`);
+          this.blockchain.isSyncing = true;
           this._requestBlocks(peer.ws);
         } else {
           this.syncingFromPeerId = null;
+          this.blockchain.isSyncing = false;
+          if (this.blockchain.archiveWriter) {
+            this.blockchain.archiveWriter.schedulePendingChunk(1000);
+          }
         }
       } else {
         this.syncingFromPeerId = null;
+        this.blockchain.isSyncing = false;
+        if (this.blockchain.archiveWriter) {
+          this.blockchain.archiveWriter.schedulePendingChunk(1000);
+        }
       }
     } catch (err) {
       console.error('❌ _processBlocksBatch error:', err.message);

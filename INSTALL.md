@@ -1,4 +1,4 @@
-# Sayman Phase 19 - Complete Installation Guide
+# Sayman Phase 20 - Complete Installation Guide
 
 ## Prerequisites
 
@@ -108,8 +108,8 @@ npm run testnet
 **Output:**
 ```
 ╔════════════════════════════════════════╗
-║   SAYMAN BLOCKCHAIN - PHASE 19         ║
-║   Pipelined Parallel Execution         ║
+║   SAYMAN BLOCKCHAIN - PHASE 20         ║
+║   Robust Archive Recovery              ║
 ╚════════════════════════════════════════╝
 
 🌐 NETWORK: TESTNET
@@ -608,7 +608,7 @@ rm -rf ~/.sayman/
 
 ---
 
-**Congratulations! You've successfully installed Sayman Phase 19.**
+**Congratulations! You've successfully installed Sayman Phase 20.**
 
 Start exploring with:
 ```bash

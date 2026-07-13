@@ -142,7 +142,7 @@ const DOCS_DATA = {
       <p>SAYMAN is a Proof-of-Stake Layer 1 blockchain with a built-in JavaScript smart contract engine, multi-layer chain support (L1/L2/Sidechain), EVM-like token and NFT factories, a DEX, staking pools, a peer reputation system, a REST API, a CLI wallet, a browser-based JS SDK, an Android wallet, and a testnet faucet.</p>
 
       <div class="note">
-        <strong>Phase 17 — now live:</strong> Dynamic smart contract constructor execution (prototype pre-binding), Render RPC node priority integration, Express SPA route fallbacks on the node server, full Moon/Sun Dark Mode toggle, mobile UX polished (auto-stacking grids, scrollable tables), and up to 7,000 simulated TPS.
+        <strong>Phase 20 — now live:</strong> Robust archive recovery, exponential backoff back-up system, pipelined sync blocks check, merge-verification cache safety fixes, dedicated transactions explorer with rewards toggling, and clean client/faucet/sdk separations.
       </div>
 
       <h3>What works today</h3>
@@ -251,12 +251,12 @@ const DOCS_DATA = {
     content: `
       <h2>Roadmap</h2>
       <div class="note">
-        <strong>Phase 14 — complete:</strong> Multi-layer chains, token/NFT/memecoin factories, DEX, staking pools, peer reputation, denomination clarity, and TPS improvements.
+        <strong>Phase 20 — complete:</strong> Robust archive recovery, concurrency-safe client locking, exponential backoff, synced block check guards, and a dedicated transactions explorer with filter options.
       </div>
       <ul>
         <li><strong>Phase 1–13 (done):</strong> Core PoS chain, JS contract engine, REST API, CLI, SDK, Android wallet, faucet, Merkle proofs, gas metering, public testnet.</li>
-        <li><strong>Phase 14 (done):</strong> L2 rollups, sidechains, permissioned chains, token factory, NFT factory, memecoin factory, DEX, staking pools, L1↔L2 bridge, peer reputation, improved TPS, clear denomination in explorer and API.</li>
-        <li><strong>Near-term:</strong> SAYMAN Genesis 2026 hackathon — building out ecosystem tooling (wallets, explorers, cross-chain bridges, security audits) on top of Phase 14 primitives.</li>
+        <li><strong>Phase 14-19 (done):</strong> L2 rollups, sidechains, factories, DEX, L1↔L2 bridge, peer reputation, pipelined parallel transaction execution.</li>
+        <li><strong>Phase 20 (done):</strong> Robust archive recovery, concurrency-safe writer lock, exponential retry backoff, syncing block checks, cache safety fixes, complete transactions explorer, and repo separations.</li>
         <li><strong>Later:</strong> Mainnet launch — 100,000,000 SAYN hard cap, Bitcoin-style halving block rewards. Exact date TBD.</li>
       </ul>
     `

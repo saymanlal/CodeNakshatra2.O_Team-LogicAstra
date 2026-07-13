@@ -81,9 +81,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Init reward toggle visual state (starts as "Show Rewards" = active)
+  const rewardWrap = document.getElementById('reward-toggle-wrap');
+  const rewardKnob = document.getElementById('reward-toggle-knob');
+  if (rewardWrap) rewardWrap.classList.add('active');
+  if (rewardKnob) rewardKnob.classList.add('active');
+
   const urlParams = new URLSearchParams(window.location.search);
   const pageParam = urlParams.get('page');
-  if (pageParam && ['dashboard', 'explorer', 'validators', 'contracts', 'layers', 'network'].includes(pageParam)) {
+  if (pageParam && ['dashboard', 'explorer', 'validators', 'transactions', 'contracts', 'layers', 'network'].includes(pageParam)) {
     showPage(pageParam);
   } else {
     showPage('dashboard');
@@ -156,13 +162,14 @@ function poll() {
   const active = document.querySelector('.nav-btn.active');
   if (!active) return;
   switch (active.dataset.page) {
-    case 'dashboard':  loadDashboard();                    break;
-    case 'explorer':   loadExplorer(explorerPage);         break;
-    case 'validators': loadValidators();                   break;
-    case 'contracts':  loadContracts();                    break;
-    case 'layers':     loadLayers();                       break;
-    case 'network':    loadNetwork();                      break;
-    case 'docs':       break;
+    case 'dashboard':     loadDashboard();                    break;
+    case 'explorer':      loadExplorer(explorerPage);         break;
+    case 'validators':    loadValidators();                   break;
+    case 'transactions':  loadTransactions();                 break;
+    case 'contracts':     loadContracts();                    break;
+    case 'layers':        loadLayers();                       break;
+    case 'network':       loadNetwork();                      break;
+    case 'docs':          break;
   }
 }
 
@@ -195,13 +202,14 @@ function showPage(pageId) {
   if (btn) btn.classList.add('active');
 
   switch (pageId) {
-    case 'dashboard':  loadDashboard();        break;
-    case 'explorer':   loadExplorer(1);        break;
-    case 'validators': loadValidators();       break;
-    case 'contracts':  loadContracts();        break;
-    case 'layers':     loadLayers();           break;
-    case 'network':    loadNetwork();          break;
-    case 'docs':       break;
+    case 'dashboard':     loadDashboard();        break;
+    case 'explorer':      loadExplorer(1);        break;
+    case 'validators':    loadValidators();       break;
+    case 'transactions':  loadTransactions();     break;
+    case 'contracts':     loadContracts();        break;
+    case 'layers':        loadLayers();           break;
+    case 'network':       loadNetwork();          break;
+    case 'docs':          break;
   }
 }
 
@@ -595,6 +603,229 @@ async function loadLayers() {
       : '—'
     );
   } catch (e) { console.error('Layers:', e); }
+}
+
+// ── Transactions ──────────────────────────────────────────────────────────────
+let allTransactions     = [];   // all txs loaded from blocks
+let filteredTransactions = [];  // after search/reward filter applied
+let txShowRewards       = true; // toggle state
+let txPage              = 1;
+const TX_PG_SZ          = 30;
+
+// Type badge colours
+const TX_TYPE_COLORS = {
+  TRANSFER:    { bg: '#1a3a5c', fg: '#60b4ff' },
+  REWARD:      { bg: '#2a4a1a', fg: '#7ddb4f' },
+  REWARD_FEE:  { bg: '#1e3d20', fg: '#5ecf6b' },
+  STAKE:       { bg: '#3a2a10', fg: '#f5a623' },
+  UNSTAKE:     { bg: '#3a1a10', fg: '#f56323' },
+  CONTRACT_DEPLOY: { bg: '#2a1a3a', fg: '#c97fff' },
+  CONTRACT_CALL:   { bg: '#1f1a3a', fg: '#9b7fff' },
+};
+
+function txTypeBadge(type) {
+  const c = TX_TYPE_COLORS[type] || { bg: 'var(--mono-900)', fg: 'var(--mono-300)' };
+  return `<span style="font-size:10px;padding:2px 7px;border-radius:3px;font-weight:600;letter-spacing:.05em;background:${c.bg};color:${c.fg};">${type}</span>`;
+}
+
+async function loadTransactions() {
+  const tbody = document.getElementById('tx-list');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading transactions…</td></tr>`;
+
+  try {
+    // Fetch all blocks (up to 500) and extract every transaction
+    const data = await apiFetch('/blocks?page=1&limit=500');
+    const blocks = data.blocks || [];
+
+    allTransactions = [];
+    for (const block of blocks) {
+      for (const tx of (block.transactions || [])) {
+        allTransactions.push({
+          id:           tx.id || '—',
+          type:         tx.type || 'UNKNOWN',
+          blockIndex:   block.index,
+          timestamp:    block.timestamp,
+          from:         tx.data?.from     || tx.data?.validator || null,
+          to:           tx.data?.to       || tx.data?.validator || null,
+          amount:       tx.data?.amount   ?? null,
+          gasUsed:      tx.gasUsed        ?? 0,
+          gasPrice:     tx.gasPrice       ?? 0,
+          data:         tx.data           || {},
+        });
+      }
+    }
+
+    // Sort newest first
+    allTransactions.sort((a, b) => b.blockIndex - a.blockIndex || 0);
+
+    txPage = 1;
+    applyTxFilters();
+  } catch (e) {
+    console.error('Transactions:', e);
+    const tbody = document.getElementById('tx-list');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="padding:calc(var(--grid)*2);color:#c00;font-size:12px;text-align:center;">Failed to load transactions</td></tr>`;
+  }
+}
+
+function applyTxFilters() {
+  const q = (document.getElementById('tx-search')?.value || '').trim().toLowerCase();
+  const rewardTypes = new Set(['REWARD', 'REWARD_FEE']);
+
+  filteredTransactions = allTransactions.filter(tx => {
+    // Reward filter
+    if (!txShowRewards && rewardTypes.has(tx.type)) return false;
+    // Text search
+    if (q) {
+      const haystack = [
+        tx.id, tx.type,
+        String(tx.blockIndex),
+        tx.from, tx.to,
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Update summary stats (always over all txs, not filtered)
+  const rewardTypes2 = new Set(['REWARD', 'REWARD_FEE']);
+  const stakeTypes   = new Set(['STAKE', 'UNSTAKE']);
+  const contractTypes = new Set(['CONTRACT_DEPLOY', 'CONTRACT_CALL']);
+  let transfers = 0, rewards = 0, stakes = 0, contracts = 0, other = 0;
+  for (const tx of allTransactions) {
+    if (rewardTypes2.has(tx.type))  rewards++;
+    else if (stakeTypes.has(tx.type))   stakes++;
+    else if (contractTypes.has(tx.type)) contracts++;
+    else if (tx.type === 'TRANSFER')     transfers++;
+    else other++;
+  }
+  setEl('tx-stat-total',     allTransactions.length);
+  setEl('tx-stat-transfers', transfers);
+  setEl('tx-stat-rewards',   rewards);
+  setEl('tx-stat-stakes',    stakes);
+  setEl('tx-stat-contracts', contracts);
+  setEl('tx-stat-other',     other);
+
+  // Badge count
+  const badge = document.getElementById('tx-count-badge');
+  if (badge) badge.textContent = `${filteredTransactions.length} tx${filteredTransactions.length !== 1 ? 's' : ''}`;
+
+  txPage = 1;
+  renderTransactions();
+}
+
+function filterTransactions() {
+  applyTxFilters();
+}
+
+function toggleRewardFilter() {
+  txShowRewards = !txShowRewards;
+  const wrap  = document.getElementById('reward-toggle-wrap');
+  const knob  = document.getElementById('reward-toggle-knob');
+  const label = document.getElementById('reward-toggle-label');
+  if (wrap)  wrap.classList.toggle('active', txShowRewards);
+  if (knob)  knob.classList.toggle('active', txShowRewards);
+  if (label) label.textContent = txShowRewards ? 'Show Block Rewards' : 'Hide Block Rewards';
+  applyTxFilters();
+}
+
+function renderTransactions() {
+  const tbody = document.getElementById('tx-list');
+  if (!tbody) return;
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / TX_PG_SZ));
+  if (txPage > totalPages) txPage = totalPages;
+
+  const start = (txPage - 1) * TX_PG_SZ;
+  const page  = filteredTransactions.slice(start, start + TX_PG_SZ);
+
+  if (!page.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="padding:calc(var(--grid)*3);text-align:center;color:var(--mono-400);font-size:12px;">No transactions found</td></tr>`;
+    renderTxPagination(1, 1);
+    return;
+  }
+
+  tbody.innerHTML = page.map(tx => {
+    const fee = tx.gasUsed && tx.gasPrice ? sayn(tx.gasUsed * tx.gasPrice) : '—';
+    const from = tx.from ? `<span class="mono" style="font-size:10px;">${tx.from.slice(0, 14)}…</span> <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.from}')"><i class="fas fa-copy"></i></button>` : '—';
+    const to   = tx.to   ? `<span class="mono" style="font-size:10px;">${tx.to.slice(0,   14)}…</span> <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.to}')"><i class="fas fa-copy"></i></button>`   : '—';
+    return `
+      <tr onclick="showTxDetail(${JSON.stringify(tx).replace(/"/g,'&quot;')})" style="cursor:pointer;">
+        <td class="mono" style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tx.id.slice(0, 18)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this,'${tx.id}')"><i class="fas fa-copy"></i></button></td>
+        <td>${txTypeBadge(tx.type)}</td>
+        <td style="font-size:11px;">#${tx.blockIndex}</td>
+        <td>${from}</td>
+        <td>${to}</td>
+        <td style="font-size:11px;">${tx.amount !== null ? sayn(tx.amount) : '—'}</td>
+        <td style="font-size:11px;">${tx.gasUsed ? tx.gasUsed.toLocaleString() + ' gas' : '—'}</td>
+        <td style="font-size:11px;">${fee}</td>
+        <td style="font-size:11px;">${fmtTime(tx.timestamp)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  renderTxPagination(txPage, totalPages);
+}
+
+function renderTxPagination(page, totalPages) {
+  const ctrl = document.getElementById('tx-pagination');
+  if (!ctrl) return;
+  if (totalPages <= 1) { ctrl.innerHTML = ''; return; }
+
+  ctrl.innerHTML = `
+    <button onclick="txGoPage(1)" ${page <= 1 ? 'disabled' : ''}><i class="fas fa-angle-double-left"></i></button>
+    <button onclick="txGoPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}><i class="fas fa-angle-left"></i> Previous</button>
+    <span style="font-size:12px;color:var(--mono-400);margin:0 calc(var(--grid)*1);">
+      Page ${page} of ${totalPages} · ${filteredTransactions.length} txs
+    </span>
+    <button onclick="txGoPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>Next <i class="fas fa-angle-right"></i></button>
+    <button onclick="txGoPage(${totalPages})" ${page >= totalPages ? 'disabled' : ''}><i class="fas fa-angle-double-right"></i></button>
+  `;
+}
+
+function txGoPage(p) {
+  txPage = p;
+  renderTransactions();
+}
+
+// ── Transaction Detail Modal ────────────────────────────────────────────────
+function showTxDetail(tx) {
+  if (typeof tx === 'string') { try { tx = JSON.parse(tx); } catch { return; } }
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+
+  const isReward = tx.type === 'REWARD' || tx.type === 'REWARD_FEE';
+  const fee = tx.gasUsed && tx.gasPrice ? sayn(tx.gasUsed * tx.gasPrice) : '—';
+
+  const extraRows = Object.entries(tx.data || {})
+    .filter(([k]) => !['from','to','amount','validator'].includes(k))
+    .map(([k, v]) => `<tr class="detail-row"><td class="detail-label">${k}</td><td class="mono" style="word-break:break-all;font-size:11px;">${typeof v === 'object' ? JSON.stringify(v) : v}</td></tr>`)
+    .join('');
+
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:700px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-exchange-alt"></i> Transaction ${isReward ? '🏆 Block Reward' : ''}</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body">
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          <tr class="detail-row"><td class="detail-label"><i class="fas fa-fingerprint"></i> TX ID</td><td class="mono" style="word-break:break-all;font-size:11px;">${tx.id} <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.id}')"><i class="fas fa-copy"></i></button></td></tr>
+          <tr class="detail-row"><td class="detail-label"><i class="fas fa-tag"></i> Type</td><td>${txTypeBadge(tx.type)}${isReward ? ' <span style="font-size:10px;color:var(--mono-400);margin-left:6px;">System-issued block validation reward</span>' : ''}</td></tr>
+          <tr class="detail-row"><td class="detail-label"><i class="fas fa-cube"></i> Block</td><td><span onclick="this.closest('.modal-overlay').remove();showBlockDetail(${tx.blockIndex})" style="cursor:pointer;color:var(--mono-200);text-decoration:underline;">#${tx.blockIndex}</span></td></tr>
+          <tr class="detail-row"><td class="detail-label"><i class="fas fa-clock"></i> Time</td><td>${fmtTime(tx.timestamp)}</td></tr>
+          ${tx.from ? `<tr class="detail-row"><td class="detail-label"><i class="fas fa-arrow-right"></i> From</td><td class="mono" style="word-break:break-all;">${tx.from} <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.from}')"><i class="fas fa-copy"></i></button></td></tr>` : ''}
+          ${tx.to   ? `<tr class="detail-row"><td class="detail-label"><i class="fas fa-arrow-left"></i> To</td><td class="mono" style="word-break:break-all;">${tx.to} <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.to}')"><i class="fas fa-copy"></i></button></td></tr>` : ''}
+          ${tx.amount !== null ? `<tr class="detail-row"><td class="detail-label"><i class="fas fa-coins"></i> Amount</td><td>${sayn(tx.amount)} <span style="font-size:10px;color:var(--mono-500);">(${Number(tx.amount).toLocaleString()} base units)</span></td></tr>` : ''}
+          <tr class="detail-row"><td class="detail-label"><i class="fas fa-gas-pump"></i> Gas Used</td><td>${tx.gasUsed ? tx.gasUsed.toLocaleString() + ' gas' : '—'}</td></tr>
+          <tr class="detail-row"><td class="detail-label"><i class="fas fa-receipt"></i> Fee</td><td>${fee}</td></tr>
+          ${extraRows}
+        </table>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
 }
 
 // ── Contracts ─────────────────────────────────────────────────────────────────

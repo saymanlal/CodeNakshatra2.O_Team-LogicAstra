@@ -56,6 +56,7 @@ class Blockchain {
     this.ensureSnapshotDir();
 
     this.isProducing    = false;
+    this.isSyncing      = false;
     this.mempoolLimit   = 1000;
     this.addressTxCount = new Map();
     this.lastCleanup    = Date.now();

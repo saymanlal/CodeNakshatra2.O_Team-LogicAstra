@@ -1,25 +1,25 @@
-# ⛓️ SAYMAN BLOCKCHAIN — PHASE 19: PIPELINED PARALLEL TRANSACTION EXECUTION
+# ⛓️ SAYMAN BLOCKCHAIN — PHASE 20: ROBUST ARCHIVE & INTEGRATED TRANSACTION EXPLORER
 
 **JavaScript-native Smart Contracts · Proof-of-Stake · Multi-Layer Chains · Custom Tokens · NFTs · DEX · Memecoins · Staking Pools**
 
-[![Phase](https://img.shields.io/badge/Phase-18-brightgreen)](https://github.com/saymanlal/SAYMAN)
+[![Phase](https://img.shields.io/badge/Phase-20-brightgreen)](https://github.com/saymanlal/SAYMAN)
 [![Network](https://img.shields.io/badge/Network-Public%20Testnet-blue)](https://sayman.onrender.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
 
-## 🎯 What's New in Phase 19
+## 🎯 What's New in Phase 20
 
-Phase 19 introduces **pipelined parallel transaction execution** on top of the Proof-of-Stake consensus layers, featuring dependency analysis on read/write sets, deterministic bucket scheduling, and live parallel efficiency metrics in the explorer UI.
+Phase 20 introduces **a highly robust archive subsystem** and a **complete transaction explorer** with specialized filtering and state-of-the-art UI elements.
 
 | Feature | Status |
 |---|---|
-| **Parallel Execution Engine** | ✅ Analyzes transaction dependency access sets (from, to, contract, validator) and schedules them in parallel |
-| **Conflict-Free Bucketing** | ✅ Groups transactions into deterministic parallel execution layers to prevent race conditions or state collisions |
-| **Explorer Concurrency Card** | ✅ Displays real-time parallel concurrency speedup factors on the dashboard |
-| **Constructor State Binding** | ✅ Pre-binds VM state helpers to class prototypes to resolve `TypeError` in constructors (Phase 17) |
-| **Render RPC Integration** | ✅ Reordered network configuration endpoints to prioritize the live node `sayman.onrender.com` (Phase 17) |
-| **SPA Route Redirections** | ✅ Configured Express fallbacks for block, transaction, and contract paths to serve `index.html` (Phase 17) |
+| **Integrated Transaction Explorer** | ✅ Dedicated transactions explorer page displaying detailed transaction entries with interactive reward toggles |
+| **Concurrency-Safe Archive Subsystem** | ✅ Implements a single-process execution lock (`isProcessing`) to prevent memory leaks and V8 heap exhaustion |
+| **Exponential Backoff and Retry** | ✅ Prevents infinite request loop spam by backing off retries (5s to 5m) on repository check or verification failures |
+| **Pipelined Synchronization Guard** | ✅ Dynamically pauses the ArchiveWriter during active block synchronization to minimize CPU and memory pressure |
+| **Verification Cache Resiliency** | ✅ Fixed a verification bug so that temporary database read errors do not cause permanent block verification failures |
+| **Clean Codebase Separation** | ✅ Removed duplicate `cli`, `sdk`, `faucet`, and `faucet-site` folders as they have been migrated to dedicated repositories |
 
 ---
 
@@ -225,16 +225,12 @@ Available as an Android APK at `/apk/puky.apk`. Features:
 
 ## 🤝 Contributing
 
-See `ABOUT.md` for full project vision. PRs welcome on `phase19` branch.
+See `ABOUT.md` for full project vision. PRs welcome on `main` or `phase20` branch.
 
-### Phase 19 Updates
-- **P2P Sync Engine overhaul**: Real-time fork resolutions, rapid multi-block syncing, strict 5s block time.
-- **PUKY Mobile Wallet Improvements**:
-  - Implemented dynamic PhonePe style bottom navigation.
-  - Added dedicated Profile/Vault section and real-time wallet balances syncing.
-  - Enhanced UI responsiveness (auto-closing mobile menus).
-  - Renamed downloadable APK to `puky.apk`.
-  - Added integrated block search parameters in Explorer.
+### Phase 20 Updates
+- **Integrated Transaction Explorer**: Added dedicated transactions page, statistics bar, and rewards filter (toggles REWARD/REWARD_FEE txs).
+- **Archive System Concurrency and Stability**: Introduced single-writer lock, exponential retry backoff, and sync-state pause protections.
+- **Repository Cleanups**: Purged legacy CLI, SDK, and Faucet code to complete separation of concerns.
 
 ---
 

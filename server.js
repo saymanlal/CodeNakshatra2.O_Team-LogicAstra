@@ -155,7 +155,12 @@ async function startServer() {
 
       if (!archiveMigrationComplete) {
         console.log('[Archive] Starting block archive migration...');
-        await runMigration(blockchain, blockchain.archiveWriter);
+        try {
+          await runMigration(blockchain, blockchain.archiveWriter);
+        } catch (migrationErr) {
+          console.error('⚠️ [Archive] Archive migration failed:', migrationErr.message);
+          console.log('ℹ️ [Archive] Continuing node execution without completing archive migration.');
+        }
       } else {
         console.log('[Archive] Archive migration already marked complete.');
       }
