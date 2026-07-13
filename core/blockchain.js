@@ -478,6 +478,27 @@ class Blockchain {
     if (block.validator) {
       this.state.increaseReputation(block.validator, 10);
     }
+
+    // Evict transactions from mempool that were included in this block
+    if (block.transactions && block.transactions.length > 0) {
+      const blockTxIds = new Set(block.transactions.map(tx => tx.id));
+      const beforeLength = this.mempool.length;
+      this.mempool = this.mempool.filter(tx => !blockTxIds.has(tx.id));
+      
+      // Rebuild pendingNonces to reflect actual remaining mempool transactions
+      this.pendingNonces.clear();
+      for (const tx of this.mempool) {
+        const confirmedNonce = this.state.getNonce(tx.data.from);
+        const pendingNonce   = this.pendingNonces.get(tx.data.from) ?? confirmedNonce;
+        const expectedNonce  = Math.max(confirmedNonce, pendingNonce);
+        this.pendingNonces.set(tx.data.from, expectedNonce + 1);
+      }
+      
+      const evicted = beforeLength - this.mempool.length;
+      if (evicted > 0) {
+        console.log(`🧹 Mempool: Evicted ${evicted} transactions confirmed in block #${block.index}.`);
+      }
+    }
   }
 
   _scheduleParallelBuckets(transactions) {
