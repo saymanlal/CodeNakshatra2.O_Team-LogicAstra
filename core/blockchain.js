@@ -87,6 +87,15 @@ class Blockchain {
   async initialize() {
     console.log(`\n🔄 Initializing ${this.networkName}...`);
 
+    // Auto-sync from archive on startup if enabled
+    if (this.config.archive && this.config.archive.enabled) {
+      try {
+        await this.syncFromArchive();
+      } catch (err) {
+        console.error('⚠️ [Sync] Auto-sync from archive failed on startup:', err.message);
+      }
+    }
+
     try {
       const snapshot = await this.loadLatestSnapshot();
 
@@ -815,8 +824,8 @@ class Blockchain {
       await this.db.put(`block:${latestBlock.index}`, json);
       await this.db.put('latest_height', latestBlock.index);
     }
-    // Also save the full chain asynchronously for backup compatibility
-    await this.db.put('chain', this.chain.map(b => b.toJSON ? b.toJSON() : b)).catch(() => {});
+    // Commented out to prevent memory OOM crashes during block sync at large heights
+    // await this.db.put('chain', this.chain.map(b => b.toJSON ? b.toJSON() : b)).catch(() => {});
 
     if (this.archiveWriter) {
       this.archiveWriter.flushQueue().catch(() => {});
@@ -1011,58 +1020,135 @@ class Blockchain {
     const archiveReader = new ArchiveReader(this.githubClient, this.repoManager, this.config);
     await this.repoManager.initialize();
     
-    // Step 1: Find the latest state snapshot height
+    // Step 1: Find the latest state snapshot height in the archive
     let latestSnapshotInfo = null;
     try {
       latestSnapshotInfo = await this.githubClient.readFile('snapshots/latest.json', this.repoManager.currentRepo);
     } catch (err) {
-      console.log('[Sync] No latest snapshot info found. Syncing blocks from genesis...');
+      try {
+        latestSnapshotInfo = await this.githubClient.readFile('snapshots/latest.json', this.repoManager.baseRepo);
+      } catch (err2) {
+        console.log('[Sync] No latest snapshot info found in archive. Syncing blocks from genesis...');
+      }
     }
     
-    let startHeight = 0;
+    let targetHeight = 0;
     if (latestSnapshotInfo && latestSnapshotInfo.height !== undefined) {
-      console.log(`[Sync] Found latest state snapshot at height ${latestSnapshotInfo.height}. Downloading snapshot...`);
+      targetHeight = latestSnapshotInfo.height;
+    } else {
+      console.log('[Sync] Target height could not be determined. Skipping archive sync.');
+      return;
+    }
+
+    // Determine current local height
+    let localHeight = 0;
+    try {
+      const rawHeight = await this.db.get('latest_height');
+      localHeight = parseInt(rawHeight, 10) + 1;
+    } catch (err) {
+      localHeight = 0;
+    }
+
+    if (localHeight >= targetHeight) {
+      console.log(`[Sync] Local chain height (${localHeight}) is already up to date with archive height (${targetHeight}).`);
+      return;
+    }
+
+    console.log(`[Sync] Syncing blocks from height ${localHeight} to ${targetHeight} from archive...`);
+
+    // Import the latest snapshot state if we are starting from genesis or significantly behind
+    if (localHeight === 0 || targetHeight - localHeight > 5000) {
+      console.log(`[Sync] Downloading and importing state snapshot at height ${targetHeight}...`);
       try {
-        const snapshot = await archiveReader.readStateSnapshot(latestSnapshotInfo.height);
-        this.state.importState(snapshot);
-        console.log('[Sync] Successfully imported state snapshot.');
+        const snapshotState = await archiveReader.readStateSnapshot(targetHeight);
+        this.state.importState(snapshotState);
+        
+        // Save the snapshot to local disk so initialize() finds it
+        const snap = {
+          blockHeight: targetHeight,
+          timestamp: Date.now(),
+          state: snapshotState,
+          stateRoot: this.state.computeStateRoot(),
+        };
+        const p = path.join(this.snapshotDir, `snapshot-${targetHeight}.json`);
+        fs.writeFileSync(p, JSON.stringify(snap, null, 2));
+        console.log(`📸 Local snapshot saved at block ${targetHeight}`);
       } catch (err) {
         console.error('[Sync] Failed to load state snapshot:', err.message);
       }
     }
-    
-    // Step 2: Download and save all block chunks
+
+    // Identify missing chunks
     const batchSize = this.config.archive.batchSize || 1000;
-    let currentHeight = 0;
-    let syncCount = 0;
+    const chunkRanges = [];
     
-    while (true) {
-      const chunkStart = currentHeight;
-      const chunkEnd = chunkStart + batchSize - 1;
-      
+    // Find the starting chunk index
+    const startChunkIndex = Math.floor(localHeight / batchSize);
+    const endChunkIndex = Math.floor(targetHeight / batchSize);
+
+    for (let i = startChunkIndex; i <= endChunkIndex; i++) {
+      chunkRanges.push({
+        start: i * batchSize,
+        end: (i + 1) * batchSize - 1
+      });
+    }
+
+    console.log(`[Sync] Downloading ${chunkRanges.length} chunks from archive in parallel (concurrency limit = 15)...`);
+
+    // Parallel download helper
+    const downloadChunk = async (range) => {
       try {
-        console.log(`[Sync] Fetching chunk ${chunkStart}-${chunkEnd}...`);
-        const chunk = await archiveReader.readChunk(chunkStart, chunkEnd);
-        
-        for (const blockJson of chunk.blocks) {
-          const block = await Block.fromJSON(blockJson);
-          // Save block to LevelDB
-          await this.db.put(`block:${block.index}`, blockJson);
-          if (block.index >= this.chain.length) {
-            this.chain.push(block);
-          }
-          syncCount++;
-        }
-        
-        await this.db.put('latest_height', chunk.endHeight);
-        currentHeight = chunk.endHeight + 1;
+        const chunk = await archiveReader.readChunk(range.start, range.end);
+        return chunk;
       } catch (err) {
-        console.log(`[Sync] Finished or stopped at block height ${currentHeight}: ${err.message}`);
-        break;
+        console.error(`[Sync] Failed to download chunk ${range.start}-${range.end}:`, err.message);
+        throw err;
+      }
+    };
+
+    // Standard promise pool with limit of 15 concurrent requests
+    const limit = 15;
+    const chunkPromises = [];
+    const executing = new Set();
+
+    for (const range of chunkRanges) {
+      const p = downloadChunk(range);
+      chunkPromises.push(p);
+      executing.add(p);
+      const clean = () => executing.delete(p);
+      p.then(clean, clean);
+      if (executing.size >= limit) {
+        await Promise.race(executing);
       }
     }
-    
-    console.log(`[Sync] Synchronization complete. Sync'd ${syncCount} blocks.`);
+
+    const downloadedChunks = await Promise.all(chunkPromises);
+    // Sort chunks by startHeight to preserve sequential import
+    downloadedChunks.sort((a, b) => a.startHeight - b.startHeight);
+
+    console.log(`[Sync] Importing blocks into LevelDB...`);
+    let syncCount = 0;
+
+    for (const chunk of downloadedChunks) {
+      const ops = [];
+      for (const blockJson of chunk.blocks) {
+        ops.push({
+          type: 'put',
+          key: `block:${blockJson.index}`,
+          value: blockJson
+        });
+        syncCount++;
+      }
+
+      // Write batch of blocks to LevelDB
+      if (ops.length > 0) {
+        await this.db.batch(ops);
+      }
+      
+      await this.db.put('latest_height', chunk.endHeight);
+    }
+
+    console.log(`[Sync] Archive synchronization complete. Synced ${syncCount} blocks from ${downloadedChunks.length} chunks.`);
   }
 }
 

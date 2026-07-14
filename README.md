@@ -1,25 +1,23 @@
-# ⛓️ SAYMAN BLOCKCHAIN — PHASE 20: ROBUST ARCHIVE & INTEGRATED TRANSACTION EXPLORER
+# ⛓️ SAYMAN BLOCKCHAIN — PHASE 21: EVM WALLET INTEGRATION & PARALLEL ARCHIVE SYNCHRONIZATION
 
 **JavaScript-native Smart Contracts · Proof-of-Stake · Multi-Layer Chains · Custom Tokens · NFTs · DEX · Memecoins · Staking Pools**
 
-[![Phase](https://img.shields.io/badge/Phase-20-brightgreen)](https://github.com/saymanlal/SAYMAN)
+[![Phase](https://img.shields.io/badge/Phase-21-brightgreen)](https://github.com/saymanlal/SAYMAN)
 [![Network](https://img.shields.io/badge/Network-Public%20Testnet-blue)](https://sayman.onrender.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
 
-## 🎯 What's New in Phase 20
+## 🎯 What's New in Phase 21
 
-Phase 20 introduces **a highly robust archive subsystem** and a **complete transaction explorer** with specialized filtering and state-of-the-art UI elements.
+Phase 21 introduces **native EVM JSON-RPC integration** for global wallet support (MetaMask, Trust Wallet, etc.), **parallelized block archive synchronization** (concurrency limit = 15) to catch up to 25K+ blocks in seconds on startup or crash recovery, and critical **LevelDB memory optimization** to eliminate continuous OOM crashes on Render.
 
 | Feature | Status |
 |---|---|
-| **Integrated Transaction Explorer** | ✅ Dedicated transactions explorer page displaying detailed transaction entries with interactive reward toggles |
-| **Concurrency-Safe Archive Subsystem** | ✅ Implements a single-process execution lock (`isProcessing`) to prevent memory leaks and V8 heap exhaustion |
-| **Exponential Backoff and Retry** | ✅ Prevents infinite request loop spam by backing off retries (5s to 5m) on repository check or verification failures |
-| **Pipelined Synchronization Guard** | ✅ Dynamically pauses the ArchiveWriter during active block synchronization to minimize CPU and memory pressure |
-| **Verification Cache Resiliency** | ✅ Fixed a verification bug so that temporary database read errors do not cause permanent block verification failures |
-| **Clean Codebase Separation** | ✅ Removed duplicate `cli`, `sdk`, `faucet`, and `faucet-site` folders as they have been migrated to dedicated repositories |
+| **EVM JSON-RPC Support** | ✅ Mounts standard Ethereum JSON-RPC endpoints at `/`, `/api`, and `/rpc` (supporting `eth_chainId`, `net_version`, `eth_blockNumber`, `eth_getBlockByNumber`, `eth_getBalance`, `eth_getTransactionCount`, `eth_sendRawTransaction`, etc.) to work out-of-the-box with MetaMask and other wallets globally |
+| **Parallel Archive Sync** | ✅ Implements a concurrency-safe promise pool (limit = 15) to fetch block chunks from the GitHub archive in parallel, reducing sync times from hours to seconds |
+| **LevelDB Storage Fix** | ✅ Removes full-chain serialization to the LevelDB `'chain'` key on every block, eliminating the $O(N^2)$ memory bottleneck and preventing OOM crashes on Render |
+| **Direct State Snapshots** | ✅ Downloads and writes state snapshots directly to the local snapshot directory (`snapshot-${targetHeight}.json`) to accelerate node initialization |
 
 ---
 

@@ -11,6 +11,16 @@ import { setupRoutes } from './api/routes.js';
 import { loadConfig } from './config/index.js';
 import { submitRollupToL1 } from './core/rollup.js';
 import { runMigration } from './core/archive/index.js';
+import {
+  parseTransaction,
+  calculateEVMHash,
+  recoverPublicKey,
+  getEthereumAddress,
+  getNumericChainId,
+  formatEVMBlock,
+  formatEVMTransaction
+} from './core/evmHelper.js';
+import Transaction, { TX_TYPES } from './core/transaction.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,8 +133,8 @@ async function startServer() {
     }
 
     console.log('\n╔════════════════════════════════════════╗');
-    console.log('║   SAYMAN BLOCKCHAIN - PHASE 14         ║');
-    console.log('║   Multi-Layer + NFT + Custom Tokens    ║');
+    console.log('║   SAYMAN BLOCKCHAIN - PHASE 21         ║');
+    console.log('║   EVM RPC Wallet & Parallel Sync       ║');
     console.log('╚════════════════════════════════════════╝\n');
     console.log(`🌐 NETWORK: ${networkFlag.toUpperCase()}`);
     console.log(`🔧 MODE: ${mode.toUpperCase()}`);
@@ -177,6 +187,7 @@ async function startServer() {
     }
 
     setupRoutes(app, blockchain, p2pServer, config);
+    app.post(['/', '/api', '/rpc'], handleJsonRpc);
 
     // Explorer SPA routing fallbacks for blocks, txs, and contracts
     app.get(['/block/:id', '/tx/:hash', '/contract/:address'], (req, res) => {
@@ -354,6 +365,227 @@ function gracefulShutdown() {
     blockchain.close().then(finish).catch(finish);
   } else {
     finish();
+  }
+}
+
+async function handleJsonRpc(req, res) {
+  const { jsonrpc, id, method, params } = req.body;
+  if (jsonrpc !== '2.0') {
+    return res.status(400).json({ error: 'Only JSON-RPC 2.0 is supported' });
+  }
+
+  try {
+    const result = await processJsonRpc(method, params);
+    res.json({ jsonrpc: '2.0', id, result });
+  } catch (err) {
+    console.error(`[RPC Error] method=${method}:`, err);
+    res.json({
+      jsonrpc: '2.0',
+      id,
+      error: {
+        code: -32603,
+        message: err.message || 'Internal error'
+      }
+    });
+  }
+}
+
+async function processJsonRpc(method, params) {
+  switch (method) {
+    case 'eth_chainId': {
+      const chainIdStr = blockchain.config.chainId;
+      const numericId = getNumericChainId(chainIdStr);
+      return '0x' + numericId.toString(16);
+    }
+    case 'net_version': {
+      const chainIdStr = blockchain.config.chainId;
+      const numericId = getNumericChainId(chainIdStr);
+      return numericId.toString();
+    }
+    case 'eth_blockNumber': {
+      const height = blockchain.chain.length - 1;
+      return '0x' + height.toString(16);
+    }
+    case 'eth_getBlockByNumber': {
+      const [blockNumParam, includeTxs] = params;
+      let blockIndex;
+      if (blockNumParam === 'latest' || blockNumParam === 'safe' || blockNumParam === 'finalized') {
+        blockIndex = blockchain.chain.length - 1;
+      } else if (blockNumParam === 'earliest') {
+        blockIndex = 0;
+      } else if (blockNumParam === 'pending') {
+        blockIndex = blockchain.chain.length - 1;
+      } else {
+        blockIndex = parseInt(blockNumParam, 16);
+      }
+
+      const block = blockchain.chain[blockIndex];
+      if (!block) return null;
+
+      return formatEVMBlock(block, !!includeTxs, blockchain);
+    }
+    case 'eth_getBlockByHash': {
+      const [blockHash, includeTxs] = params;
+      const hashStr = blockHash.startsWith('0x') ? blockHash.slice(2) : blockHash;
+      const block = blockchain.chain.find(b => b.hash === hashStr);
+      if (!block) return null;
+      return formatEVMBlock(block, !!includeTxs, blockchain);
+    }
+    case 'eth_getBalance': {
+      const [addressParam] = params;
+      let address = addressParam.toLowerCase();
+      if (address.startsWith('0x')) address = address.slice(2);
+      
+      const balance = blockchain.state.getBalance(address);
+      const balanceWei = BigInt(balance) * 10n**10n;
+      return '0x' + balanceWei.toString(16);
+    }
+    case 'eth_getTransactionCount': {
+      const [addressParam] = params;
+      let address = addressParam.toLowerCase();
+      if (address.startsWith('0x')) address = address.slice(2);
+
+      const nonce = blockchain.state.getNonce(address);
+      return '0x' + nonce.toString(16);
+    }
+    case 'eth_gasPrice': {
+      const gasPrice = blockchain.config.defaultGasPrice || 1;
+      const gasPriceWei = BigInt(gasPrice) * 10n**10n;
+      return '0x' + gasPriceWei.toString(16);
+    }
+    case 'eth_estimateGas': {
+      return '0x5208'; // 21000 gas
+    }
+    case 'eth_sendRawTransaction': {
+      const [rawTxHex] = params;
+      const evmTx = parseTransaction(rawTxHex);
+      
+      // Recover public key
+      const msgHash = calculateEVMHash(evmTx);
+      const pubKeyHex = recoverPublicKey(msgHash, evmTx.r, evmTx.s, evmTx.v, evmTx.typeByte);
+      const senderAddr = getEthereumAddress(pubKeyHex);
+
+      const cleanSenderAddr = senderAddr.startsWith('0x') ? senderAddr.slice(2) : senderAddr;
+
+      let txType = TX_TYPES.TRANSFER;
+      let dataPayload = {
+        from: cleanSenderAddr,
+        to: evmTx.to,
+        amount: Number(evmTx.value / 10n**10n)
+      };
+
+      if (evmTx.data && evmTx.data !== '' && evmTx.data !== '0x') {
+        if (!evmTx.to) {
+          txType = TX_TYPES.CONTRACT_DEPLOY;
+          dataPayload = {
+            from: cleanSenderAddr,
+            code: evmTx.data
+          };
+        } else {
+          txType = TX_TYPES.CONTRACT_CALL;
+          dataPayload = {
+            from: cleanSenderAddr,
+            contractAddress: evmTx.to,
+            method: 'execute',
+            args: { rawInput: evmTx.data }
+          };
+        }
+      }
+
+      const tx = new Transaction(txType, dataPayload);
+      tx.nonce = evmTx.nonce;
+      tx.gasLimit = evmTx.gasLimit;
+      tx.gasPrice = Number(BigInt(evmTx.gasPrice) / 10n**10n) || 1;
+      tx.signature = { r: evmTx.r, s: evmTx.s, v: evmTx.v };
+      tx.publicKey = pubKeyHex;
+      tx.isEVM = true;
+      tx.evmRaw = rawTxHex;
+      tx.timestamp = Date.now();
+      tx.id = crypto.createHash('sha256').update(rawTxHex).digest('hex');
+
+      const added = await blockchain.addTransaction(tx, pubKeyHex);
+      if (!added) {
+        throw new Error('Transaction rejected by mempool');
+      }
+
+      if (p2pServer) {
+        p2pServer.broadcastTransaction(tx);
+      }
+
+      return '0x' + tx.id;
+    }
+    case 'eth_getTransactionByHash': {
+      const [txHash] = params;
+      const hashStr = txHash.startsWith('0x') ? txHash.slice(2) : txHash;
+      
+      let foundTx = null;
+      let foundBlock = null;
+      let txIdx = 0;
+      for (const block of blockchain.chain) {
+        const idx = block.transactions.findIndex(t => t.id === hashStr);
+        if (idx !== -1) {
+          foundTx = block.transactions[idx];
+          foundBlock = block;
+          txIdx = idx;
+          break;
+        }
+      }
+
+      if (!foundTx) {
+        foundTx = blockchain.mempool.find(t => t.id === hashStr);
+      }
+
+      if (!foundTx) return null;
+      return formatEVMTransaction(foundTx, foundBlock, blockchain, txIdx);
+    }
+    case 'eth_getTransactionReceipt': {
+      const [txHash] = params;
+      const hashStr = txHash.startsWith('0x') ? txHash.slice(2) : txHash;
+
+      let foundTx = null;
+      let foundBlock = null;
+      let txIdx = 0;
+      for (const block of blockchain.chain) {
+        const idx = block.transactions.findIndex(t => t.id === hashStr);
+        if (idx !== -1) {
+          foundTx = block.transactions[idx];
+          foundBlock = block;
+          txIdx = idx;
+          break;
+        }
+      }
+
+      if (!foundTx || !foundBlock) return null;
+
+      const fromAddr = foundTx.data.from ? (foundTx.data.from.startsWith('0x') ? foundTx.data.from : '0x' + foundTx.data.from) : '0x' + '0'.repeat(40);
+      const toAddr = foundTx.data.to ? (foundTx.data.to.startsWith('0x') ? foundTx.data.to : '0x' + foundTx.data.to) : null;
+
+      return {
+        transactionHash: '0x' + foundTx.id,
+        transactionIndex: '0x' + txIdx.toString(16),
+        blockHash: '0x' + foundBlock.hash,
+        blockNumber: '0x' + foundBlock.index.toString(16),
+        from: fromAddr,
+        to: toAddr,
+        cumulativeGasUsed: '0x' + (foundTx.gasUsed || 21000).toString(16),
+        gasUsed: '0x' + (foundTx.gasUsed || 21000).toString(16),
+        contractAddress: null,
+        logs: [],
+        logsBloom: '0x' + '0'.repeat(512),
+        status: '0x1'
+      };
+    }
+    case 'eth_accounts': {
+      return [];
+    }
+    case 'eth_requestAccounts': {
+      return [];
+    }
+    case 'web3_clientVersion': {
+      return 'SAYMAN/v7.0.0/javascript';
+    }
+    default:
+      throw new Error(`Method ${method} not supported`);
   }
 }
 

@@ -27,6 +27,7 @@ This document provides a simple, high-level comparison of the development roadma
 | **Phase 17** | **Constructor State Fix** | Fixed VM constructor execution (prototype pre-binding); added Dark Theme & SPA routing. |
 | **Phase 19** | **Pipelined Concurrency & Database Security** | Implemented parallel scheduling, snapshot-accelerated block replay (no more event-loop blocking), atomic block persistence (preventing data loss/corruption), self-connection blacklisting, and WebSocket leak fixes. |
 | **Phase 20** | **Robust Archive Recovery & Integrated Explorer** | Implemented concurrency-safe archive lock, exponential backoff (starting at 5s up to 5 min), pipelined sync checks to pause archiver during active block download, validation cache fixes, and dedicated transaction page with validator rewards filters. |
+| **Phase 21** | **EVM JSON-RPC Wallet Integration & Parallel Archive Synchronization** | Implemented native EVM JSON-RPC server endpoints to connect MetaMask and global wallets, parallelized block archive downloader to recover node in seconds, and optimized LevelDB storage to fix Render crashes at large heights (13K-25K+ blocks). |
 
 ---
 
@@ -106,3 +107,8 @@ This document provides a simple, high-level comparison of the development roadma
 * **Cache Safety Fix**: Prevented permanent verification failures caused by caching false results on database/system read errors.
 * **Dedicated Transaction Explorer**: Expanded explorer with a transactions view, rewards filter, and real-time statistics.
 * **Repository Cleanups**: Removed deprecated client, SDK, faucet, and faucet-site folders to isolate base chain components.
+
+### Phase 21: EVM JSON-RPC Wallet Integration & Parallel Archive Synchronization
+* **EVM JSON-RPC Server**: Full JSON-RPC server (supporting `eth_chainId`, `net_version`, `eth_blockNumber`, `eth_getBlockByNumber`, `eth_getBlockByHash`, `eth_getBalance`, `eth_getTransactionCount`, `eth_gasPrice`, `eth_estimateGas`, `eth_sendRawTransaction`, `eth_getTransactionByHash`, `eth_getTransactionReceipt`, etc.) allowing MetaMask and other EVM-compatible wallets globally to connect, display balances, and send/receive transactions natively.
+* **Parallel Archive Synchronization**: Concurrency-controlled archive downloader utilizing a custom promise pool (limit = 15) to fetch chunks in parallel, restoring nodes up to the target height in seconds on startup or crash recovery. Writes downloaded state snapshots directly to disk.
+* **LevelDB Storage Fix**: Comments out full chain serialization to the LevelDB `'chain'` key on every block, resolving OOM crashes on Render and ensuring continuous, stable node execution at large heights (13K-25K+ blocks).

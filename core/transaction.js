@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import elliptic from 'elliptic';
+import { calculateEVMHash, parseTransaction } from './evmHelper.js';
 
 const EC = elliptic.ec;
 const ec = new EC('secp256k1');
@@ -59,6 +60,8 @@ class Transaction {
     this.nonce     = 0;
     this.gasUsed   = 0;
     this.publicKey = null;
+    this.isEVM     = false;
+    this.evmRaw    = null;
   }
 
   calculateHash() {
@@ -88,6 +91,26 @@ class Transaction {
     if (!this.signature) return false;
     if (this.gasLimit === undefined || this.gasPrice === undefined) return false;
 
+    if (this.isEVM) {
+      try {
+        const evmTx = parseTransaction(this.evmRaw);
+        const msgHash = calculateEVMHash(evmTx);
+        const key = ec.keyFromPublic(this.publicKey, 'hex');
+        const sigObj = {
+          r: new ec.curve.n.constructor(evmTx.r, 16),
+          s: new ec.curve.n.constructor(evmTx.s, 16)
+        };
+        const isValid = key.verify(msgHash, sigObj);
+        if (!isValid) {
+          console.error(`❌ EVM Signature verification failed for ${this.data.from}`);
+        }
+        return isValid;
+      } catch (error) {
+        console.error('EVM Signature verification error:', error.message);
+        return false;
+      }
+    }
+
     const publicKey = (publicKeys && publicKeys.get(this.data.from)) || this.publicKey;
     if (!publicKey) return false;
 
@@ -115,7 +138,9 @@ class Transaction {
       gasPrice:  this.gasPrice,
       nonce:     this.nonce,
       gasUsed:   this.gasUsed,
-      publicKey: this.publicKey
+      publicKey: this.publicKey,
+      isEVM:     this.isEVM,
+      evmRaw:    this.evmRaw
     };
   }
 
@@ -129,6 +154,8 @@ class Transaction {
     tx.nonce       = json.nonce     || 0;
     tx.gasUsed     = json.gasUsed   || 0;
     tx.publicKey   = json.publicKey || null;
+    tx.isEVM       = json.isEVM     || false;
+    tx.evmRaw      = json.evmRaw    || null;
     return tx;
   }
 

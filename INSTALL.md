@@ -1,4 +1,4 @@
-# Sayman Phase 20 - Complete Installation Guide
+# Sayman Phase 21 - Complete Installation Guide
 
 ## Prerequisites
 
@@ -108,8 +108,8 @@ npm run testnet
 **Output:**
 ```
 ╔════════════════════════════════════════╗
-║   SAYMAN BLOCKCHAIN - PHASE 20         ║
-║   Robust Archive Recovery              ║
+║   SAYMAN BLOCKCHAIN - PHASE 21         ║
+║   EVM Wallet & Parallel Archive Sync   ║
 ╚════════════════════════════════════════╝
 
 🌐 NETWORK: TESTNET
@@ -608,7 +608,7 @@ rm -rf ~/.sayman/
 
 ---
 
-**Congratulations! You've successfully installed Sayman Phase 20.**
+**Congratulations! You've successfully installed Sayman Phase 21.**
 
 Start exploring with:
 ```bash

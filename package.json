@@ -1,7 +1,7 @@
 {
   "name": "sayman-blockchain",
-  "version": "7.0.0",
-  "description": "Sayman Phase 7 - Public Network + Real P2P + Multi-Node",
+  "version": "21.0.0",
+  "description": "Sayman Phase 21 - EVM Wallet Integration & Parallel Archive Synchronization",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -44,6 +44,7 @@
     "cors": "^2.8.5",
     "elliptic": "^6.5.4",
     "express": "^4.18.2",
+    "js-sha3": "^0.9.3",
     "level": "^8.0.0",
     "node-fetch": "^3.3.2",
     "uuid": "^14.0.0",
