@@ -419,7 +419,7 @@ async function processJsonRpc(method, params) {
         blockIndex = parseInt(blockNumParam, 16);
       }
 
-      const block = blockchain.chain[blockIndex];
+      const block = await blockchain.getBlock(blockIndex);
       if (!block) return null;
 
       return formatEVMBlock(block, !!includeTxs, blockchain);
@@ -427,9 +427,14 @@ async function processJsonRpc(method, params) {
     case 'eth_getBlockByHash': {
       const [blockHash, includeTxs] = params;
       const hashStr = blockHash.startsWith('0x') ? blockHash.slice(2) : blockHash;
-      const block = blockchain.chain.find(b => b.hash === hashStr);
-      if (!block) return null;
-      return formatEVMBlock(block, !!includeTxs, blockchain);
+      
+      const blockIndexRaw = await blockchain.db.get(`hash:${hashStr}`).catch(() => null);
+      if (blockIndexRaw !== null) {
+        const blockIndex = parseInt(blockIndexRaw, 10);
+        const block = await blockchain.getBlock(blockIndex);
+        if (block) return formatEVMBlock(block, !!includeTxs, blockchain);
+      }
+      return null;
     }
     case 'eth_getBalance': {
       const [addressParam] = params;
@@ -521,13 +526,15 @@ async function processJsonRpc(method, params) {
       let foundTx = null;
       let foundBlock = null;
       let txIdx = 0;
-      for (const block of blockchain.chain) {
-        const idx = block.transactions.findIndex(t => t.id === hashStr);
-        if (idx !== -1) {
-          foundTx = block.transactions[idx];
+      
+      const txLocationRaw = await blockchain.db.get(`tx:${hashStr}`).catch(() => null);
+      if (txLocationRaw) {
+        const txLocation = typeof txLocationRaw === 'string' ? JSON.parse(txLocationRaw) : txLocationRaw;
+        const block = await blockchain.getBlock(txLocation.blockIndex);
+        if (block) {
           foundBlock = block;
-          txIdx = idx;
-          break;
+          txIdx = txLocation.txIndex;
+          foundTx = block.transactions[txIdx];
         }
       }
 
@@ -545,13 +552,15 @@ async function processJsonRpc(method, params) {
       let foundTx = null;
       let foundBlock = null;
       let txIdx = 0;
-      for (const block of blockchain.chain) {
-        const idx = block.transactions.findIndex(t => t.id === hashStr);
-        if (idx !== -1) {
-          foundTx = block.transactions[idx];
+      
+      const txLocationRaw = await blockchain.db.get(`tx:${hashStr}`).catch(() => null);
+      if (txLocationRaw) {
+        const txLocation = typeof txLocationRaw === 'string' ? JSON.parse(txLocationRaw) : txLocationRaw;
+        const block = await blockchain.getBlock(txLocation.blockIndex);
+        if (block) {
           foundBlock = block;
-          txIdx = idx;
-          break;
+          txIdx = txLocation.txIndex;
+          foundTx = block.transactions[txIdx];
         }
       }
 

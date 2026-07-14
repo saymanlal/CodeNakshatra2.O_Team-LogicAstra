@@ -690,7 +690,7 @@ export class P2PServer {
       const ourHeight = this.blockchain.chain.length;
 
       if (blockData.index < ourHeight) {
-        const localBlock = this.blockchain.chain[blockData.index];
+        const localBlock = await this.blockchain.getBlock(blockData.index);
         if (localBlock && localBlock.hash !== blockData.hash) {
           console.warn(`⚠️ Fork at block ${blockData.index}. Requesting sync from common ancestor...`);
           const peer = this.peers.get(peerId);
@@ -743,10 +743,8 @@ export class P2PServer {
       );
       if (mempoolDuplicate) return;
 
-      const chainDuplicate = this.blockchain.chain.some(block =>
-        block.transactions.some(existing => existing.id === tx.id)
-      );
-      if (chainDuplicate) return;
+      const txLocationRaw = await this.blockchain.db.get(`tx:${tx.id}`).catch(() => null);
+      if (txLocationRaw) return;
 
       this.blockchain.addTransaction(tx, tx.publicKey);
       this._broadcastExcept({
@@ -818,7 +816,7 @@ export class P2PServer {
     }
   }
 
-  _handleGetBlocks(msg, peerId) {
+  async _handleGetBlocks(msg, peerId) {
     const peer = this.peers.get(peerId);
     if (!peer) return;
 
@@ -830,7 +828,14 @@ export class P2PServer {
     //   gap > 100  → 1000 blocks per batch (fast catch-up, prevents data loss)
     //   gap <= 100 → 100 blocks per batch  (fine-grained, avoids conflicts near tip)
     const BATCH = gap > 100 ? 1000 : 100;
-    const blocks = this.blockchain.chain.slice(from, from + BATCH);
+    const blocks = [];
+    const limit = Math.min(ourHeight, from + BATCH);
+    for (let i = from; i < limit; i++) {
+      const block = await this.blockchain.getBlock(i);
+      if (block) {
+        blocks.push(block);
+      }
+    }
 
     if (!blocks.length) return;
 
@@ -869,7 +874,7 @@ export class P2PServer {
         const ourHeight = this.blockchain.chain.length;
 
         if (blockData.index < ourHeight) {
-          const localBlock = this.blockchain.chain[blockData.index];
+          const localBlock = await this.blockchain.getBlock(blockData.index);
           if (localBlock && localBlock.hash !== blockData.hash) {
             console.warn(`⚠️ Fork detected at block #${blockData.index}`);
             if (peer && peer.chainHeight > ourHeight + 5) {

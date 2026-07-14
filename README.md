@@ -21,6 +21,34 @@ Phase 21 introduces **native EVM JSON-RPC integration** for global wallet suppor
 
 ---
 
+## 🔌 MetaMask & Global Wallet Integration
+
+SAYMAN supports standard Ethereum JSON-RPC 2.0. You can connect MetaMask, Trust Wallet, Coinbase Wallet, or any other Web3 wallet globally to SAYMAN using the following custom network parameters:
+
+### 🌐 Network Connection Settings
+
+| Parameter | Public Testnet | Local Development |
+| :--- | :--- | :--- |
+| **Network Name** | Sayman Public Testnet | Sayman Local Testnet |
+| **New RPC URL** | `https://sayman.onrender.com` | `http://localhost:10000` |
+| **Chain ID** | `82922` (or hex `0x143ea`) | `82923` (or hex `0x143eb`) |
+| **Currency Symbol** | `SAYN` | `SAYN` |
+| **Block Explorer** | `https://sayman.onrender.com` | `http://localhost:10000` |
+
+### 🛠️ Supported JSON-RPC API Methods
+
+The node exposes an EVM-compatible RPC layer at `/`, `/api`, and `/rpc` supporting:
+- `eth_chainId` / `net_version` - returns the network numeric identifier (`82922` for public testnet)
+- `eth_blockNumber` - returns the latest block index
+- `eth_getBlockByNumber` / `eth_getBlockByHash` - returns block data in EVM format
+- `eth_getBalance` - retrieves address balance mapped to Wei (multiplied by $10^{10}$)
+- `eth_getTransactionCount` - retrieves account nonces for sequential anti-replay transactions
+- `eth_sendRawTransaction` - accepts EIP-155, EIP-2930, and EIP-1559 signed Ethereum transactions, recovers the sender public key using ECDSA (secp256k1), and broadcasts it to SAYMAN mempool
+- `eth_getTransactionByHash` / `eth_getTransactionReceipt` - returns transaction details and receipts
+- `eth_estimateGas` - returns estimated gas (`21000` gas base limit for standard transactions)
+
+---
+
 ## 🏗️ Architecture
 
 ```

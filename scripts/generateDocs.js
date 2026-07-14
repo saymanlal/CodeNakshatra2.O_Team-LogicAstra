@@ -241,13 +241,8 @@ sayman stake ${network.minStake}
 *This document is auto-generated. Last updated: ${new Date().toLocaleString()}*
 `;
 
-    // Save to docs folder
-    const docsDir = path.join(__dirname, '..', 'docs');
-    if (!fs.existsSync(docsDir)) {
-      fs.mkdirSync(docsDir, { recursive: true });
-    }
-
-    const filePath = path.join(docsDir, 'NETWORK_INFO.md');
+    // Save to root folder
+    const filePath = path.join(__dirname, '..', 'NETWORK_INFO.md');
     fs.writeFileSync(filePath, markdown);
 
     console.log('✅ Documentation generated successfully!');

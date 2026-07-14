@@ -76,9 +76,14 @@ async function run() {
   const readme = fs.readFileSync(path.join(rootDir, 'README.md'), 'utf8');
   const install = fs.readFileSync(path.join(rootDir, 'INSTALL.md'), 'utf8');
   const comparison = fs.readFileSync(path.join(rootDir, 'comparison.md'), 'utf8');
+  const networkInfo = fs.readFileSync(path.join(rootDir, 'NETWORK_INFO.md'), 'utf8');
 
   const content = `
     ${readme}
+    
+    <div style="page-break-after: always;"></div>
+    
+    ${networkInfo}
     
     <div style="page-break-after: always;"></div>
     

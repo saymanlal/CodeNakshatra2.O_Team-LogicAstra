@@ -34,6 +34,124 @@ import { GithubClient, RepoManager, ArchiveWriter, ArchiveReader } from './archi
 const EC  = elliptic.ec;
 const ec  = new EC('secp256k1');
 
+function createChainProxy(blockchain) {
+  const cache = new Map();
+  let chainLength = 0;
+
+  const target = {
+    push: async (block) => {
+      const index = block.index;
+      const json = block.toJSON ? block.toJSON() : block;
+      
+      const ops = [
+        { type: 'put', key: `block:${index}`, value: json },
+        { type: 'put', key: 'latest_height', value: index }
+      ];
+      
+      if (block.hash) {
+        ops.push({ type: 'put', key: `hash:${block.hash}`, value: index });
+      }
+      
+      if (block.transactions) {
+        for (let i = 0; i < block.transactions.length; i++) {
+          const tx = block.transactions[i];
+          const txId = tx.id || (tx.toJSON ? tx.toJSON().id : tx);
+          if (txId) {
+            ops.push({
+              type: 'put',
+              key: `tx:${txId}`,
+              value: { blockIndex: index, txIndex: i }
+            });
+            
+            const involvedAddresses = new Set();
+            if (tx.data) {
+              if (tx.data.from) involvedAddresses.add(tx.data.from.toLowerCase());
+              if (tx.data.to) involvedAddresses.add(tx.data.to.toLowerCase());
+              if (tx.data.validator) involvedAddresses.add(tx.data.validator.toLowerCase());
+              if (tx.data.contractAddress) involvedAddresses.add(tx.data.contractAddress.toLowerCase());
+            }
+            for (const addr of involvedAddresses) {
+              ops.push({
+                type: 'put',
+                key: `addr:${addr}:${index}:${i}`,
+                value: txId
+              });
+            }
+          }
+        }
+      }
+      
+      await blockchain.db.batch(ops).catch(err => console.error('Error batch writing block/txs:', err));
+      
+      cache.set(index, block);
+      if (index >= chainLength) {
+        chainLength = index + 1;
+      }
+      // Keep only last 100 blocks in memory cache
+      if (cache.size > 100) {
+        for (const [key] of cache) {
+          if (key < chainLength - 100) {
+            cache.delete(key);
+          }
+        }
+      }
+      return chainLength;
+    },
+    
+    get length() {
+      return chainLength;
+    },
+    
+    set length(val) {
+      chainLength = val;
+      for (const [key] of cache) {
+        if (key >= val) {
+          cache.delete(key);
+        }
+      }
+    },
+    
+    slice: (start, end) => {
+      const result = [];
+      let s = start < 0 ? chainLength + start : start;
+      let e = end === undefined ? chainLength : (end < 0 ? chainLength + end : end);
+      s = Math.max(0, s);
+      e = Math.min(chainLength, e);
+      for (let i = s; i < e; i++) {
+        if (cache.has(i)) {
+          result.push(cache.get(i));
+        }
+      }
+      return result;
+    }
+  };
+
+  return new Proxy(target, {
+    get(target, prop, receiver) {
+      if (prop in target) {
+        return Reflect.get(target, prop, receiver);
+      }
+      const index = Number(prop);
+      if (!isNaN(index) && Number.isInteger(index)) {
+        if (index < 0 || index >= chainLength) return undefined;
+        return cache.get(index);
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    set(target, prop, value, receiver) {
+      const index = Number(prop);
+      if (!isNaN(index) && Number.isInteger(index)) {
+        cache.set(index, value);
+        if (index >= chainLength) {
+          chainLength = index + 1;
+        }
+        return true;
+      }
+      return Reflect.set(target, prop, value, receiver);
+    }
+  });
+}
+
 class Blockchain {
   constructor(config, dbPath = null) {
     this.config      = config;
@@ -41,7 +159,7 @@ class Blockchain {
     this.networkName = config.networkName;
     this.decimals    = config.decimals || 10_000;
 
-    this.chain     = [];
+    this.chain     = createChainProxy(this);
     this.mempool   = [];
     this.state     = new StateEngine();
     this.pos       = new ProofOfStake(this.state, config);
@@ -84,40 +202,78 @@ class Blockchain {
 
   // ─── Initialization ─────────────────────────────────────────────────────────
 
+  async getBlock(index) {
+    if (index < 0 || index >= this.chain.length) return null;
+    const cached = this.chain[index];
+    if (cached) return cached;
+    
+    const blockData = await this.db.get(`block:${index}`).catch(() => null);
+    if (blockData) {
+      const block = await Block.fromJSON(blockData);
+      this.chain[index] = block;
+      return block;
+    }
+    return null;
+  }
+
   async initialize() {
     console.log(`\n🔄 Initializing ${this.networkName}...`);
 
-    // Auto-sync from archive on startup if enabled
-    if (this.config.archive && this.config.archive.enabled) {
-      try {
-        await this.syncFromArchive();
-      } catch (err) {
-        console.error('⚠️ [Sync] Auto-sync from archive failed on startup:', err.message);
-      }
-    }
+    // NOTE: syncFromArchive() is triggered AFTER the HTTP server starts (in server.js)
+    // to avoid blocking port binding which causes Render to kill the process.
 
     try {
+      // 1. Run legacy key migration if necessary
+      const latestHeight = await this.db.get('latest_height').catch(() => null);
+      if (latestHeight === null) {
+        const legacyChain = await this.db.get('chain').catch(() => null);
+        if (legacyChain && legacyChain.length > 0) {
+          console.log(`⚠️ Migrating ${legacyChain.length} blocks to individual keys...`);
+          for (let i = 0; i < legacyChain.length; i++) {
+            await this.db.put(`block:${i}`, legacyChain[i]);
+            const block = legacyChain[i];
+            if (block.hash) {
+              await this.db.put(`hash:${block.hash}`, i).catch(() => {});
+            }
+            if (block.transactions) {
+              const ops = [];
+              for (let j = 0; j < block.transactions.length; j++) {
+                const tx = block.transactions[j];
+                const txId = tx.id;
+                if (txId) {
+                  ops.push({ type: 'put', key: `tx:${txId}`, value: { blockIndex: i, txIndex: j } });
+                }
+              }
+              if (ops.length > 0) await this.db.batch(ops).catch(() => {});
+            }
+          }
+          await this.db.put('latest_height', legacyChain.length - 1);
+          await this.db.del('chain').catch(() => {});
+          console.log('✅ Migration complete.');
+        }
+      }
+
       const snapshot = await this.loadLatestSnapshot();
 
       if (snapshot) {
         console.log(`📸 Snapshot at block ${snapshot.blockHeight} — loading...`);
         this.state.importState(snapshot.state);
 
-        const savedChain = await this._getSavedChain();
-        if (savedChain?.length > 0) {
-          const loadLimit = Math.min(savedChain.length, snapshot.blockHeight + 1);
-          for (let i = 0; i < loadLimit; i++) {
-            this.chain.push(await Block.fromJSON(savedChain[i]));
-          }
-          for (let i = loadLimit; i < savedChain.length; i++) {
-            const block = await Block.fromJSON(savedChain[i]);
-            this.chain.push(block);
-            this.applyBlock(block);
+        const currentHeightRaw = await this.db.get('latest_height').catch(() => null);
+        if (currentHeightRaw !== null) {
+          const height = parseInt(currentHeightRaw, 10);
+          this.chain.length = height + 1;
+
+          // Cache the latest block
+          const latestBlockData = await this.db.get(`block:${height}`).catch(() => null);
+          if (latestBlockData) {
+            const latestBlock = await Block.fromJSON(latestBlockData);
+            this.chain[height] = latestBlock;
           }
 
-          if (savedChain.length < snapshot.blockHeight + 1) {
-            console.log(`⚠️ Database height is behind snapshot (${savedChain.length} < ${snapshot.blockHeight + 1}). Rolling back state to match database...`);
-            await this._rollbackToHeight(savedChain.length - 1);
+          if (height < snapshot.blockHeight) {
+            console.log(`⚠️ Database height is behind snapshot (${height} < ${snapshot.blockHeight}). Rolling back state to match database...`);
+            await this._rollbackToHeight(height);
           }
         } else {
           console.log('⚠️ Snapshot exists but saved chain is missing. Starting from genesis...');
@@ -126,10 +282,19 @@ class Blockchain {
         }
 
       } else {
-        const savedChain = await this._getSavedChain();
-        if (savedChain?.length > 0) {
-          console.log(`📚 Loading chain (${savedChain.length} blocks)...`);
-          for (const b of savedChain) this.chain.push(await Block.fromJSON(b));
+        const currentHeightRaw = await this.db.get('latest_height').catch(() => null);
+        if (currentHeightRaw !== null) {
+          const height = parseInt(currentHeightRaw, 10);
+          console.log(`📚 Loading chain state up to height ${height}...`);
+          this.chain.length = height + 1;
+
+          // Cache the latest block
+          const latestBlockData = await this.db.get(`block:${height}`).catch(() => null);
+          if (latestBlockData) {
+            const latestBlock = await Block.fromJSON(latestBlockData);
+            this.chain[height] = latestBlock;
+          }
+
           await this.replayState();
         } else {
           this.createGenesisBlock();
@@ -429,7 +594,8 @@ class Blockchain {
     }
 
     // Validate genesis matches
-    if (blocks[0]?.hash !== this.chain[0]?.hash) {
+    const genesisBlock = await this.getBlock(0);
+    if (blocks[0]?.hash !== genesisBlock?.hash) {
       console.warn('replaceChain: genesis mismatch — rejecting');
       return false;
     }
@@ -444,7 +610,10 @@ class Blockchain {
 
     console.log(`🔄 Replacing chain: ${this.chain.length} → ${blocks.length} blocks`);
 
-    this.chain = blocks;
+    this.chain.length = 0;
+    for (const b of blocks) {
+      await this.chain.push(b);
+    }
     this.state.clear();
     await this.replayState();
     await this.saveChain();
@@ -456,7 +625,7 @@ class Blockchain {
   // ─── Internal rollback helper ────────────────────────────────────────────────
 
   async _rollbackToHeight(height) {
-    this.chain = this.chain.slice(0, height + 1);
+    this.chain.length = height + 1;
     this.state.clear();
     await this.replayState();
     await this.saveChain();
@@ -900,7 +1069,7 @@ class Blockchain {
 
     let count = 0;
     for (let i = startIndex; i < targetHeight; i++) {
-      const block = this.chain[i];
+      const block = await this.getBlock(i);
       if (block) {
         this.applyBlock(block);
         count++;
@@ -1093,7 +1262,7 @@ class Blockchain {
       });
     }
 
-    console.log(`[Sync] Downloading ${chunkRanges.length} chunks from archive in parallel (concurrency limit = 15)...`);
+    console.log(`[Sync] Downloading ${chunkRanges.length} chunks from archive in batches of 10...`);
 
     // Parallel download helper
     const downloadChunk = async (range) => {
@@ -1106,49 +1275,76 @@ class Blockchain {
       }
     };
 
-    // Standard promise pool with limit of 15 concurrent requests
-    const limit = 15;
-    const chunkPromises = [];
-    const executing = new Set();
-
-    for (const range of chunkRanges) {
-      const p = downloadChunk(range);
-      chunkPromises.push(p);
-      executing.add(p);
-      const clean = () => executing.delete(p);
-      p.then(clean, clean);
-      if (executing.size >= limit) {
-        await Promise.race(executing);
-      }
-    }
-
-    const downloadedChunks = await Promise.all(chunkPromises);
-    // Sort chunks by startHeight to preserve sequential import
-    downloadedChunks.sort((a, b) => a.startHeight - b.startHeight);
-
-    console.log(`[Sync] Importing blocks into LevelDB...`);
     let syncCount = 0;
-
-    for (const chunk of downloadedChunks) {
-      const ops = [];
-      for (const blockJson of chunk.blocks) {
-        ops.push({
-          type: 'put',
-          key: `block:${blockJson.index}`,
-          value: blockJson
-        });
-        syncCount++;
-      }
-
-      // Write batch of blocks to LevelDB
-      if (ops.length > 0) {
-        await this.db.batch(ops);
+    const chunkSizeBatch = 10;
+    for (let offset = 0; offset < chunkRanges.length; offset += chunkSizeBatch) {
+      const batchRanges = chunkRanges.slice(offset, offset + chunkSizeBatch);
+      console.log(`[Sync] Downloading batch ${offset / chunkSizeBatch + 1}/${Math.ceil(chunkRanges.length / chunkSizeBatch)} (${batchRanges.length} chunks)...`);
+      
+      const batchPromises = batchRanges.map(range => downloadChunk(range));
+      const batchDownloaded = await Promise.all(batchPromises);
+      batchDownloaded.sort((a, b) => a.startHeight - b.startHeight);
+      
+      console.log(`[Sync] Importing batch into LevelDB and building indexes...`);
+      for (const chunk of batchDownloaded) {
+        if (!chunk || !chunk.blocks) continue;
+        const ops = [];
+        for (const blockJson of chunk.blocks) {
+          ops.push({
+            type: 'put',
+            key: `block:${blockJson.index}`,
+            value: blockJson
+          });
+          
+          if (blockJson.hash) {
+            ops.push({
+              type: 'put',
+              key: `hash:${blockJson.hash}`,
+              value: blockJson.index
+            });
+          }
+          
+          if (blockJson.transactions) {
+            for (let i = 0; i < blockJson.transactions.length; i++) {
+              const tx = blockJson.transactions[i];
+              const txId = tx.id;
+              if (txId) {
+                ops.push({
+                  type: 'put',
+                  key: `tx:${txId}`,
+                  value: { blockIndex: blockJson.index, txIndex: i }
+                });
+                
+                const involvedAddresses = new Set();
+                if (tx.data) {
+                  if (tx.data.from) involvedAddresses.add(tx.data.from.toLowerCase());
+                  if (tx.data.to) involvedAddresses.add(tx.data.to.toLowerCase());
+                  if (tx.data.validator) involvedAddresses.add(tx.data.validator.toLowerCase());
+                  if (tx.data.contractAddress) involvedAddresses.add(tx.data.contractAddress.toLowerCase());
+                }
+                for (const addr of involvedAddresses) {
+                  ops.push({
+                    type: 'put',
+                    key: `addr:${addr}:${blockJson.index}:${i}`,
+                    value: txId
+                  });
+                }
+              }
+            }
+          }
+          syncCount++;
+        }
+        if (ops.length > 0) {
+          await this.db.batch(ops);
+        }
+        await this.db.put('latest_height', chunk.endHeight);
       }
       
-      await this.db.put('latest_height', chunk.endHeight);
+      // Update proxy length
+      this.chain.length = batchDownloaded[batchDownloaded.length - 1].endHeight + 1;
     }
 
-    console.log(`[Sync] Archive synchronization complete. Synced ${syncCount} blocks from ${downloadedChunks.length} chunks.`);
+    console.log(`[Sync] Archive synchronization complete. Synced ${syncCount} blocks.`);
   }
 }
 

@@ -61,50 +61,64 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   });
 
   // Blocks with pagination
-  router.get('/blocks', (req, res) => {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
-    const allBlocks = blockchain.chain
-      .map(normalizeBlockForApi)
-      .sort((a, b) => b.index - a.index);
-    const start = (page - 1) * limit;
-    const end = start + limit;
-    const paginatedBlocks = allBlocks.slice(start, end);
-    
-    res.json({
-      blocks: paginatedBlocks,
-      total: allBlocks.length,
-      page,
-      limit,
-      totalPages: Math.ceil(allBlocks.length / limit)
-    });
+  router.get('/blocks', async (req, res) => {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 50;
+      const totalBlocks = blockchain.chain.length;
+      
+      const start = Math.max(0, totalBlocks - page * limit);
+      const end = Math.max(0, totalBlocks - (page - 1) * limit);
+      
+      const paginatedBlocks = [];
+      for (let i = end - 1; i >= start; i--) {
+        const block = await blockchain.getBlock(i);
+        if (block) {
+          paginatedBlocks.push(normalizeBlockForApi(block));
+        }
+      }
+      
+      res.json({
+        blocks: paginatedBlocks,
+        total: totalBlocks,
+        page,
+        limit,
+        totalPages: Math.ceil(totalBlocks / limit)
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // Single block by index (legacy)
-  router.get('/blocks/:index', (req, res) => {
-    const index = parseInt(req.params.index);
-    const block = blockchain.chain[index];
-    
-    if (!block) {
-      return res.status(404).json({ error: 'Block not found' });
-    }
+  router.get('/blocks/:index', async (req, res) => {
+    try {
+      const index = parseInt(req.params.index);
+      const block = await blockchain.getBlock(index);
+      
+      if (!block) {
+        return res.status(404).json({ error: 'Block not found' });
+      }
 
-    res.json(normalizeBlockForApi(block));
+      res.json(normalizeBlockForApi(block));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // ─── FIX: Get block by index (frontend uses this) ──────────────────────────
-  router.get('/block/:index', (req, res) => {
+  router.get('/block/:index', async (req, res) => {
     try {
       const index = parseInt(req.params.index);
       if (isNaN(index) || index < 0) {
         return res.status(400).json({ error: 'Invalid block index' });
       }
 
-      if (index >= blockchain.chain.length) {
+      const block = await blockchain.getBlock(index);
+      if (!block) {
         return res.status(404).json({ error: 'Block not found' });
       }
 
-      const block = blockchain.chain[index];
       res.json(normalizeBlockForApi(block));
     } catch (err) {
       console.error('Error fetching block:', err);
@@ -113,18 +127,30 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   });
 
   // ─── FIX: Get block by hash ──────────────────────────────────────────────────
-  router.get('/block/hash/:hash', (req, res) => {
+  router.get('/block/hash/:hash', async (req, res) => {
     try {
       const hash = req.params.hash;
       if (!hash || hash.length < 8) {
         return res.status(400).json({ error: 'Invalid hash' });
       }
 
-      const chain = blockchain.chain;
-      const block = chain.find(b => {
-        const blockHash = b.hash || '';
-        return blockHash === hash || blockHash.startsWith(hash);
-      });
+      // Check if we have hash mapping in db
+      const blockIndexRaw = await blockchain.db.get(`hash:${hash}`).catch(() => null);
+      let block = null;
+      if (blockIndexRaw !== null) {
+        const blockIndex = parseInt(blockIndexRaw, 10);
+        block = await blockchain.getBlock(blockIndex);
+      } else {
+        // Fallback for short hashes or unindexed hashes: check the last 100 blocks in cache
+        const recentLimit = Math.max(0, blockchain.chain.length - 100);
+        for (let i = blockchain.chain.length - 1; i >= recentLimit; i--) {
+          const b = await blockchain.getBlock(i);
+          if (b && (b.hash === hash || b.hash.startsWith(hash))) {
+            block = b;
+            break;
+          }
+        }
+      }
 
       if (!block) {
         return res.status(404).json({ error: 'Block not found' });
@@ -138,10 +164,10 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   });
 
   // Light client endpoint - Block header only
-  router.get('/light/block/:height', (req, res) => {
+  router.get('/light/block/:height', async (req, res) => {
     try {
       const height = parseInt(req.params.height);
-      const block = blockchain.chain[height];
+      const block = await blockchain.getBlock(height);
       
       if (!block) {
         return res.status(404).json({ error: 'Block not found' });
@@ -215,66 +241,99 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   });
 
   // Transaction by ID
-  router.get('/transactions/:id', (req, res) => {
-    const txId = req.params.id;
-    
-    for (const block of blockchain.chain) {
-      const tx = block.transactions.find(t => t.id === txId);
-      if (tx) {
+  router.get('/transactions/:id', async (req, res) => {
+    try {
+      const txId = req.params.id;
+      
+      const txLocationRaw = await blockchain.db.get(`tx:${txId}`).catch(() => null);
+      if (txLocationRaw) {
+        const txLocation = typeof txLocationRaw === 'string' ? JSON.parse(txLocationRaw) : txLocationRaw;
+        const block = await blockchain.getBlock(txLocation.blockIndex);
+        if (block) {
+          const tx = block.transactions[txLocation.txIndex];
+          if (tx) {
+            return res.json({
+              transaction: tx.toJSON(),
+              blockIndex: block.index,
+              blockHash: block.hash,
+              timestamp: block.timestamp,
+              stateRoot: block.stateRoot
+            });
+          }
+        }
+      }
+      
+      // Fallback for mempool
+      const mempoolTx = blockchain.mempool.find(t => t.id === txId);
+      if (mempoolTx) {
         return res.json({
-          transaction: tx.toJSON(),
-          blockIndex: block.index,
-          blockHash: block.hash,
-          timestamp: block.timestamp,
-          stateRoot: block.stateRoot
+          transaction: mempoolTx.toJSON(),
+          blockIndex: -1,
+          blockHash: 'pending',
+          timestamp: mempoolTx.timestamp || Date.now(),
+          stateRoot: 'pending'
         });
       }
+      
+      res.status(404).json({ error: 'Transaction not found' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
-    
-    res.status(404).json({ error: 'Transaction not found' });
   });
 
   // Address info with nonce
-  router.get('/address/:address', (req, res) => {
-    const { address } = req.params;
-    
-    const balance = blockchain.state.getBalance(address);
-    const stake = blockchain.state.getStake(address);
-    const unstaking = blockchain.state.isUnstaking(address);
-    const unlockBlock = blockchain.state.getUnlockBlock(address);
-    const nonce = blockchain.state.getNonce(address);
-    
-    const transactions = [];
-    for (const block of blockchain.chain) {
-      for (const tx of block.transactions) {
-        if (tx.data.from === address || tx.data.to === address || 
-            tx.data.validator === address || tx.data.contractAddress === address) {
-          transactions.push({
-            ...tx.toJSON(),
-            blockIndex: block.index,
-            blockHash: block.hash,
-            timestamp: block.timestamp
-          });
+  router.get('/address/:address', async (req, res) => {
+    try {
+      const { address } = req.params;
+      
+      const balance = blockchain.state.getBalance(address);
+      const stake = blockchain.state.getStake(address);
+      const unstaking = blockchain.state.isUnstaking(address);
+      const unlockBlock = blockchain.state.getUnlockBlock(address);
+      const nonce = blockchain.state.getNonce(address);
+      
+      const transactions = [];
+      const prefix = `addr:${address.toLowerCase()}:`;
+      try {
+        for await (const [key, txId] of blockchain.db.iterator({ gte: prefix, lte: prefix + '\xff' })) {
+          const parts = key.split(':');
+          const blockIndex = parseInt(parts[2], 10);
+          const txIndex = parseInt(parts[3], 10);
+          
+          const block = await blockchain.getBlock(blockIndex);
+          if (block && block.transactions[txIndex]) {
+            const tx = block.transactions[txIndex];
+            transactions.push({
+              ...tx.toJSON(),
+              blockIndex: block.index,
+              blockHash: block.hash,
+              timestamp: block.timestamp
+            });
+          }
         }
+      } catch (err) {
+        console.error('Error scanning address transactions:', err);
       }
+      
+      const validators = blockchain.state.getValidators();
+      const validatorInfo = validators.find(v => v.address === address);
+      
+      const reputation = blockchain.state.getReputation(address);
+      res.json({
+        address,
+        balance,
+        stake,
+        unstaking,
+        unlockBlock,
+        nonce,
+        reputation,
+        transactions: transactions.reverse(),
+        isValidator: !!validatorInfo,
+        validatorInfo: validatorInfo || null
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
-    
-    const validators = blockchain.state.getValidators();
-    const validatorInfo = validators.find(v => v.address === address);
-    
-    const reputation = blockchain.state.getReputation(address);
-    res.json({
-      address,
-      balance,
-      stake,
-      unstaking,
-      unlockBlock,
-      nonce,
-      reputation,
-      transactions: transactions.reverse(),
-      isValidator: !!validatorInfo,
-      validatorInfo: validatorInfo || null
-    });
   });
 
   // Balance (legacy)
@@ -500,50 +559,68 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   });
 
   // Search
-  router.get('/search/:query', (req, res) => {
-    const query = req.params.query.toLowerCase();
-    
-    if (!isNaN(query)) {
-      const blockIndex = parseInt(query);
-      if (blockchain.chain[blockIndex]) {
-        return res.json({
-          type: 'block',
-          result: blockchain.chain[blockIndex].toJSON()
-        });
+  router.get('/search/:query', async (req, res) => {
+    try {
+      const query = req.params.query.toLowerCase();
+      
+      // 1. Block by index
+      if (!isNaN(query)) {
+        const blockIndex = parseInt(query);
+        const block = await blockchain.getBlock(blockIndex);
+        if (block) {
+          return res.json({
+            type: 'block',
+            result: block.toJSON()
+          });
+        }
       }
-    }
-    
-    const blockByHash = blockchain.chain.find(b => b.hash.toLowerCase() === query);
-    if (blockByHash) {
-      return res.json({
-        type: 'block',
-        result: blockByHash.toJSON()
-      });
-    }
-    
-    for (const block of blockchain.chain) {
-      const tx = block.transactions.find(t => t.id.toLowerCase() === query);
-      if (tx) {
-        return res.json({
-          type: 'transaction',
-          result: {
-            ...tx.toJSON(),
-            blockIndex: block.index,
-            blockHash: block.hash
+      
+      // 2. Block by hash
+      const blockIndexRaw = await blockchain.db.get(`hash:${query}`).catch(() => null);
+      if (blockIndexRaw !== null) {
+        const blockIndex = parseInt(blockIndexRaw, 10);
+        const block = await blockchain.getBlock(blockIndex);
+        if (block) {
+          return res.json({
+            type: 'block',
+            result: block.toJSON()
+          });
+        }
+      }
+      
+      // 3. Transaction by ID
+      const txLocationRaw = await blockchain.db.get(`tx:${query}`).catch(() => null);
+      if (txLocationRaw) {
+        const txLocation = typeof txLocationRaw === 'string' ? JSON.parse(txLocationRaw) : txLocationRaw;
+        const block = await blockchain.getBlock(txLocation.blockIndex);
+        if (block) {
+          const tx = block.transactions[txLocation.txIndex];
+          if (tx) {
+            return res.json({
+              type: 'transaction',
+              result: {
+                ...tx.toJSON(),
+                blockIndex: block.index,
+                blockHash: block.hash
+              }
+            });
           }
+        }
+      }
+      
+      // 4. Address search
+      const balance = blockchain.state.getBalance(query);
+      if (balance > 0 || blockchain.state.getStake(query) > 0 || blockchain.state.getNonce(query) > 0) {
+        return res.json({
+          type: 'address',
+          result: query
         });
       }
+      
+      res.status(404).json({ error: 'Not found' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
-    
-    const balance = blockchain.state.getBalance(query);
-    if (balance > 0 || blockchain.state.getStake(query) > 0) {
-      return res.json({
-        type: 'address',
-        result: query
-      });
-    }
-    
-    res.status(404).json({ error: 'Not found' });
   });
 
   // Gas estimation

@@ -354,7 +354,7 @@ function getCount() {
 npm run docs
 ```
 
-Generates `docs/NETWORK_INFO.md` with:
+Generates `NETWORK_INFO.md` in the root directory with:
 - Current network stats
 - Gas configuration
 - Validator list
@@ -579,7 +579,7 @@ rm -rf ~/.sayman/
 ### Learn More
 
 1. Read `README.md` for detailed features
-2. Check `docs/NETWORK_INFO.md` for network details
+2. Check `NETWORK_INFO.md` for network details
 3. Review smart contract examples
 4. Explore API endpoints
 

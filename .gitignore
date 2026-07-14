@@ -19,3 +19,6 @@ ai.md
 
 # PDF Documentation — tracked for distribution
 # docs.pdf
+
+# docs/ directory removed — NETWORK_INFO.md now lives in root
+docs/
