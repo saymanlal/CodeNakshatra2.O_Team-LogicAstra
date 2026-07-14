@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import elliptic from 'elliptic';
-import { keccak256 } from 'js-sha3';
+import jsSha3 from 'js-sha3';
+const { keccak256 } = jsSha3;
 
 const EC = elliptic.ec;
 const ec = new EC('secp256k1');
