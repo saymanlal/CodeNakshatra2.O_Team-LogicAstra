@@ -182,18 +182,39 @@ class GasCalculator {
     return tracker;
   }
 
+  // ─── Actual fee computation ───────────────────────────────────────────────
+  // Returns structured fee info for display. Use this everywhere — not raw gasUsed.
+  // gasPrice defaults to config.defaultGasPrice when omitted.
+  computeActualFee(tx, gasPriceBaseUnits) {
+    const gasUsed = tx.gasUsed || tx.gasLimit || this.costs.DEFAULT;
+    const gasPrice = gasPriceBaseUnits ?? tx.gasPrice ?? this.defaultGasPrice;
+    const feeBaseUnits = gasUsed * gasPrice;
+    const decimals = this.config.decimals || 100_000_000;
+    const symbol = this.config.nativeCurrency?.symbol || this.config.ticker || 'SAYN';
+    return {
+      gasUsed,
+      gasPrice,
+      feeBaseUnits,
+      feeSAYN: (feeBaseUnits / decimals).toFixed(8),
+      feeDisplay: `${(feeBaseUnits / decimals).toFixed(8)} ${symbol}`,
+      breakdown: `${gasUsed.toLocaleString()} units × ${gasPrice} base unit/gas`
+    };
+  }
+
   // ─── Display helpers ─────────────────────────────────────────────────────
-  // Convert base units → SAYN string with 4 decimal places.
-  // e.g. formatSAYN(105000) → "0.0105 SAYN"
+  // Convert base units → token string with 8 decimal places.
+  // e.g. formatSAYN(2100000) → "0.02100000 tSAYN"
   formatSAYN(baseUnits) {
-    const decimals = this.config.decimals || 10_000;
-    return (baseUnits / decimals).toFixed(4) + ' SAYN';
+    const decimals = this.config.decimals || 100_000_000;
+    const symbol = this.config.nativeCurrency?.symbol || this.config.ticker || 'SAYN';
+    return (baseUnits / decimals).toFixed(8) + ' ' + symbol;
   }
 
   // Human-readable fee string for a transaction.
   describeFee(gasUsed, gasPrice) {
     const fee = this.calculateFee(gasUsed, gasPrice);
-    return `${gasUsed.toLocaleString()} gas × ${gasPrice} = ${this.formatSAYN(fee)}`;
+    const symbol = this.config.nativeCurrency?.symbol || this.config.ticker || 'SAYN';
+    return `${gasUsed.toLocaleString()} units × ${gasPrice} = ${this.formatSAYN(fee)} (${fee.toLocaleString()} base units)`;
   }
 }
 

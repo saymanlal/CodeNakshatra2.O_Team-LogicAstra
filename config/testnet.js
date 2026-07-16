@@ -14,14 +14,20 @@
  */
 
 export const DECIMALS     = 100_000_000;           // 1 SAYN = 100,000,000 base units
-export const TICKER       = 'SAYN';
+export const TICKER       = 'tSAYN';   // testnet display symbol
 export const DISPLAY_NAME = 'SAYMAN';
 
 export default {
   networkName:  'SAYMAN Testnet',
   chainId:      'sayman-testnet-1',
+  nativeCurrency: {
+    name: 'Test SAYN',
+    symbol: 'tSAYN',
+    decimals: 8
+  },
+  isTestnet: true,
   layer:        1,                             // Layer 1 — SAYMAN base chain
-  ticker:       TICKER,
+  ticker:       TICKER,                          // 'tSAYN' on testnet
   decimals:     DECIMALS,                    // always pass this through config
 
   apiPort:      parseInt(process.env.PORT)    || 10000,

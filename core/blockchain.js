@@ -26,6 +26,7 @@ import StateEngine from './state.js';
 import ProofOfStake from './pos.js';
 import ContractEngine from './contracts.js';
 import GasCalculator from './gas.js';
+import NonceManager from './nonce.js';
 import { Level } from 'level';
 import fs from 'fs';
 import path from 'path';
@@ -179,7 +180,8 @@ class Blockchain {
     this.addressTxCount = new Map();
     this.lastCleanup    = Date.now();
 
-    this.pendingNonces  = new Map();
+    this.nonceManager   = new NonceManager();
+    this.pendingNonces  = this.nonceManager.pendingNonces;
 
     this.totalParallelBuckets = 0;
     this.totalParallelTransactions = 0;
@@ -1146,7 +1148,7 @@ class Blockchain {
       blockRewardSAYN: this._fmt(blockReward),
       blockTime:       this.config.blockTime,
       decimals:        this.config.decimals || 10_000,
-      ticker:          this.config.ticker || 'SAYN',
+      ticker:          this.config.nativeCurrency?.symbol || this.config.ticker || 'SAYN',
       stateRoot:       this.state.computeStateRoot(),
       gasLimits:       this.gas.limits,
       gasCosts:        this.gas.costs,

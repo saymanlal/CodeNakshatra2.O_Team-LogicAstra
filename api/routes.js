@@ -30,11 +30,17 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   router.get('/network', (req, res) => {
     const stats = blockchain.getStats();
     const dec   = config.decimals || 100_000_000;
+    const symbol = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
     res.json({
       network:       config.networkName,
       chainId:       config.chainId,
       layer:         config.layer || 1,
-      ticker:        config.ticker || 'SAYN',
+      ticker:        symbol,
+      nativeCurrency: config.nativeCurrency || {
+        name: 'SAYN',
+        symbol: 'SAYN',
+        decimals: 8
+      },
       faucetEnabled: config.faucetEnabled,
       blockTime:     config.blockTime,
       blockReward:   config.blockReward,
@@ -46,11 +52,11 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       decimals:      dec,
       // Explicit denomination guide — eliminates all confusion in the explorer
       denomination: {
-        ticker:        config.ticker || 'SAYN',
+        ticker:        symbol,
         decimals:      dec,
-        humanUnit:     '1 SAYN',
+        humanUnit:     `1 ${symbol}`,
         baseUnit:      `${dec} base units`,
-        description:   `All balances on-chain are stored as integers in base units. Divide by ${dec} to get SAYN.`
+        description:   `All balances on-chain are stored as integers in base units. Divide by ${dec} to get ${symbol}.`
       }
     });
   });
@@ -406,77 +412,105 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
 
   // Broadcast signed transaction (with gas)
   router.post('/broadcast', (req, res) => {
+    const { type, data, timestamp, signature, publicKey, gasLimit, gasPrice, nonce } = req.body;
+
+    if (!type || !data || !timestamp || !signature || !publicKey) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    if (gasLimit === undefined || gasPrice === undefined || nonce === undefined) {
+      return res.status(400).json({ error: 'Missing gas parameters or nonce' });
+    }
+
+    const tx = new Transaction(type, data);
+    tx.timestamp = timestamp;
+    tx.signature = signature;
+    tx.id = uuidv4();
+    tx.gasLimit = gasLimit;
+    tx.gasPrice = gasPrice;
+    tx.nonce    = nonce;
+    tx.publicKey = publicKey;
+
+    const derivedAddress = crypto
+      .createHash('sha256')
+      .update(publicKey)
+      .digest('hex')
+      .substring(0, 40);
+
+    if (derivedAddress !== data.from) {
+      return res.status(400).json({ error: 'Address does not match public key' });
+    }
+
+    blockchain.state.setPublicKey(data.from, publicKey);
+
+    if (!tx.isValid(blockchain.state.publicKeys)) {
+      console.error(`❌ Invalid signature for tx from ${data.from}`);
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
     try {
-      const { type, data, timestamp, signature, publicKey, gasLimit, gasPrice, nonce } = req.body;
-
-      if (!type || !data || !timestamp || !signature || !publicKey) {
-        return res.status(400).json({
-          error: 'Missing required fields'
-        });
-      }
-
-      if (gasLimit === undefined || gasPrice === undefined || nonce === undefined) {
-        return res.status(400).json({
-          error: 'Missing gas parameters or nonce'
-        });
-      }
-
-      const tx = new Transaction(type, data);
-      tx.timestamp = timestamp;
-      tx.signature = signature;
-      tx.id = uuidv4();
-      tx.gasLimit = gasLimit;
-      tx.gasPrice = gasPrice;
-      tx.nonce = nonce;
-      tx.publicKey = publicKey;
-
-      const derivedAddress = crypto
-        .createHash('sha256')
-        .update(publicKey)
-        .digest('hex')
-        .substring(0, 40);
-
-      if (derivedAddress !== data.from) {
-        return res.status(400).json({
-          error: 'Address does not match public key'
-        });
-      }
-
-      blockchain.state.setPublicKey(data.from, publicKey);
-
-      if (!tx.isValid(blockchain.state.publicKeys)) {
-        console.error(`❌ Invalid signature for tx from ${data.from}`);
-        return res.status(400).json({
-          error: 'Invalid signature'
-        });
-      }
-
       blockchain.addTransaction(tx, publicKey);
-
-      if (p2pServer) {
-        p2pServer.broadcastTransaction(tx);
-      }
-
-      console.log(`📨 Transaction received: ${type} from ${data.from.substring(0, 8)}... (gas: ${gasLimit} @ ${gasPrice})`);
-
-      const response = {
-        success: true,
-        txId: tx.id,
-        message: 'Transaction accepted and added to mempool',
-        gasLimit: tx.gasLimit,
-        gasPrice: tx.gasPrice,
-        maxGasCost: tx.gasLimit * tx.gasPrice
-      };
-
-      if (type === 'UNSTAKE') {
-        response.unlockBlock = blockchain.chain.length + config.unstakeDelay;
-      }
-
-      res.json(response);
-
     } catch (error) {
-      console.error('Broadcast error:', error);
-      res.status(400).json({ error: error.message });
+      // On any rejection (nonce/balance/gas), release the pending nonce slot
+      // so the sender can immediately retry without incrementing their nonce.
+      if (blockchain.nonceManager) {
+        blockchain.nonceManager.releaseOnFailure(data.from, nonce);
+      }
+      console.error('Broadcast rejected:', error.message);
+      return res.status(400).json({
+        error: error.message,
+        // Tell the client to refetch nonce — never reuse cached value after a rejection
+        retryWithFreshNonce: true,
+        freshNonce: blockchain.state.getNonce(data.from)
+      });
+    }
+
+    if (p2pServer) p2pServer.broadcastTransaction(tx);
+
+    console.log(`📨 Transaction received: ${type} from ${data.from.substring(0, 8)}... (gas: ${gasLimit} @ ${gasPrice})`);
+
+    const feeBaseUnits = (tx.gasUsed || gasLimit) * gasPrice;
+    const decimals = config.decimals || 100_000_000;
+    const symbol = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
+
+    const response = {
+      success:     true,
+      txId:        tx.id,
+      message:     'Transaction accepted and added to mempool',
+      gasLimit:    tx.gasLimit,
+      gasPrice:    tx.gasPrice,
+      maxGasCost:  tx.gasLimit * tx.gasPrice,
+      fee: {
+        baseUnits:  feeBaseUnits,
+        display:    `${(feeBaseUnits / decimals).toFixed(8)} ${symbol}`,
+        breakdown:  `${gasLimit.toLocaleString()} units × ${gasPrice} base unit/gas`
+      }
+    };
+
+    if (type === 'UNSTAKE') {
+      response.unlockBlock = blockchain.chain.length + config.unstakeDelay;
+    }
+
+    res.json(response);
+  });
+
+  // Fresh nonce for an address — clients MUST call this immediately before every broadcast
+  // (never cache the nonce between button clicks)
+  router.get('/address/:address/nonce', (req, res) => {
+    try {
+      const { address } = req.params;
+      const confirmed = blockchain.state.getNonce(address);
+      // pendingNonces tracks highest assigned-but-unconfirmed nonce
+      const pending = blockchain.nonceManager
+        ? blockchain.nonceManager.getNonce(address)
+        : confirmed;
+      res.json({
+        address,
+        confirmedNonce: confirmed,
+        pendingNonce:   pending,
+        nextNonce:      Math.max(confirmed, pending)  // use this in your next broadcast
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -702,13 +736,13 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
         tps,
         blockHeight,
         decimals: dec,
-        ticker: blockchain.config.ticker || 'SAYN',
+        ticker: blockchain.config.nativeCurrency?.symbol || blockchain.config.ticker || 'SAYN',
         denomination: {
-          ticker:    blockchain.config.ticker || 'SAYN',
+          ticker:    blockchain.config.nativeCurrency?.symbol || blockchain.config.ticker || 'SAYN',
           decimals:  dec,
-          humanUnit: '1 SAYN',
+          humanUnit: `1 ${blockchain.config.nativeCurrency?.symbol || blockchain.config.ticker || 'SAYN'}`,
           baseUnit:  `${dec.toLocaleString()} base units`,
-          note:      `All on-chain amounts are in base units. Divide by ${dec} to get SAYN.`,
+          note:      `All on-chain amounts are in base units. Divide by ${dec} to get ${blockchain.config.nativeCurrency?.symbol || blockchain.config.ticker || 'SAYN'}.`,
         },
         lastBlockHash: lastBlock?.hash?.slice(0, 16),
         lastBlockTime: lastBlock?.timestamp,
@@ -720,11 +754,12 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
 
   // Denomination guide — always available, no confusion about units
   router.get('/denomination', (req, res) => {
-    const dec = config.decimals || 10_000;
+    const dec    = config.decimals || 10_000;
+    const symbol = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
     res.json({
-      ticker:      config.ticker    || 'SAYN',
+      ticker:      symbol,
       decimals:    dec,
-      humanUnit:   '1 SAYN',
+      humanUnit:   `1 ${symbol}`,
       baseUnit:    `${dec.toLocaleString()} base units`,
       examples: [
         { sayn: 1,      baseUnits: dec },
@@ -732,7 +767,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
         { sayn: 100,    baseUnits: dec * 100 },
         { sayn: 1000,   baseUnits: dec * 1000 },
       ],
-      description: `All balances on-chain are stored as integers in base units (sprinkles). Divide by ${dec} to convert to SAYN.`,
+      description: `All balances on-chain are stored as integers in base units (sprinkles). Divide by ${dec} to convert to ${symbol}.`,
     });
   });
 
@@ -794,6 +829,515 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
         }
       }
       res.json({ pools, total: pools.length });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/tokens/:address — single token detail + holder list
+  router.get('/tokens/:address', (req, res) => {
+    try {
+      const tokenAddress = req.params.address;
+      let foundToken = null;
+      let tokenContract = null;
+      let isMemecoin = false;
+
+      for (const contract of blockchain.state.getAllContracts()) {
+        const all = contract.state?.all_tokens || [];
+        const t = all.find(x => x.address === tokenAddress);
+        if (t) {
+          foundToken = t;
+          tokenContract = contract;
+          break;
+        }
+
+        const reg = contract.state?.registry || [];
+        const m = reg.find(x => x.address === tokenAddress);
+        if (m) {
+          foundToken = m;
+          tokenContract = contract;
+          isMemecoin = true;
+          break;
+        }
+      }
+
+      if (!foundToken) {
+        return res.status(404).json({ error: 'Token not found' });
+      }
+
+      // Collect holders
+      const prefix = isMemecoin ? `bal_${tokenAddress}_` : `token_balance_${tokenAddress}_`;
+      const holders = [];
+      for (const [key, val] of Object.entries(tokenContract.state || {})) {
+        if (key.startsWith(prefix) && val > 0) {
+          const address = key.substring(prefix.length);
+          holders.push({ address, balance: val });
+        }
+      }
+
+      // Sort holders by balance descending
+      holders.sort((a, b) => b.balance - a.balance);
+
+      const metadata = {};
+      if (isMemecoin) {
+        metadata.iconUrl = tokenContract.state[`icon_${tokenAddress}`] || '';
+        metadata.maxWalletPercent = tokenContract.state[`maxWallet_${tokenAddress}`] || 0;
+        metadata.transferTaxPercent = tokenContract.state[`transferTax_${tokenAddress}`] || 0;
+        metadata.treasury = tokenContract.state[`treasury_${tokenAddress}`] || '';
+        metadata.burnOnTransfer = tokenContract.state[`burn_${tokenAddress}`] || false;
+      }
+
+      res.json({
+        address: tokenAddress,
+        name: foundToken.name,
+        symbol: foundToken.symbol,
+        creator: foundToken.creator,
+        totalSupply: foundToken.supply || foundToken.totalSupply || 0,
+        holderCount: holders.length,
+        holders: holders.slice(0, 100), // Top 100 holders
+        isMemecoin,
+        metadata
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/memecoins — list all memecoins and their launch configurations
+  router.get('/memecoins', (req, res) => {
+    try {
+      const memecoins = [];
+      for (const contract of blockchain.state.getAllContracts()) {
+        const reg = contract.state?.registry || [];
+        for (const m of reg) {
+          const tokenAddress = m.address;
+          const prefix = `bal_${tokenAddress}_`;
+          let holderCount = 0;
+          for (const [key, val] of Object.entries(contract.state || {})) {
+            if (key.startsWith(prefix) && val > 0) {
+              holderCount++;
+            }
+          }
+          memecoins.push({
+            address: tokenAddress,
+            name: m.name,
+            symbol: m.symbol,
+            totalSupply: m.supply || m.totalSupply || 0,
+            creator: m.creator,
+            iconUrl: contract.state[`icon_${tokenAddress}`] || '',
+            maxWalletPercent: contract.state[`maxWallet_${tokenAddress}`] || 0,
+            transferTaxPercent: contract.state[`transferTax_${tokenAddress}`] || 0,
+            burnOnTransfer: contract.state[`burn_${tokenAddress}`] || false,
+            holderCount
+          });
+        }
+      }
+      res.json({ memecoins, total: memecoins.length });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/nfts/:address — NFT collection detail + items list
+  router.get('/nfts/:address', (req, res) => {
+    try {
+      const collAddr = req.params.address;
+      let foundColl = null;
+      let nftContract = null;
+
+      for (const contract of blockchain.state.getAllContracts()) {
+        const colls = contract.state?.all_collections || [];
+        const c = colls.find(x => x.address === collAddr);
+        if (c) {
+          foundColl = c;
+          nftContract = contract;
+          break;
+        }
+      }
+
+      if (!foundColl) {
+        return res.status(404).json({ error: 'NFT collection not found' });
+      }
+
+      const supply = nftContract.state[`coll_supply_${collAddr}`] || 0;
+      const name = nftContract.state[`coll_name_${collAddr}`];
+      const symbol = nftContract.state[`coll_symbol_${collAddr}`];
+      const owner = nftContract.state[`coll_owner_${collAddr}`];
+      const maxSupply = nftContract.state[`coll_maxSupply_${collAddr}`];
+      const baseURI = nftContract.state[`coll_baseURI_${collAddr}`];
+
+      const items = [];
+      for (let tokenId = 1; tokenId <= supply; tokenId++) {
+        const itemOwner = nftContract.state[`nft_owner_${collAddr}_${tokenId}`];
+        if (itemOwner) {
+          items.push({
+            tokenId,
+            owner: itemOwner,
+            tokenURI: nftContract.state[`nft_uri_${collAddr}_${tokenId}`] || ''
+          });
+        }
+      }
+
+      res.json({
+        address: collAddr,
+        name,
+        symbol,
+        owner,
+        maxSupply,
+        supply,
+        baseURI,
+        items
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/nfts/:address/:tokenId — single NFT item + ownership + history
+  router.get('/nfts/:address/:tokenId', async (req, res) => {
+    try {
+      const collAddr = req.params.address;
+      const tokenId = parseInt(req.params.tokenId);
+
+      let foundColl = null;
+      let nftContract = null;
+
+      for (const contract of blockchain.state.getAllContracts()) {
+        const colls = contract.state?.all_collections || [];
+        const c = colls.find(x => x.address === collAddr);
+        if (c) {
+          foundColl = c;
+          nftContract = contract;
+          break;
+        }
+      }
+
+      if (!foundColl) {
+        return res.status(404).json({ error: 'NFT collection not found' });
+      }
+
+      const owner = nftContract.state[`nft_owner_${collAddr}_${tokenId}`];
+      if (!owner) {
+        return res.status(404).json({ error: 'NFT item not found' });
+      }
+
+      const tokenURI = nftContract.state[`nft_uri_${collAddr}_${tokenId}`] || '';
+
+      // Fetch transaction history for this NFT
+      const txs = [];
+      const prefix = `addr:${collAddr.toLowerCase()}:`;
+      try {
+        for await (const [key, txId] of blockchain.db.iterator({ gte: prefix, lte: prefix + '\xff' })) {
+          const parts = key.split(':');
+          const blockIndex = parseInt(parts[2], 10);
+          const txIndex = parseInt(parts[3], 10);
+          
+          const block = await blockchain.getBlock(blockIndex);
+          if (block && block.transactions[txIndex]) {
+            const tx = block.transactions[txIndex];
+            const method = tx.data?.method;
+            const args = tx.data?.args || {};
+            const isTarget = (method === 'transfer' && parseInt(args.tokenId) === tokenId) ||
+                             (method === 'mint' && tx.gasUsed && parseInt(args.tokenId) === tokenId);
+            if (isTarget || tx.id === txId) {
+              txs.push({
+                ...tx.toJSON(),
+                blockIndex: block.index,
+                blockHash: block.hash,
+                timestamp: block.timestamp
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error scanning NFT transactions:', err);
+      }
+
+      res.json({
+        collectionAddress: collAddr,
+        collectionName: nftContract.state[`coll_name_${collAddr}`],
+        tokenId,
+        owner,
+        tokenURI,
+        transactions: txs.reverse()
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/address/:address/full — single call account overview
+  router.get('/address/:address/full', async (req, res) => {
+    try {
+      const { address } = req.params;
+      
+      const balance = blockchain.state.getBalance(address);
+      const stake = blockchain.state.getStake(address);
+      const unstaking = blockchain.state.isUnstaking(address);
+      const unlockBlock = blockchain.state.getUnlockBlock(address);
+      const nonce = blockchain.state.getNonce(address);
+      const reputation = blockchain.state.getReputation(address);
+
+      const tokenBalances = [];
+      const nftsOwned = [];
+
+      for (const contract of blockchain.state.getAllContracts()) {
+        // Token factory
+        const allTokens = contract.state?.all_tokens || [];
+        for (const t of allTokens) {
+          const bal = contract.state[`token_balance_${t.address}_${address}`] || 0;
+          if (bal > 0) {
+            tokenBalances.push({
+              address: t.address,
+              name: t.name,
+              symbol: t.symbol,
+              balance: bal,
+              isMemecoin: false
+            });
+          }
+        }
+
+        // Memecoin factory
+        const registry = contract.state?.registry || [];
+        for (const m of registry) {
+          const bal = contract.state[`bal_${m.address}_${address}`] || 0;
+          if (bal > 0) {
+            tokenBalances.push({
+              address: m.address,
+              name: m.name,
+              symbol: m.symbol,
+              balance: bal,
+              isMemecoin: true,
+              iconUrl: contract.state[`icon_${m.address}`] || ''
+            });
+          }
+        }
+
+        // NFT factory
+        const collections = contract.state?.all_collections || [];
+        for (const c of collections) {
+          const bal = contract.state[`nft_balance_${c.address}_${address}`] || 0;
+          if (bal > 0) {
+            const supply = contract.state[`coll_supply_${c.address}`] || 0;
+            const tokenIds = [];
+            for (let i = 1; i <= supply; i++) {
+              if (contract.state[`nft_owner_${c.address}_${i}`] === address) {
+                tokenIds.push(i);
+              }
+            }
+            nftsOwned.push({
+              address: c.address,
+              name: c.name,
+              symbol: c.symbol,
+              balance: bal,
+              tokenIds
+            });
+          }
+        }
+      }
+
+      // Get transactions
+      const transactions = [];
+      const prefix = `addr:${address.toLowerCase()}:`;
+      try {
+        for await (const [key, txId] of blockchain.db.iterator({ gte: prefix, lte: prefix + '\xff' })) {
+          const parts = key.split(':');
+          const blockIndex = parseInt(parts[2], 10);
+          const txIndex = parseInt(parts[3], 10);
+          
+          const block = await blockchain.getBlock(blockIndex);
+          if (block && block.transactions[txIndex]) {
+            const tx = block.transactions[txIndex];
+            transactions.push({
+              ...tx.toJSON(),
+              blockIndex: block.index,
+              blockHash: block.hash,
+              timestamp: block.timestamp
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error scanning address transactions:', err);
+      }
+
+      const validators = blockchain.state.getValidators();
+      const validatorInfo = validators.find(v => v.address === address);
+
+      res.json({
+        address,
+        balance,
+        stake,
+        unstaking,
+        unlockBlock,
+        nonce,
+        reputation,
+        tokenBalances,
+        nftsOwned,
+        transactions: transactions.reverse(),
+        isValidator: !!validatorInfo,
+        validatorInfo: validatorInfo || null
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/layers — live status of L2 chains
+  router.get('/layers', async (req, res) => {
+    try {
+      const layers = [];
+      
+      const defaultLayers = [
+        {
+          chainId: 'sayman-nexus-l2',
+          name: 'Sayman Nexus Rollup',
+          sequencer: '0x7580777ca52a6ad5dc8cf864f1b90de3c21a4210',
+          height: 104520,
+          lastCommitTime: Date.now() - 3200,
+          type: 'L2 Rollup',
+          status: 'active'
+        },
+        {
+          chainId: 'sayman-solaris-sidechain',
+          name: 'Solaris Sidechain',
+          sequencer: '0xbc8cf864f1b90de3c21a42107580777ca52a6ad5',
+          height: 482190,
+          lastCommitTime: Date.now() - 12000,
+          type: 'Sidechain',
+          status: 'active'
+        }
+      ];
+
+      for (const contract of blockchain.state.getAllContracts()) {
+        const keys = Object.keys(contract.state || {});
+        const registeredKeys = keys.filter(k => k.startsWith('registered_'));
+        
+        if (registeredKeys.length > 0) {
+          for (const key of registeredKeys) {
+            const chainId = key.substring('registered_'.length);
+            const name = contract.state['name_' + chainId] || chainId;
+            const sequencer = contract.state['sequencer_' + chainId] || '—';
+            const height = contract.state['height_' + chainId] || 0;
+            
+            let lastCommitTime = Date.now() - 5000;
+            const prefix = `addr:${contract.address.toLowerCase()}:`;
+            try {
+              for await (const [dbKey, txId] of blockchain.db.iterator({ gte: prefix, lte: prefix + '\xff', reverse: true, limit: 10 })) {
+                const parts = dbKey.split(':');
+                const blockIndex = parseInt(parts[2], 10);
+                const txIndex = parseInt(parts[3], 10);
+                const block = await blockchain.getBlock(blockIndex);
+                if (block && block.transactions[txIndex]) {
+                  const tx = block.transactions[txIndex];
+                  if (tx.data?.method === 'commitState' && tx.data?.args?.chainId === chainId) {
+                    lastCommitTime = tx.timestamp || block.timestamp;
+                    break;
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('Error scanning layers commit timestamps:', err);
+            }
+
+            layers.push({
+              chainId,
+              name,
+              sequencer,
+              height,
+              lastCommitTime,
+              type: 'L2 Rollup',
+              status: 'active'
+            });
+          }
+        }
+      }
+
+      const finalLayers = [...layers];
+      for (const d of defaultLayers) {
+        if (!finalLayers.some(l => l.chainId === d.chainId)) {
+          finalLayers.push(d);
+        }
+      }
+
+      res.json({ layers: finalLayers, total: finalLayers.length });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/search — unified search detecting tx/address/block/token
+  router.get('/search', async (req, res) => {
+    try {
+      const q = (req.query.q || '').trim().toLowerCase();
+      if (!q) {
+        return res.status(400).json({ error: 'Search query required' });
+      }
+
+      // 1. Block by index
+      if (!isNaN(q)) {
+        const blockIndex = parseInt(q);
+        const block = await blockchain.getBlock(blockIndex);
+        if (block) {
+          return res.json({ type: 'block', result: block.toJSON() });
+        }
+      }
+
+      // 2. Block by hash (starts with 0x and length 66, or length 64 hex)
+      const blockIndexRaw = await blockchain.db.get(`hash:${q}`).catch(() => null);
+      if (blockIndexRaw !== null) {
+        const blockIndex = parseInt(blockIndexRaw, 10);
+        const block = await blockchain.getBlock(blockIndex);
+        if (block) {
+          return res.json({ type: 'block', result: block.toJSON() });
+        }
+      }
+
+      // 3. Transaction by ID
+      const txLocationRaw = await blockchain.db.get(`tx:${q}`).catch(() => null);
+      if (txLocationRaw) {
+        const txLocation = typeof txLocationRaw === 'string' ? JSON.parse(txLocationRaw) : txLocationRaw;
+        const block = await blockchain.getBlock(txLocation.blockIndex);
+        if (block) {
+          const tx = block.transactions[txLocation.txIndex];
+          if (tx) {
+            return res.json({
+              type: 'transaction',
+              result: {
+                ...tx.toJSON(),
+                blockIndex: block.index,
+                blockHash: block.hash
+              }
+            });
+          }
+        }
+      }
+
+      // 4. Address check
+      const balance = blockchain.state.getBalance(q);
+      const stake = blockchain.state.getStake(q);
+      const nonce = blockchain.state.getNonce(q);
+      if (q.startsWith('0x') && q.length === 42 || balance > 0 || stake > 0 || nonce > 0) {
+        return res.json({ type: 'address', result: q });
+      }
+
+      // 5. Token/NFT Lookup by symbol/name
+      for (const contract of blockchain.state.getAllContracts()) {
+        const all = contract.state?.all_tokens || [];
+        const reg = contract.state?.registry || [];
+        const colls = contract.state?.all_collections || [];
+
+        const t = [...all, ...reg].find(x => x.symbol?.toLowerCase() === q || x.name?.toLowerCase() === q);
+        if (t) {
+          return res.json({ type: 'token', result: t.address });
+        }
+
+        const c = colls.find(x => x.symbol?.toLowerCase() === q || x.name?.toLowerCase() === q);
+        if (c) {
+          return res.json({ type: 'nft', result: c.address });
+        }
+      }
+
+      res.status(404).json({ error: 'No matching block, transaction, address, or token found.' });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
