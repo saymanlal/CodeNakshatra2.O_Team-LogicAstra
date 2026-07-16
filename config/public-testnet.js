@@ -16,7 +16,7 @@
  */
 
 export const DECIMALS     = 100_000_000;
-export const TICKER       = 'SAYN';
+export const TICKER       = 'tSAYN';   // testnet display symbol
 export const DISPLAY_NAME = 'SAYMAN';
 
 // ── Bootstrap peers from environment variable ─────────────────────────────────
@@ -29,8 +29,14 @@ const envPeers = process.env.BOOTSTRAP_PEERS
 export default {
   networkName:  'Sayman Public Testnet',
   chainId:      'sayman-public-testnet-1',
+  nativeCurrency: {
+    name: 'Test SAYN',
+    symbol: 'tSAYN',
+    decimals: 8
+  },
+  isTestnet: true,
   layer:        1,                           // Layer 1 — SAYMAN base chain
-  ticker:       TICKER,
+  ticker:       TICKER,                          // 'tSAYN' on testnet
   decimals:     DECIMALS,
 
   apiPort:      parseInt(process.env.PORT)     || 10000,

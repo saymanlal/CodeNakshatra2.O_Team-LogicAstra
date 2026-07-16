@@ -50,6 +50,12 @@ export function getBlockReward(blockHeight) {
 export default {
   networkName:  'SAYMAN Mainnet',
   chainId:      'sayman-mainnet-1',
+  nativeCurrency: {
+    name: 'SAYN',
+    symbol: 'SAYN',
+    decimals: 8
+  },
+  isTestnet: false,
   layer:        1,                           // Layer 1 — SAYMAN base chain
   ticker:       TICKER,
   decimals:     DECIMALS,

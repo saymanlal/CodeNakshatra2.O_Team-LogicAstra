@@ -44,6 +44,9 @@
       <li class="nav-item"><button class="nav-btn" data-page="validators" onclick="showPage('validators')"><i class="fas fa-user-check"></i> Validators</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="transactions" onclick="showPage('transactions')"><i class="fas fa-exchange-alt"></i> Transactions</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="contracts" onclick="showPage('contracts')"><i class="fas fa-file-contract"></i> Contracts</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="tokens" onclick="showPage('tokens')"><i class="fas fa-coins"></i> Tokens</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="nfts" onclick="showPage('nfts')"><i class="fas fa-images"></i> NFTs</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="memecoins" onclick="showPage('memecoins')"><i class="fas fa-rocket"></i> Memecoins</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="layers" onclick="showPage('layers')"><i class="fas fa-layer-group"></i> Layers</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="network" onclick="showPage('network')"><i class="fas fa-network-wired"></i> Network</button></li>
        <li class="nav-item"><button class="nav-btn" data-page="docs" onclick="window.open('https://sayman-docs.vercel.app', '_blank')"><i class="fas fa-book"></i> Docs</button></li>
@@ -104,7 +107,7 @@
 
       <table>
         <thead>
-          <tr><th>Block</th><th>Hash</th><th>Validator</th><th>Txs</th><th>Gas Used</th><th>Time</th></tr>
+          <tr><th>Block</th><th>Hash</th><th>Validator</th><th>Txs</th><th>Fee / Gas</th><th>Time</th></tr>
         </thead>
         <tbody id="explorer-blocks"><tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading blocks…</td></tr></tbody>
       </table>
@@ -294,6 +297,77 @@ await client.callContract({
 });</pre>
         </div>
       </div>
+
+      <div class="section" style="margin-top:calc(var(--grid)*4); margin-bottom:calc(var(--grid)*3)">
+        <div class="section-header"><h2>Active L2 / Sidechains</h2></div>
+        <table>
+          <thead>
+            <tr><th>Chain Name</th><th>Chain ID</th><th>Sequencer Address</th><th>Block Height</th><th>Last Commitment</th><th>Status</th></tr>
+          </thead>
+          <tbody id="active-layers-list">
+            <tr><td colspan="6" style="padding:calc(var(--grid)*2);color:var(--mono-400);font-size:12px;text-align:center;">Loading active chains…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ TOKENS ═══ -->
+  <div id="tokens" class="page">
+    <div class="section">
+      <div class="section-header"><h2>Fungible Tokens</h2></div>
+      <div class="search-bar">
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="token-search" placeholder="Search tokens by name or symbol…" oninput="filterTokens()">
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Token Name</th><th>Symbol</th><th>Contract Address</th><th>Total Supply</th><th>Holders</th><th>Type</th></tr>
+        </thead>
+        <tbody id="token-list">
+          <tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading tokens…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ NFTS ═══ -->
+  <div id="nfts" class="page">
+    <div class="section">
+      <div class="section-header"><h2>NFT Collections</h2></div>
+      <div class="search-bar">
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="nft-search" placeholder="Search NFT collections by name or symbol…" oninput="filterNFTs()">
+        </div>
+      </div>
+      <div id="nft-collection-grid" class="nft-grid-container">
+        <p style="color:var(--mono-400);font-size:12px;padding:calc(var(--grid)*2);">Loading collections…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MEMECOINS ═══ -->
+  <div id="memecoins" class="page">
+    <div class="section">
+      <div class="section-header"><h2>Memecoin Launchpad</h2></div>
+      <div class="search-bar">
+        <div class="search-wrapper">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="memecoin-search" placeholder="Search memecoins by name or symbol…" oninput="filterMemecoins()">
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Icon</th><th>Name</th><th>Symbol</th><th>Total Supply</th><th>Holders</th><th>Burn %</th><th>Tax %</th><th>Anti-Whale</th><th>Type</th></tr>
+        </thead>
+        <tbody id="memecoin-list">
+          <tr><td colspan="9" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading memecoins…</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 

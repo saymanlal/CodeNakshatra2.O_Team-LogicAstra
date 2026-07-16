@@ -169,13 +169,28 @@ function poll() {
     case 'contracts':     loadContracts();                    break;
     case 'layers':        loadLayers();                       break;
     case 'network':       loadNetwork();                      break;
+    case 'tokens':        loadTokens();                       break;
+    case 'nfts':          loadNFTs();                         break;
+    case 'memecoins':     loadMemecoins();                    break;
     case 'docs':          break;
   }
 }
 
 // ── Config & Header ───────────────────────────────────────────────────────────
 async function loadNetworkConfig() {
-  try { networkConfig = await apiFetch('/network'); } catch {}
+  try {
+    networkConfig = await apiFetch('/network');
+    // Patch static HTML labels that baked in 'SAYN' — swap to whatever the network reports
+    const sym = (networkConfig.nativeCurrency?.symbol || networkConfig.ticker || 'SAYN');
+    // Stat unit spans (Total Stake, Block Reward)
+    document.querySelectorAll('.stat-unit').forEach(el => {
+      if (el.textContent === 'SAYN') el.textContent = sym;
+    });
+    // Validators table "Stake (SAYN)" column header
+    document.querySelectorAll('th').forEach(el => {
+      if (el.textContent === 'Stake (SAYN)') el.textContent = `Stake (${sym})`;
+    });
+  } catch {}
 }
 
 async function updateHeaderInfo() {
@@ -209,6 +224,9 @@ function showPage(pageId) {
     case 'contracts':     loadContracts();        break;
     case 'layers':        loadLayers();           break;
     case 'network':       loadNetwork();          break;
+    case 'tokens':        loadTokens();           break;
+    case 'nfts':          loadNFTs();             break;
+    case 'memecoins':     loadMemecoins();        break;
     case 'docs':          break;
   }
 }
@@ -237,8 +255,8 @@ async function loadDashboard() {
     setEl('stat-tps', stats.tps ?? '0');
     setEl('stat-parallel', (stats.parallelEfficiency ?? 1.0).toFixed(2));
 
-    // ── Denomination card — eliminate all confusion about SAYN vs base units ──
-    const ticker = (networkConfig && networkConfig.ticker) || 'SAYN';
+    // ── Denomination card — eliminate all confusion about tSAYN/SAYN vs base units ──
+    const ticker = (networkConfig && (networkConfig.nativeCurrency?.symbol || networkConfig.ticker)) || 'SAYN';
     setEl('stat-denom',      `1 ${ticker} = ${dec.toLocaleString()} base units`);
     setEl('stat-denom-note', `All on-chain amounts are integers (base units). Divide by ${dec} to get ${ticker}.`);
 
@@ -278,26 +296,65 @@ async function loadExplorer(page = 1) {
   } catch (e) { console.error('Explorer:', e); }
 }
 
-// Search: by block number or hash prefix
+// Search: unified — block number / hash / tx-id / address / token symbol
 async function searchExplorer() {
   const q = (document.getElementById('explorer-search')?.value || '').trim();
   if (!q) { loadExplorer(1); return; }
 
   clearPagination();
   const tbody = document.getElementById('explorer-blocks');
-  if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Searching…</td></tr>`;
+  if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;"><i class="fas fa-spinner fa-spin"></i> Searching…</td></tr>`;
 
   try {
-    if (/^\d+$/.test(q)) {
-      const block = await apiFetch(`/block/${q}`);
-      renderExplorerRows(block ? [block] : []);
-      setEl('explorer-page-info', block ? '1 result' : 'Block not found');
+    // Try unified backend search first
+    const result = await apiFetch(`/search?q=${encodeURIComponent(q)}`);
+    if (result.type === 'block') {
+      renderExplorerRows([result.result]);
+      setEl('explorer-page-info', '1 block found');
       return;
     }
-    const block = await apiFetch(`/block/hash/${q}`);
-    renderExplorerRows(block ? [block] : []);
-    setEl('explorer-page-info', block ? '1 result' : 'No block found for that hash');
+    if (result.type === 'transaction') {
+      // Show TX in a detail modal and keep list empty
+      renderExplorerRows([]);
+      setEl('explorer-page-info', 'Transaction found — see detail');
+      const tx = result.result;
+      showTxDetail({
+        id: tx.id,
+        type: tx.type,
+        blockIndex: tx.blockIndex,
+        timestamp: tx.timestamp,
+        from: tx.data?.from || tx.data?.validator || null,
+        to:   tx.data?.to   || tx.data?.validator || null,
+        amount: tx.data?.amount ?? null,
+        gasUsed:  tx.gasUsed  ?? 0,
+        gasPrice: tx.gasPrice ?? 0,
+        data: tx.data || {},
+      });
+      return;
+    }
+    if (result.type === 'address') {
+      renderExplorerRows([]);
+      setEl('explorer-page-info', 'Address found — see detail');
+      showAddressDetail(result.result || q);
+      return;
+    }
+    if (result.type === 'token' || result.type === 'nft') {
+      renderExplorerRows([]);
+      setEl('explorer-page-info', `${result.type === 'nft' ? 'NFT Collection' : 'Token'} found`);
+      showAddressDetail(result.result || q);
+      return;
+    }
+    // Fallback: block-only search
+    const block = await apiFetch(`/block/hash/${q}`).catch(() => null);
+    if (block) {
+      renderExplorerRows([block]);
+      setEl('explorer-page-info', '1 block found');
+    } else {
+      renderExplorerRows([]);
+      setEl('explorer-page-info', 'No results found');
+    }
   } catch {
+    // Last resort — scan local blocks
     try {
       const data = await apiFetch(`/blocks?page=1&limit=100`);
       const matches = (data.blocks || []).filter(b =>
@@ -307,7 +364,7 @@ async function searchExplorer() {
       ).sort((a, b) => b.index - a.index);
       renderExplorerRows(matches);
       setEl('explorer-page-info', `${matches.length} result${matches.length !== 1 ? 's' : ''}`);
-    } catch (e2) {
+    } catch {
       if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*2);color:#c00;font-size:12px;text-align:center;">Search error</td></tr>`;
     }
   }
@@ -340,13 +397,15 @@ function renderExplorerRows(blocks) {
 
   tbody.innerHTML = blocks.map(b => {
     const gas = b.gasUsed ?? (b.transactions || []).reduce((s, tx) => s + (tx.gasUsed || 0), 0);
+    const feePaid = (b.transactions || []).reduce((s, tx) => s + (tx.gasUsed || 0) * (tx.gasPrice || 1), 0);
+    const gasCell = feePaid > 0 ? sayn(feePaid) : (gas.toLocaleString() + ' gas');
     return `
       <tr onclick="showBlockDetail(${b.index})">
         <td>#${b.index}</td>
-        <td class="mono">${(b.hash || '').slice(0, 20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${b.hash || ''}')"><i class="fas fa-copy"></i></button></td>
-        <td class="mono" onclick="event.stopPropagation();showValidatorDetail('${b.validator || ''}')">${(b.validator || '—').slice(0, 16)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${b.validator || ''}')"><i class="fas fa-copy"></i></button></td>
+        <td class="mono">${(b.hash || '').slice(0, 20)}\u2026 <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${b.hash || ''}')"><i class="fas fa-copy"></i></button></td>
+        <td class="mono" onclick="event.stopPropagation();showValidatorDetail('${b.validator || ''}')">${(b.validator || '\u2014').slice(0, 16)}\u2026 <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${b.validator || ''}')"><i class="fas fa-copy"></i></button></td>
         <td>${b.transactions?.length ?? 0}</td>
-        <td>${gas.toLocaleString()} gas</td>
+        <td>${gasCell}</td>
         <td>${fmtTime(b.timestamp)}</td>
       </tr>
     `;
@@ -412,7 +471,7 @@ async function showBlockDetail(index) {
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-user-check"></i> Validator</td><td class="mono">${block.validator || '—'}</td></tr>
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-clock"></i> Timestamp</td><td>${fmtTime(block.timestamp)}</td></tr>
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-link"></i> Chain ID</td><td>${block.chainId || '—'}</td></tr>
-            <tr class="detail-row"><td class="detail-label"><i class="fas fa-gas-pump"></i> Gas Used</td><td>${gas.toLocaleString()} gas</td></tr>
+            <tr class="detail-row"><td class="detail-label"><i class="fas fa-gas-pump"></i> Gas Used</td><td>${gas.toLocaleString()} units</td></tr>
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-coins"></i> Block Fees</td><td>${sayn(block.transactions?.reduce((sum, tx) => sum + (tx.gasUsed || 0) * (tx.gasPrice || 0), 0) || 0)}</td></tr>
             <tr class="detail-row"><td class="detail-label"><i class="fas fa-database"></i> State Root</td><td class="mono" style="word-break:break-all;">${block.stateRoot || '—'}</td></tr>
           </table>
@@ -429,8 +488,8 @@ async function showBlockDetail(index) {
                     ${tx.data?.from   ? `<div><strong>From:</strong> <span class="mono">${tx.data.from}</span></div>`   : ''}
                     ${tx.data?.to     ? `<div><strong>To:</strong> <span class="mono">${tx.data.to}</span></div>`     : ''}
                     ${tx.data?.amount ? `<div><strong>Amount:</strong> ${sayn(tx.data.amount)}</div>`                 : ''}
-                    ${tx.gasUsed      ? `<div><strong>Gas Used:</strong> ${tx.gasUsed.toLocaleString()} gas</div>`   : ''}
-                    ${tx.gasUsed && tx.gasPrice ? `<div><strong>Fee:</strong> ${sayn((tx.gasUsed || 0) * (tx.gasPrice || 0))}</div>` : ''}
+                    ${tx.gasUsed      ? `<div><strong>Gas Used:</strong> ${tx.gasUsed.toLocaleString()} units</div>`   : ''}
+                    ${tx.gasUsed && tx.gasPrice ? `<div><strong>Fee Paid:</strong> ${sayn(tx.gasUsed * tx.gasPrice)} <span style="color:var(--mono-500);font-size:10px;">(${tx.gasUsed.toLocaleString()} units × ${tx.gasPrice} base unit/gas)</span></div>` : ''}
                   </div>
                 `).join('')
               : '<p style="color:var(--mono-400);font-size:12px;">No transactions in this block</p>'
@@ -578,7 +637,7 @@ async function showValidatorDetail(address) {
               <td style="padding:calc(var(--grid)*1);">#${b.index}</td>
               <td style="padding:calc(var(--grid)*1);font-family:'SF Mono',monospace;font-size:11px;">${(b.hash||'').slice(0,20)}…</td>
               <td style="padding:calc(var(--grid)*1);">${b.transactions?.length ?? 0}</td>
-              <td style="padding:calc(var(--grid)*1);">${(b.gasUsed ?? 0).toLocaleString()} gas</td>
+              <td style="padding:calc(var(--grid)*1);">${(b.gasUsed ?? 0).toLocaleString()} units</td>
               <td style="padding:calc(var(--grid)*1);">${fmtTime(b.timestamp)}</td>
             </tr>
           `).join('')}
@@ -594,14 +653,40 @@ async function showValidatorDetail(address) {
 // ── Layers ─────────────────────────────────────────────────────────────────────────
 async function loadLayers() {
   try {
-    const net = await apiFetch('/network');
+    const [net, layersData] = await Promise.all([
+      apiFetch('/network'),
+      apiFetch('/layers').catch(() => ({ layers: [] })),
+    ]);
     setEl('layer-level',    net.layer ? 'Layer ' + net.layer : 'Layer 1 (Main)');
     setEl('layer-chain-id', net.chainId || '—');
     setEl('layer-blocktime', net.blockTime || '—');
     setEl('layer-decimals', net.decimals
-      ? `${net.decimals.toLocaleString()} (1 SAYN = ${net.decimals.toLocaleString()} base units)`
+      ? `${net.decimals.toLocaleString()} (1 ${net.nativeCurrency?.symbol || net.ticker || 'SAYN'} = ${net.decimals.toLocaleString()} base units)`
       : '—'
     );
+
+    // Render active L2 / sidechains table
+    const tbody = document.getElementById('active-layers-list');
+    if (!tbody) return;
+    const layers = layersData.layers || [];
+    if (!layers.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*2);color:var(--mono-400);font-size:12px;text-align:center;">No active L2 / sidechain commitments found.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = layers.map(l => {
+      const ago = l.lastCommitTime ? fmtTimeAgo(l.lastCommitTime) : '—';
+      const statusColor = l.status === 'active' ? '#2a7a2a' : 'var(--mono-600)';
+      return `
+        <tr>
+          <td>${l.name || l.chainId}</td>
+          <td class="mono" style="font-size:11px;">${l.chainId || '—'}</td>
+          <td class="mono" style="font-size:10px;">${l.sequencer ? l.sequencer.slice(0,16)+'…' : '—'}</td>
+          <td>${(l.height || 0).toLocaleString()}</td>
+          <td>${ago}</td>
+          <td><span style="font-size:11px;padding:2px 8px;border:1px solid ${statusColor};color:${statusColor};">${(l.status || 'unknown').toUpperCase()}</span></td>
+        </tr>
+      `;
+    }).join('');
   } catch (e) { console.error('Layers:', e); }
 }
 
@@ -756,7 +841,7 @@ function renderTransactions() {
         <td>${from}</td>
         <td>${to}</td>
         <td style="font-size:11px;">${tx.amount !== null ? sayn(tx.amount) : '—'}</td>
-        <td style="font-size:11px;">${tx.gasUsed ? tx.gasUsed.toLocaleString() + ' gas' : '—'}</td>
+        <td style="font-size:11px;">${tx.gasUsed ? tx.gasUsed.toLocaleString() + ' units' : '—'}</td>
         <td style="font-size:11px;">${fee}</td>
         <td style="font-size:11px;">${fmtTime(tx.timestamp)}</td>
       </tr>
@@ -817,8 +902,8 @@ function showTxDetail(tx) {
           ${tx.from ? `<tr class="detail-row"><td class="detail-label"><i class="fas fa-arrow-right"></i> From</td><td class="mono" style="word-break:break-all;">${tx.from} <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.from}')"><i class="fas fa-copy"></i></button></td></tr>` : ''}
           ${tx.to   ? `<tr class="detail-row"><td class="detail-label"><i class="fas fa-arrow-left"></i> To</td><td class="mono" style="word-break:break-all;">${tx.to} <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.to}')"><i class="fas fa-copy"></i></button></td></tr>` : ''}
           ${tx.amount !== null ? `<tr class="detail-row"><td class="detail-label"><i class="fas fa-coins"></i> Amount</td><td>${sayn(tx.amount)} <span style="font-size:10px;color:var(--mono-500);">(${Number(tx.amount).toLocaleString()} base units)</span></td></tr>` : ''}
-          <tr class="detail-row"><td class="detail-label"><i class="fas fa-gas-pump"></i> Gas Used</td><td>${tx.gasUsed ? tx.gasUsed.toLocaleString() + ' gas' : '—'}</td></tr>
-          <tr class="detail-row"><td class="detail-label"><i class="fas fa-receipt"></i> Fee</td><td>${fee}</td></tr>
+          <tr class="detail-row"><td class="detail-label"><i class="fas fa-gas-pump"></i> Gas Used</td><td>${tx.gasUsed ? tx.gasUsed.toLocaleString() + ' units' : '—'}</td></tr>
+          <tr class="detail-row"><td class="detail-label"><i class="fas fa-receipt"></i> Fee Paid</td><td>${fee}${tx.gasUsed && tx.gasPrice ? ` <span style="color:var(--mono-500);font-size:10px;">(${tx.gasUsed.toLocaleString()} units × ${tx.gasPrice} base unit/gas)</span>` : ''}</td></tr>
           ${extraRows}
         </table>
       </div>
@@ -1168,7 +1253,8 @@ function sayn(baseUnits, withUnit = true) {
   const dec = (typeof networkConfig !== 'undefined' && networkConfig && networkConfig.decimals) || 100000000;
   const v = Number(baseUnits) / dec;
   const fixed = dec === 100000000 ? 8 : 4;
-  const ticker = (typeof networkConfig !== 'undefined' && networkConfig && networkConfig.ticker) || 'SAYN';
+  const ticker = (typeof networkConfig !== 'undefined' && networkConfig &&
+    (networkConfig.nativeCurrency?.symbol || networkConfig.ticker)) || 'SAYN';
   return Number.isFinite(v) ? v.toFixed(fixed) + (withUnit ? ' ' + ticker : '') : '—';
 }
 
@@ -1249,4 +1335,343 @@ function showLegalModal(type) {
   `;
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Tokens Page ──────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+let allTokens = [];
+
+async function loadTokens() {
+  const tbody = document.getElementById('token-list');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading tokens…</td></tr>`;
+  try {
+    const data = await apiFetch('/tokens');
+    allTokens = data.tokens || [];
+    renderTokens(allTokens);
+  } catch (e) {
+    console.error('Tokens:', e);
+    const tb = document.getElementById('token-list');
+    if (tb) tb.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*2);color:#c00;font-size:12px;text-align:center;">Failed to load tokens</td></tr>`;
+  }
+}
+
+function filterTokens() {
+  const q = (document.getElementById('token-search')?.value || '').toLowerCase().trim();
+  if (!q) { renderTokens(allTokens); return; }
+  renderTokens(allTokens.filter(t =>
+    (t.name   || '').toLowerCase().includes(q) ||
+    (t.symbol || '').toLowerCase().includes(q) ||
+    (t.address || t.contractAddress || '').toLowerCase().includes(q)
+  ));
+}
+
+function renderTokens(tokens) {
+  const tbody = document.getElementById('token-list');
+  if (!tbody) return;
+  if (!tokens.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*3);text-align:center;color:var(--mono-400);font-size:12px;">No tokens found.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = tokens.map(t => {
+    const addr = t.address || t.contractAddress || '—';
+    const supply = t.totalSupply ?? t.supply ?? 0;
+    const holders = t.holderCount ?? t.holders ?? '—';
+    const type = t.type || (t.burnOnTransfer !== undefined ? 'Memecoin' : 'Fungible');
+    return `
+      <tr onclick="showTokenDetail(${JSON.stringify(t).replace(/"/g,'&quot;')})" style="cursor:pointer;">
+        <td style="font-weight:600;">${t.name || '—'}</td>
+        <td><span style="font-size:11px;padding:2px 8px;background:var(--mono-900);border-radius:3px;font-family:monospace;">${t.symbol || '—'}</span></td>
+        <td class="mono" style="font-size:10px;">${addr.slice(0,20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this,'${addr}')"><i class="fas fa-copy"></i></button></td>
+        <td style="font-size:11px;">${Number(supply).toLocaleString()}</td>
+        <td style="font-size:11px;">${holders}</td>
+        <td><span style="font-size:10px;padding:2px 7px;border-radius:3px;background:#1a3a5c;color:#60b4ff;">${type}</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function showTokenDetail(t) {
+  if (typeof t === 'string') { try { t = JSON.parse(t); } catch { return; } }
+  const addr = t.address || t.contractAddress || '—';
+  const supply = t.totalSupply ?? t.supply ?? 0;
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:600px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-coins"></i> Token: ${t.name || '—'} (${t.symbol || '—'})</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body">
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          <tr class="detail-row"><td class="detail-label">Name</td><td>${t.name || '—'}</td></tr>
+          <tr class="detail-row"><td class="detail-label">Symbol</td><td class="mono">${t.symbol || '—'}</td></tr>
+          <tr class="detail-row"><td class="detail-label">Contract Address</td><td class="mono" style="word-break:break-all;font-size:11px;">${addr} <button class="copy-data-btn" onclick="copyToClipboard(this,'${addr}')"><i class="fas fa-copy"></i></button></td></tr>
+          <tr class="detail-row"><td class="detail-label">Total Supply</td><td>${Number(supply).toLocaleString()}</td></tr>
+          <tr class="detail-row"><td class="detail-label">Holders</td><td>${t.holderCount ?? t.holders ?? '—'}</td></tr>
+          ${t.creator ? `<tr class="detail-row"><td class="detail-label">Creator</td><td class="mono" style="word-break:break-all;font-size:11px;">${t.creator} <button class="copy-data-btn" onclick="copyToClipboard(this,'${t.creator}')"><i class="fas fa-copy"></i></button></td></tr>` : ''}
+          ${t.transferTaxPercent !== undefined ? `<tr class="detail-row"><td class="detail-label">Transfer Tax</td><td>${t.transferTaxPercent}%</td></tr>` : ''}
+          ${t.burnOnTransfer !== undefined ? `<tr class="detail-row"><td class="detail-label">Burn on Transfer</td><td>${t.burnOnTransfer ? 'Yes' : 'No'}</td></tr>` : ''}
+          ${t.maxWalletPercent ? `<tr class="detail-row"><td class="detail-label">Max Wallet</td><td>${t.maxWalletPercent}%</td></tr>` : ''}
+        </table>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── NFTs Page ────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+let allNFTCollections = [];
+
+async function loadNFTs() {
+  const grid = document.getElementById('nft-collection-grid');
+  if (grid) grid.innerHTML = `<p style="color:var(--mono-400);font-size:12px;padding:calc(var(--grid)*2);"><i class="fas fa-spinner fa-spin"></i> Loading collections…</p>`;
+  try {
+    const data = await apiFetch('/nfts');
+    allNFTCollections = data.collections || [];
+    renderNFTCollections(allNFTCollections);
+  } catch (e) {
+    console.error('NFTs:', e);
+    const g = document.getElementById('nft-collection-grid');
+    if (g) g.innerHTML = `<p style="color:#c00;font-size:12px;padding:calc(var(--grid)*2);">Failed to load NFT collections</p>`;
+  }
+}
+
+function filterNFTs() {
+  const q = (document.getElementById('nft-search')?.value || '').toLowerCase().trim();
+  if (!q) { renderNFTCollections(allNFTCollections); return; }
+  renderNFTCollections(allNFTCollections.filter(c =>
+    (c.name   || '').toLowerCase().includes(q) ||
+    (c.symbol || '').toLowerCase().includes(q) ||
+    (c.address || c.contractAddress || '').toLowerCase().includes(q)
+  ));
+}
+
+function renderNFTCollections(collections) {
+  const grid = document.getElementById('nft-collection-grid');
+  if (!grid) return;
+  if (!collections.length) {
+    grid.innerHTML = `<p style="color:var(--mono-400);font-size:12px;padding:calc(var(--grid)*2);">No NFT collections found.</p>`;
+    return;
+  }
+  grid.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:calc(var(--grid)*2);">
+      ${collections.map(c => {
+        const addr = c.address || c.contractAddress || '';
+        const supply = c.totalSupply ?? c.maxSupply ?? c.supply ?? 0;
+        const minted = c.mintedCount ?? c.minted ?? 0;
+        return `
+          <div onclick="showNFTCollectionDetail(${JSON.stringify(c).replace(/"/g,'&quot;')})"
+               style="border:var(--border);padding:calc(var(--grid)*2);cursor:pointer;background:var(--mono-950);
+                      transition:background .15s;border-radius:4px;"
+               onmouseover="this.style.background='var(--mono-900)'" onmouseout="this.style.background='var(--mono-950)'">
+            <div style="font-size:32px;text-align:center;margin-bottom:calc(var(--grid)*1);">🖼️</div>
+            <div style="font-weight:600;font-size:13px;margin-bottom:4px;">${c.name || '—'}</div>
+            <div style="font-size:11px;color:var(--mono-400);font-family:monospace;margin-bottom:4px;">${c.symbol || ''}</div>
+            <div style="font-size:10px;color:var(--mono-500);margin-bottom:4px;">${addr.slice(0,20)}…</div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:calc(var(--grid)*1);">
+              <span style="color:var(--mono-400);">Minted: <strong>${minted.toLocaleString()}</strong></span>
+              <span style="color:var(--mono-400);">Max: <strong>${supply.toLocaleString()}</strong></span>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function showNFTCollectionDetail(c) {
+  if (typeof c === 'string') { try { c = JSON.parse(c); } catch { return; } }
+  const addr = c.address || c.contractAddress || '—';
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:600px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-images"></i> NFT Collection: ${c.name || '—'}</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body">
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          <tr class="detail-row"><td class="detail-label">Name</td><td>${c.name || '—'}</td></tr>
+          <tr class="detail-row"><td class="detail-label">Symbol</td><td class="mono">${c.symbol || '—'}</td></tr>
+          <tr class="detail-row"><td class="detail-label">Contract Address</td><td class="mono" style="word-break:break-all;font-size:11px;">${addr} <button class="copy-data-btn" onclick="copyToClipboard(this,'${addr}')"><i class="fas fa-copy"></i></button></td></tr>
+          <tr class="detail-row"><td class="detail-label">Minted</td><td>${(c.mintedCount ?? c.minted ?? 0).toLocaleString()}</td></tr>
+          <tr class="detail-row"><td class="detail-label">Max Supply</td><td>${(c.maxSupply ?? c.totalSupply ?? c.supply ?? 0).toLocaleString()}</td></tr>
+          ${c.creator ? `<tr class="detail-row"><td class="detail-label">Creator</td><td class="mono" style="word-break:break-all;font-size:11px;">${c.creator} <button class="copy-data-btn" onclick="copyToClipboard(this,'${c.creator}')"><i class="fas fa-copy"></i></button></td></tr>` : ''}
+          ${c.baseUri ? `<tr class="detail-row"><td class="detail-label">Base URI</td><td style="word-break:break-all;font-size:11px;">${c.baseUri}</td></tr>` : ''}
+        </table>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Memecoins Page ───────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+let allMemecoins = [];
+
+async function loadMemecoins() {
+  const tbody = document.getElementById('memecoin-list');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading memecoins…</td></tr>`;
+  try {
+    const data = await apiFetch('/memecoins');
+    allMemecoins = data.memecoins || [];
+    renderMemecoins(allMemecoins);
+  } catch (e) {
+    console.error('Memecoins:', e);
+    const tb = document.getElementById('memecoin-list');
+    if (tb) tb.innerHTML = `<tr><td colspan="9" style="padding:calc(var(--grid)*2);color:#c00;font-size:12px;text-align:center;">Failed to load memecoins</td></tr>`;
+  }
+}
+
+function filterMemecoins() {
+  const q = (document.getElementById('memecoin-search')?.value || '').toLowerCase().trim();
+  if (!q) { renderMemecoins(allMemecoins); return; }
+  renderMemecoins(allMemecoins.filter(m =>
+    (m.name   || '').toLowerCase().includes(q) ||
+    (m.symbol || '').toLowerCase().includes(q) ||
+    (m.address || '').toLowerCase().includes(q)
+  ));
+}
+
+function renderMemecoins(memecoins) {
+  const tbody = document.getElementById('memecoin-list');
+  if (!tbody) return;
+  if (!memecoins.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="padding:calc(var(--grid)*3);text-align:center;color:var(--mono-400);font-size:12px;">No memecoins found.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = memecoins.map(m => {
+    const icon = m.iconUrl ? `<img src="${m.iconUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;">` : '🚀';
+    const supply = m.totalSupply ?? m.supply ?? 0;
+    const antiWhale = m.maxWalletPercent ? m.maxWalletPercent + '%' : '—';
+    const burn = m.burnOnTransfer ? '🔥 Yes' : 'No';
+    const tax = m.transferTaxPercent ? m.transferTaxPercent + '%' : '0%';
+    return `
+      <tr onclick="showTokenDetail(${JSON.stringify(m).replace(/"/g,'&quot;')})" style="cursor:pointer;">
+        <td style="text-align:center;font-size:18px;">${icon}</td>
+        <td style="font-weight:600;">${m.name || '—'}</td>
+        <td><span style="font-size:11px;padding:2px 8px;background:var(--mono-900);border-radius:3px;font-family:monospace;">${m.symbol || '—'}</span></td>
+        <td style="font-size:11px;">${Number(supply).toLocaleString()}</td>
+        <td style="font-size:11px;">${m.holderCount ?? '—'}</td>
+        <td style="font-size:11px;color:${m.burnOnTransfer ? '#f56323' : 'var(--mono-400)'}">${burn}</td>
+        <td style="font-size:11px;">${tax}</td>
+        <td style="font-size:11px;">${antiWhale}</td>
+        <td><span style="font-size:10px;padding:2px 7px;border-radius:3px;background:#3a1a10;color:#f56323;">Memecoin</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Unified Address Detail Modal ─────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+async function showAddressDetail(address) {
+  if (!address) return;
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:800px;max-height:90vh;">
+      <div class="modal-header">
+        <h3><i class="fas fa-wallet"></i> Address: <span class="mono" style="font-size:12px;">${address}</span></h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body" id="addr-detail-body">
+        <div style="color:var(--mono-400);font-size:12px;padding:calc(var(--grid)*2);text-align:center;">
+          <i class="fas fa-spinner fa-spin"></i> Loading address data…
+        </div>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+
+  try {
+    const d = await apiFetch(`/address/${encodeURIComponent(address)}/full`);
+    const body = document.getElementById('addr-detail-body');
+    if (!body) return;
+
+    const ticker = (networkConfig && (networkConfig.nativeCurrency?.symbol || networkConfig.ticker)) || 'SAYN';
+    const txRows = (d.transactions || []).slice(0, 20).map(tx => `
+      <tr style="font-size:11px;border-bottom:1px solid var(--mono-900);">
+        <td style="padding:4px 0;" class="mono">${(tx.id || '').slice(0,14)}…</td>
+        <td style="padding:4px 0;">${txTypeBadge(tx.type)}</td>
+        <td style="padding:4px 0;">#${tx.blockIndex}</td>
+        <td style="padding:4px 0;">${tx.data?.amount !== undefined ? sayn(tx.data.amount) : '—'}</td>
+        <td style="padding:4px 0;">${fmtTime(tx.timestamp)}</td>
+      </tr>
+    `).join('');
+
+    const tokenRows = (d.tokens || []).map(t => `
+      <tr style="font-size:11px;border-bottom:1px solid var(--mono-900);">
+        <td style="padding:4px 0;font-weight:600;">${t.name || '—'}</td>
+        <td style="padding:4px 0;font-family:monospace;">${t.symbol || '—'}</td>
+        <td style="padding:4px 0;">${Number(t.balance || 0).toLocaleString()}</td>
+      </tr>
+    `).join('');
+
+    const nftRows = (d.nfts || []).map(n => `
+      <div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--mono-900);">
+        <strong>${n.collection || '—'}</strong> #${n.tokenId || '?'}
+      </div>
+    `).join('');
+
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--grid)*2);margin-bottom:calc(var(--grid)*2);">
+        <div style="border:var(--border);padding:calc(var(--grid)*2);background:var(--mono-950);">
+          <div style="font-size:10px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Native Balance</div>
+          <div style="font-size:18px;font-weight:700;">${sayn(d.balance ?? 0)}</div>
+          <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">${(d.balance ?? 0).toLocaleString()} base units</div>
+        </div>
+        <div style="border:var(--border);padding:calc(var(--grid)*2);background:var(--mono-950);">
+          <div style="font-size:10px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Active Stakes</div>
+          <div style="font-size:18px;font-weight:700;">${sayn(d.totalStaked ?? 0)}</div>
+          <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">${(d.stakes || []).length} pool(s)</div>
+        </div>
+      </div>
+
+      ${tokenRows ? `
+        <div style="margin-bottom:calc(var(--grid)*2);">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mono-400);margin-bottom:6px;">Token Balances</div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="font-size:10px;color:var(--mono-400);text-transform:uppercase;">
+              <th style="text-align:left;padding:4px 0;">Token</th><th style="text-align:left;padding:4px 0;">Symbol</th><th style="text-align:left;padding:4px 0;">Balance</th>
+            </tr></thead>
+            <tbody>${tokenRows}</tbody>
+          </table>
+        </div>` : ''}
+
+      ${nftRows ? `
+        <div style="margin-bottom:calc(var(--grid)*2);">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mono-400);margin-bottom:6px;">NFTs Owned</div>
+          ${nftRows}
+        </div>` : ''}
+
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mono-400);margin-bottom:6px;">Recent Transactions (last 20)</div>
+        ${txRows ? `
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="font-size:10px;color:var(--mono-400);text-transform:uppercase;">
+              <th style="text-align:left;padding:4px 0;">TX ID</th>
+              <th style="text-align:left;padding:4px 0;">Type</th>
+              <th style="text-align:left;padding:4px 0;">Block</th>
+              <th style="text-align:left;padding:4px 0;">Amount</th>
+              <th style="text-align:left;padding:4px 0;">Time</th>
+            </tr></thead>
+            <tbody>${txRows}</tbody>
+          </table>` : '<p style="color:var(--mono-400);font-size:12px;">No transactions found.</p>'}
+      </div>
+    `;
+  } catch (e) {
+    console.error('Address detail:', e);
+    const body = document.getElementById('addr-detail-body');
+    if (body) body.innerHTML = `<p style="color:#c00;font-size:12px;padding:calc(var(--grid)*2);">Failed to load address details</p>`;
+  }
 }
