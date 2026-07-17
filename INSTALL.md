@@ -1,4 +1,4 @@
-# Sayman Phase 21 - Complete Installation Guide
+# Sayman Phase 22 - Complete Installation Guide
 
 ## Prerequisites
 
@@ -108,8 +108,8 @@ npm run testnet
 **Output:**
 ```
 ╔════════════════════════════════════════╗
-║   SAYMAN BLOCKCHAIN - PHASE 21         ║
-║   EVM Wallet & Parallel Archive Sync   ║
+║   SAYMAN BLOCKCHAIN - PHASE 22         ║
+║   Full EVM/MetaMask Compat · tSAYN    ║
 ╚════════════════════════════════════════╝
 
 🌐 NETWORK: TESTNET
@@ -117,6 +117,7 @@ npm run testnet
 🔗 Chain ID: sayman-testnet-1
 ⛽ Gas: ENABLED
 🚰 Faucet: ENABLED ✅
+💱 Ticker: tSAYN (testnet)
 
 ✅ API server running on http://localhost:3000
 ```
@@ -184,7 +185,7 @@ sayman wallet info
 # Request from faucet (via browser or curl)
 curl -X POST http://localhost:3000/api/faucet \
   -H "Content-Type: application/json" \
-  -d '{"address":"YOUR_ADDRESS"}'
+  -d '{"address":"YOUR_ADDRESS"}'  # Accepts both 0x-prefixed and bare hex
 ```
 
 **Via UI:**
@@ -296,9 +297,9 @@ Features:
 
 ### Get Test Tokens
 
-1. Click "Faucet" tab
-2. Paste your address
-3. Click "Claim 1000 SAYN"
+1. Click "Faucet" tab (or visit https://sayman-faucet-site.vercel.app)
+2. Paste your address (0x-prefixed MetaMask addresses supported)
+3. Click "Claim 1000 tSAYN"
 4. Wait ~6 seconds for block
 
 ### Send Transaction
@@ -530,13 +531,13 @@ sayman estimate TRANSFER '{"from":"...","to":"...","amount":100}'
 Error: Invalid nonce. Expected: 5, Got: 3
 ```
 
-**Solution:**
+**Solution:** The wallet now fetches a fresh nonce from `/api/nonce/:address` before every broadcast automatically. If using CLI manually:
 ```bash
-# Check current nonce
-sayman balance
+# Fetch current nonce
+curl https://sayman.onrender.com/api/nonce/YOUR_ADDRESS
 
-# Transactions must be sequential
-# If nonce is 5, next transaction must use nonce 5
+# Or check balance which includes nonce
+sayman balance
 ```
 
 ### Rate Limit Exceeded
@@ -608,7 +609,7 @@ rm -rf ~/.sayman/
 
 ---
 
-**Congratulations! You've successfully installed Sayman Phase 21.**
+**Congratulations! You've successfully installed Sayman Phase 22.**
 
 Start exploring with:
 ```bash

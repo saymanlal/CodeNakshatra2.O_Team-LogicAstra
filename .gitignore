@@ -9,7 +9,7 @@ logs/
 .render/
 dist/
 
-# Internal documentation and pitch files
+# Private business / internal docs — do NOT push
 pitch.md
 summary.md
 PULL_REQUEST.md
@@ -20,5 +20,5 @@ ai.md
 # PDF Documentation — tracked for distribution
 # docs.pdf
 
-# docs/ directory removed — NETWORK_INFO.md now lives in root
+# docs/ directory — NETWORK_INFO.md lives in root now
 docs/
