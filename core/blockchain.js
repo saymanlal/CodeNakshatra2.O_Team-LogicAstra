@@ -892,8 +892,12 @@ class Blockchain {
     const pendingNonce   = this.pendingNonces.get(tx.data.from) ?? confirmedNonce;
     const expectedNonce  = Math.max(confirmedNonce, pendingNonce);
 
-    if (tx.nonce !== expectedNonce) {
-      throw new Error(`Invalid nonce. Expected: ${expectedNonce}, Got: ${tx.nonce}`);
+    if (tx.nonce < confirmedNonce) {
+      throw new Error(`Transaction nonce too low. Account nonce: ${confirmedNonce}, Tx nonce: ${tx.nonce}`);
+    }
+
+    if (tx.nonce > expectedNonce) {
+      console.log(`[Mempool] Accepting transaction with future/higher nonce ${tx.nonce} (expected ${expectedNonce}) for ${tx.data.from}`);
     }
 
     this.gas.validateGasParams(tx);
@@ -935,7 +939,7 @@ class Blockchain {
         }
     }
 
-    this.pendingNonces.set(tx.data.from, expectedNonce + 1);
+    this.pendingNonces.set(tx.data.from, tx.nonce + 1);
     this.mempool.push(tx);
     this.addressTxCount.set(tx.data.from, addrCount + 1);
   }
@@ -1188,165 +1192,201 @@ class Blockchain {
 
   async syncFromArchive() {
     console.log('[Sync] Starting synchronization from archive...');
-    const archiveReader = new ArchiveReader(this.githubClient, this.repoManager, this.config);
-    await this.repoManager.initialize();
-    
-    // Step 1: Find the latest state snapshot height in the archive
-    let latestSnapshotInfo = null;
+    this.isSyncing = true;
     try {
-      latestSnapshotInfo = await this.githubClient.readFile('snapshots/latest.json', this.repoManager.currentRepo);
-    } catch (err) {
-      try {
-        latestSnapshotInfo = await this.githubClient.readFile('snapshots/latest.json', this.repoManager.baseRepo);
-      } catch (err2) {
-        console.log('[Sync] No latest snapshot info found in archive. Syncing blocks from genesis...');
-      }
-    }
-    
-    let targetHeight = 0;
-    if (latestSnapshotInfo && latestSnapshotInfo.height !== undefined) {
-      targetHeight = latestSnapshotInfo.height;
-    } else {
-      console.log('[Sync] Target height could not be determined. Skipping archive sync.');
-      return;
-    }
-
-    // Determine current local height
-    let localHeight = 0;
-    try {
-      const rawHeight = await this.db.get('latest_height');
-      localHeight = parseInt(rawHeight, 10) + 1;
-    } catch (err) {
-      localHeight = 0;
-    }
-
-    if (localHeight >= targetHeight) {
-      console.log(`[Sync] Local chain height (${localHeight}) is already up to date with archive height (${targetHeight}).`);
-      return;
-    }
-
-    console.log(`[Sync] Syncing blocks from height ${localHeight} to ${targetHeight} from archive...`);
-
-    // Import the latest snapshot state if we are starting from genesis or significantly behind
-    if (localHeight === 0 || targetHeight - localHeight > 5000) {
-      console.log(`[Sync] Downloading and importing state snapshot at height ${targetHeight}...`);
-      try {
-        const snapshotState = await archiveReader.readStateSnapshot(targetHeight);
-        this.state.importState(snapshotState);
-        
-        // Save the snapshot to local disk so initialize() finds it
-        const snap = {
-          blockHeight: targetHeight,
-          timestamp: Date.now(),
-          state: snapshotState,
-          stateRoot: this.state.computeStateRoot(),
-        };
-        const p = path.join(this.snapshotDir, `snapshot-${targetHeight}.json`);
-        fs.writeFileSync(p, JSON.stringify(snap, null, 2));
-        console.log(`📸 Local snapshot saved at block ${targetHeight}`);
-      } catch (err) {
-        console.error('[Sync] Failed to load state snapshot:', err.message);
-      }
-    }
-
-    // Identify missing chunks
-    const batchSize = this.config.archive.batchSize || 1000;
-    const chunkRanges = [];
-    
-    // Find the starting chunk index
-    const startChunkIndex = Math.floor(localHeight / batchSize);
-    const endChunkIndex = Math.floor(targetHeight / batchSize);
-
-    for (let i = startChunkIndex; i <= endChunkIndex; i++) {
-      chunkRanges.push({
-        start: i * batchSize,
-        end: (i + 1) * batchSize - 1
-      });
-    }
-
-    console.log(`[Sync] Downloading ${chunkRanges.length} chunks from archive in batches of 10...`);
-
-    // Parallel download helper
-    const downloadChunk = async (range) => {
-      try {
-        const chunk = await archiveReader.readChunk(range.start, range.end);
-        return chunk;
-      } catch (err) {
-        console.error(`[Sync] Failed to download chunk ${range.start}-${range.end}:`, err.message);
-        throw err;
-      }
-    };
-
-    let syncCount = 0;
-    const chunkSizeBatch = 10;
-    for (let offset = 0; offset < chunkRanges.length; offset += chunkSizeBatch) {
-      const batchRanges = chunkRanges.slice(offset, offset + chunkSizeBatch);
-      console.log(`[Sync] Downloading batch ${offset / chunkSizeBatch + 1}/${Math.ceil(chunkRanges.length / chunkSizeBatch)} (${batchRanges.length} chunks)...`);
+      const archiveReader = new ArchiveReader(this.githubClient, this.repoManager, this.config);
+      await this.repoManager.initialize();
       
-      const batchPromises = batchRanges.map(range => downloadChunk(range));
-      const batchDownloaded = await Promise.all(batchPromises);
-      batchDownloaded.sort((a, b) => a.startHeight - b.startHeight);
+      // Step 1: Find the latest state snapshot height in the archive
+      let latestSnapshotInfo = null;
+      try {
+        latestSnapshotInfo = await this.githubClient.readFile('snapshots/latest.json', this.repoManager.currentRepo);
+      } catch (err) {
+        try {
+          latestSnapshotInfo = await this.githubClient.readFile('snapshots/latest.json', this.repoManager.baseRepo);
+        } catch (err2) {
+          console.log('[Sync] No latest snapshot info found in archive. Syncing blocks from genesis...');
+        }
+      }
       
-      console.log(`[Sync] Importing batch into LevelDB and building indexes...`);
-      for (const chunk of batchDownloaded) {
-        if (!chunk || !chunk.blocks) continue;
-        const ops = [];
-        for (const blockJson of chunk.blocks) {
-          ops.push({
-            type: 'put',
-            key: `block:${blockJson.index}`,
-            value: blockJson
-          });
+      let targetHeight = 0;
+      if (latestSnapshotInfo && latestSnapshotInfo.height !== undefined) {
+        targetHeight = latestSnapshotInfo.height;
+      }
+      
+      // Probe further chunks to find the true highest archived block and avoid data loss
+      console.log(`[Sync] Probing for additional chunks starting from height ${targetHeight}...`);
+      const batchSize = this.config.archive.batchSize || 1000;
+      let probeHeight = Math.floor(targetHeight / batchSize) * batchSize;
+      let foundHigher = true;
+      
+      while (foundHigher) {
+        const nextStart = probeHeight + batchSize;
+        const nextEnd = nextStart + batchSize - 1;
+        try {
+          // Verify if chunk is accessible/downloadable
+          const chunk = await archiveReader.readChunk(nextStart, nextEnd);
+          if (chunk && chunk.endHeight !== undefined) {
+            targetHeight = chunk.endHeight;
+            probeHeight = nextStart;
+            console.log(`[Sync] Found higher chunk in archive: ${nextStart} to ${chunk.endHeight}`);
+          } else {
+            foundHigher = false;
+          }
+        } catch (e) {
+          foundHigher = false;
+        }
+      }
+
+      console.log(`[Sync] True target height determined from archive: ${targetHeight}`);
+      if (targetHeight === 0 && !latestSnapshotInfo) {
+        console.log('[Sync] Target height could not be determined. Skipping archive sync.');
+        return;
+      }
+
+      // Determine current local height
+      let localHeight = 0;
+      try {
+        const rawHeight = await this.db.get('latest_height');
+        localHeight = parseInt(rawHeight, 10) + 1;
+      } catch (err) {
+        localHeight = 0;
+      }
+
+      if (localHeight >= targetHeight) {
+        console.log(`[Sync] Local chain height (${localHeight}) is already up to date with archive height (${targetHeight}).`);
+        return;
+      }
+
+      console.log(`[Sync] Syncing blocks from height ${localHeight} to ${targetHeight} from archive...`);
+
+      // Import the latest snapshot state if we are starting from genesis or significantly behind
+      if (localHeight === 0 || targetHeight - localHeight > 5000) {
+        console.log(`[Sync] Downloading and importing state snapshot at height ${targetHeight}...`);
+        try {
+          const snapshotState = await archiveReader.readStateSnapshot(targetHeight);
+          this.state.importState(snapshotState);
           
-          if (blockJson.hash) {
+          // Save the snapshot to local disk so initialize() finds it
+          const snap = {
+            blockHeight: targetHeight,
+            timestamp: Date.now(),
+            state: snapshotState,
+            stateRoot: this.state.computeStateRoot(),
+          };
+          const p = path.join(this.snapshotDir, `snapshot-${targetHeight}.json`);
+          fs.writeFileSync(p, JSON.stringify(snap, null, 2));
+          console.log(`📸 Local snapshot saved at block ${targetHeight}`);
+        } catch (err) {
+          console.error('[Sync] Failed to load state snapshot:', err.message);
+        }
+      }
+
+      // Identify missing chunks
+      const chunkRanges = [];
+      
+      // Find the starting chunk index
+      const startChunkIndex = Math.floor(localHeight / batchSize);
+      const endChunkIndex = Math.floor(targetHeight / batchSize);
+
+      for (let i = startChunkIndex; i <= endChunkIndex; i++) {
+        chunkRanges.push({
+          start: i * batchSize,
+          end: (i + 1) * batchSize - 1
+        });
+      }
+
+      console.log(`[Sync] Downloading ${chunkRanges.length} chunks from archive in batches of 10...`);
+
+      // Parallel download helper
+      const downloadChunk = async (range) => {
+        try {
+          const chunk = await archiveReader.readChunk(range.start, range.end);
+          return chunk;
+        } catch (err) {
+          console.error(`[Sync] Failed to download chunk ${range.start}-${range.end}:`, err.message);
+          throw err;
+        }
+      };
+
+      let syncCount = 0;
+      const chunkSizeBatch = 10;
+      for (let offset = 0; offset < chunkRanges.length; offset += chunkSizeBatch) {
+        const batchRanges = chunkRanges.slice(offset, offset + chunkSizeBatch);
+        console.log(`[Sync] Downloading batch ${offset / chunkSizeBatch + 1}/${Math.ceil(chunkRanges.length / chunkSizeBatch)} (${batchRanges.length} chunks)...`);
+        
+        const batchPromises = batchRanges.map(range => downloadChunk(range));
+        const batchDownloaded = await Promise.all(batchPromises);
+        batchDownloaded.sort((a, b) => a.startHeight - b.startHeight);
+        
+        console.log(`[Sync] Importing batch into LevelDB and building indexes...`);
+        for (const chunk of batchDownloaded) {
+          if (!chunk || !chunk.blocks) continue;
+          const ops = [];
+          for (const blockJson of chunk.blocks) {
             ops.push({
               type: 'put',
-              key: `hash:${blockJson.hash}`,
-              value: blockJson.index
+              key: `block:${blockJson.index}`,
+              value: blockJson
             });
-          }
-          
-          if (blockJson.transactions) {
-            for (let i = 0; i < blockJson.transactions.length; i++) {
-              const tx = blockJson.transactions[i];
-              const txId = tx.id;
-              if (txId) {
-                ops.push({
-                  type: 'put',
-                  key: `tx:${txId}`,
-                  value: { blockIndex: blockJson.index, txIndex: i }
-                });
-                
-                const involvedAddresses = new Set();
-                if (tx.data) {
-                  if (tx.data.from) involvedAddresses.add(tx.data.from.toLowerCase());
-                  if (tx.data.to) involvedAddresses.add(tx.data.to.toLowerCase());
-                  if (tx.data.validator) involvedAddresses.add(tx.data.validator.toLowerCase());
-                  if (tx.data.contractAddress) involvedAddresses.add(tx.data.contractAddress.toLowerCase());
-                }
-                for (const addr of involvedAddresses) {
+            
+            if (blockJson.hash) {
+              ops.push({
+                type: 'put',
+                key: `hash:${blockJson.hash}`,
+                value: blockJson.index
+              });
+            }
+            
+            if (blockJson.transactions) {
+              for (let i = 0; i < blockJson.transactions.length; i++) {
+                const tx = blockJson.transactions[i];
+                const txId = tx.id;
+                if (txId) {
                   ops.push({
                     type: 'put',
-                    key: `addr:${addr}:${blockJson.index}:${i}`,
-                    value: txId
+                    key: `tx:${txId}`,
+                    value: { blockIndex: blockJson.index, txIndex: i }
                   });
+                  
+                  const involvedAddresses = new Set();
+                  if (tx.data) {
+                    if (tx.data.from) involvedAddresses.add(tx.data.from.toLowerCase());
+                    if (tx.data.to) involvedAddresses.add(tx.data.to.toLowerCase());
+                    if (tx.data.validator) involvedAddresses.add(tx.data.validator.toLowerCase());
+                    if (tx.data.contractAddress) involvedAddresses.add(tx.data.contractAddress.toLowerCase());
+                  }
+                  for (const addr of involvedAddresses) {
+                    ops.push({
+                      type: 'put',
+                      key: `addr:${addr}:${blockJson.index}:${i}`,
+                      value: txId
+                    });
+                  }
                 }
               }
             }
+            syncCount++;
           }
-          syncCount++;
+          if (ops.length > 0) {
+            await this.db.batch(ops);
+          }
+          await this.db.put('latest_height', chunk.endHeight);
         }
-        if (ops.length > 0) {
-          await this.db.batch(ops);
-        }
-        await this.db.put('latest_height', chunk.endHeight);
+        
+        // Update proxy length
+        this.chain.length = batchDownloaded[batchDownloaded.length - 1].endHeight + 1;
       }
-      
-      // Update proxy length
-      this.chain.length = batchDownloaded[batchDownloaded.length - 1].endHeight + 1;
-    }
 
-    console.log(`[Sync] Archive synchronization complete. Synced ${syncCount} blocks.`);
+      console.log(`[Sync] Replaying state up to height ${this.chain.length} to finalize synchronization...`);
+      await this.replayState();
+
+      console.log(`[Sync] Archive synchronization complete. Synced ${syncCount} blocks.`);
+    } catch (err) {
+      console.error('[Sync] Fatal error during archive synchronization:', err);
+    } finally {
+      this.isSyncing = false;
+    }
   }
 }
 

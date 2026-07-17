@@ -3,6 +3,7 @@ import Transaction from '../core/transaction.js';
 import Wallet from '../wallet/wallet.js';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
+import { getNumericChainId } from '../core/evmHelper.js';
 
 export function setupRoutes(app, blockchain, p2pServer, config) {
   const router = express.Router();
@@ -1346,9 +1347,10 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   router.get('/wallet/chain', (req, res) => {
     const symbol  = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
     const chainId = config.chainId;
-    const chainIdHex = '0x' + Number(chainId).toString(16);
+    const numericId = getNumericChainId(chainId);
+    const chainIdHex = '0x' + numericId.toString(16);
     const host   = req.get('host') || 'sayman.onrender.com';
-    const proto  = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+    const proto  = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
     const base   = `${proto}://${host}`;
 
     res.json({

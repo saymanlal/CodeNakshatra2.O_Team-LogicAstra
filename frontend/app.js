@@ -190,6 +190,62 @@ async function loadNetworkConfig() {
     document.querySelectorAll('th').forEach(el => {
       if (el.textContent === 'Stake (SAYN)') el.textContent = `Stake (${sym})`;
     });
+
+    // Dynamically populate Add SAYMAN to Your Wallet details
+    const netName = networkConfig.network || 'SAYMAN';
+    const chainIdStr = networkConfig.chainId || '';
+    let numericId = 82922;
+    if (chainIdStr === 'sayman-mainnet-1') numericId = 82921;
+    else if (chainIdStr === 'sayman-public-testnet-1') numericId = 82922;
+    else if (chainIdStr === 'sayman-testnet-1') numericId = 82923;
+    else {
+      const parsedId = parseInt(chainIdStr.replace(/\D/g, ''), 10);
+      if (!isNaN(parsedId) && parsedId > 0) numericId = parsedId;
+    }
+
+    const host = window.location.host;
+    const proto = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
+    const base = `${proto}://${host}`;
+
+    const decVal = networkConfig.decimals || 100000000;
+    const internalDec = decVal === 100000000 ? 8 : 4;
+
+    const netNameEl = document.getElementById('wallet-net-name');
+    if (netNameEl) {
+      netNameEl.innerHTML = `${netName} <button class="copy-data-btn" onclick="copyToClipboard(this,'${netName}')"><i class="fas fa-copy"></i></button>`;
+    }
+    const chainIdEl = document.getElementById('wallet-chain-id');
+    if (chainIdEl) {
+      chainIdEl.innerHTML = `${numericId} <button class="copy-data-btn" onclick="copyToClipboard(this,'${numericId}')"><i class="fas fa-copy"></i></button>`;
+    }
+    const symbolEl = document.getElementById('wallet-symbol');
+    if (symbolEl) {
+      symbolEl.innerHTML = `${sym} <button class="copy-data-btn" onclick="copyToClipboard(this,'${sym}')"><i class="fas fa-copy"></i></button>`;
+    }
+    const rpcEl = document.getElementById('wallet-rpc-url');
+    if (rpcEl) {
+      rpcEl.innerHTML = `${base}/rpc <button class="copy-data-btn" onclick="copyToClipboard(this,'${base}/rpc')"><i class="fas fa-copy"></i></button>`;
+    }
+    const expEl = document.getElementById('wallet-explorer-url');
+    if (expEl) {
+      expEl.innerHTML = `${base} <button class="copy-data-btn" onclick="copyToClipboard(this,'${base}')"><i class="fas fa-copy"></i></button>`;
+    }
+    const decEl = document.getElementById('wallet-decimals');
+    if (decEl) {
+      decEl.textContent = internalDec;
+    }
+    const cardTitleEl = document.getElementById('wallet-card-title');
+    if (cardTitleEl) {
+      cardTitleEl.textContent = `${netName}`;
+    }
+    const clickInfoEl = document.getElementById('wallet-oneclick-info');
+    if (clickInfoEl) {
+      clickInfoEl.textContent = `Chain ID: ${numericId} · Symbol: ${sym}`;
+    }
+    const listLinkEl = document.getElementById('wallet-chainlist-link');
+    if (listLinkEl) {
+      listLinkEl.href = `https://chainlist.org/chain/${numericId}`;
+    }
   } catch {}
 }
 
@@ -1317,6 +1373,16 @@ function sayn(baseUnits, withUnit = true) {
 async function addSaymanToMetaMask() {
   const btn = document.getElementById('metamask-add-btn');
   if (!window.ethereum) {
+    // Check if user is on mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      // Redirect to MetaMask Dapp browser
+      const cleanHost = window.location.host;
+      const deepLink = `https://metamask.app.link/dapp/${cleanHost}`;
+      window.open(deepLink, '_blank');
+      showNotification('Opening MetaMask Mobile...');
+      return;
+    }
     showNotification('No wallet detected. Please install MetaMask.');
     return;
   }
@@ -1324,22 +1390,40 @@ async function addSaymanToMetaMask() {
     if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
     // Fetch live chain params from our EIP-3085 endpoint (includes logo URL)
     const chainParams = await apiFetch('/wallet/chain').catch(() => null);
+    
+    // Construct robust fallback matching active network settings
+    const sym = (networkConfig && (networkConfig.nativeCurrency?.symbol || networkConfig.ticker)) || 'tSAYN';
+    const netName = (networkConfig && networkConfig.network) || 'Sayman Public Testnet';
+    const chainIdStr = (networkConfig && networkConfig.chainId) || '';
+    let numericId = 82922;
+    if (chainIdStr === 'sayman-mainnet-1') numericId = 82921;
+    else if (chainIdStr === 'sayman-public-testnet-1') numericId = 82922;
+    else if (chainIdStr === 'sayman-testnet-1') numericId = 82923;
+    else {
+      const parsedId = parseInt(chainIdStr.replace(/\D/g, ''), 10);
+      if (!isNaN(parsedId) && parsedId > 0) numericId = parsedId;
+    }
+    const chainIdHex = '0x' + numericId.toString(16);
+    const host = window.location.host;
+    const proto = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
+    const base = `${proto}://${host}`;
+
     const params = chainParams || {
-      chainId:           '0x143CA',   // 82922 in hex
-      chainName:         'Sayman Public Testnet',
-      nativeCurrency:    { name: 'Test SAYN', symbol: 'tSAYN', decimals: 18 },
-      rpcUrls:           ['https://sayman.onrender.com/rpc'],
-      blockExplorerUrls: ['https://sayman.onrender.com'],
-      iconUrls:          ['https://sayman.onrender.com/assets/logo-512.png'],
+      chainId:           chainIdHex,
+      chainName:         netName,
+      nativeCurrency:    { name: `Test ${sym}`, symbol: sym, decimals: 18 },
+      rpcUrls:           [`${base}/rpc`],
+      blockExplorerUrls: [base],
+      iconUrls:          [`${base}/assets/logo-512.png`],
     };
     // Remove internal metadata before sending to wallet
-    delete params._metadata;
+    if (params._metadata) delete params._metadata;
 
     await window.ethereum.request({
       method: 'wallet_addEthereumChain',
       params: [params],
     });
-    showNotification('✅ SAYMAN Testnet added to your wallet!');
+    showNotification('✅ SAYMAN network added to your wallet!');
   } catch (err) {
     if (err.code === 4001) {
       showNotification('Request cancelled by user.');

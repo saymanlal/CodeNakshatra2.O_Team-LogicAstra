@@ -139,6 +139,13 @@ export class ArchiveWriter {
       const stateSnapshot = this.blockchain.state.exportState();
       await this.githubClient.queueWrite(`snapshots/state_${end}.json`, stateSnapshot, currentRepo);
 
+      // Update latest snapshot info
+      await this.githubClient.queueWrite(
+        'snapshots/latest.json',
+        { height: end, repo: currentRepo },
+        currentRepo
+      );
+
       // Update checkpoint
       this.lastArchivedBlock = end;
       this.saveCheckpoint();
