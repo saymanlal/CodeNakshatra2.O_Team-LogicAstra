@@ -440,19 +440,26 @@ async function processJsonRpc(method, params) {
     }
     case 'eth_getBalance': {
       const [addressParam] = params;
-      let address = addressParam.toLowerCase();
+      let address = (addressParam || '').toLowerCase();
       if (address.startsWith('0x')) address = address.slice(2);
       
       const balance = blockchain.state.getBalance(address);
+      // SAYMAN base units (1e8 decimals) → 18-decimal wei for MetaMask display
+      // Multiply by 1e10 to bridge the 8-decimal gap
       const balanceWei = BigInt(balance) * 10n**10n;
       return '0x' + balanceWei.toString(16);
     }
     case 'eth_getTransactionCount': {
       const [addressParam] = params;
-      let address = addressParam.toLowerCase();
+      let address = (addressParam || '').toLowerCase();
       if (address.startsWith('0x')) address = address.slice(2);
 
-      const nonce = blockchain.state.getNonce(address);
+      const confirmedNonce = blockchain.state.getNonce(address);
+      // Include pending nonce from NonceManager if available
+      const pendingNonce = blockchain.nonceManager
+        ? blockchain.nonceManager.getNonce(address)
+        : confirmedNonce;
+      const nonce = Math.max(confirmedNonce, pendingNonce);
       return '0x' + nonce.toString(16);
     }
     case 'eth_gasPrice': {
@@ -461,7 +468,8 @@ async function processJsonRpc(method, params) {
       return '0x' + gasPriceWei.toString(16);
     }
     case 'eth_estimateGas': {
-      return '0x5208'; // 21000 gas
+      // Return a reasonable gas estimate for MetaMask
+      return '0x' + (21000).toString(16);
     }
     case 'eth_sendRawTransaction': {
       const [rawTxHex] = params;
@@ -477,7 +485,7 @@ async function processJsonRpc(method, params) {
       let txType = TX_TYPES.TRANSFER;
       let dataPayload = {
         from: cleanSenderAddr,
-        to: evmTx.to,
+        to: evmTx.to ? (evmTx.to.startsWith('0x') ? evmTx.to.slice(2) : evmTx.to) : null,
         amount: Number(evmTx.value / 10n**10n)
       };
 
@@ -492,7 +500,7 @@ async function processJsonRpc(method, params) {
           txType = TX_TYPES.CONTRACT_CALL;
           dataPayload = {
             from: cleanSenderAddr,
-            contractAddress: evmTx.to,
+            contractAddress: evmTx.to.startsWith('0x') ? evmTx.to.slice(2) : evmTx.to,
             method: 'execute',
             args: { rawInput: evmTx.data }
           };
@@ -570,6 +578,7 @@ async function processJsonRpc(method, params) {
 
       const fromAddr = foundTx.data.from ? (foundTx.data.from.startsWith('0x') ? foundTx.data.from : '0x' + foundTx.data.from) : '0x' + '0'.repeat(40);
       const toAddr = foundTx.data.to ? (foundTx.data.to.startsWith('0x') ? foundTx.data.to : '0x' + foundTx.data.to) : null;
+      const gasUsed = foundTx.gasUsed || 21000;
 
       return {
         transactionHash: '0x' + foundTx.id,
@@ -578,12 +587,15 @@ async function processJsonRpc(method, params) {
         blockNumber: '0x' + foundBlock.index.toString(16),
         from: fromAddr,
         to: toAddr,
-        cumulativeGasUsed: '0x' + (foundTx.gasUsed || 21000).toString(16),
-        gasUsed: '0x' + (foundTx.gasUsed || 21000).toString(16),
-        contractAddress: null,
+        cumulativeGasUsed: '0x' + gasUsed.toString(16),
+        gasUsed: '0x' + gasUsed.toString(16),
+        contractAddress: foundTx.type === 'CONTRACT_DEPLOY' && foundTx.data?.contractAddress
+          ? '0x' + foundTx.data.contractAddress
+          : null,
         logs: [],
         logsBloom: '0x' + '0'.repeat(512),
-        status: '0x1'
+        status: '0x1',   // all mined txs are successful (revert = not in chain)
+        effectiveGasPrice: '0x' + ((blockchain.config.defaultGasPrice || 1) * 10**10).toString(16)
       };
     }
     case 'eth_accounts': {
@@ -592,8 +604,53 @@ async function processJsonRpc(method, params) {
     case 'eth_requestAccounts': {
       return [];
     }
+    // ── Log/Filter methods — MetaMask polls these constantly ────────────────────
+    case 'eth_getLogs': {
+      // Return empty logs array — SAYMAN events are not EVM-ABI encoded
+      return [];
+    }
+    case 'eth_newBlockFilter': {
+      // Return a filter ID; MetaMask uses this to detect new blocks
+      return '0x1';
+    }
+    case 'eth_newPendingTransactionFilter': {
+      return '0x2';
+    }
+    case 'eth_newFilter': {
+      return '0x3';
+    }
+    case 'eth_getFilterChanges': {
+      // Return latest block hash so MetaMask knows chain is live
+      const lastBlock = blockchain.getLastBlock();
+      return lastBlock ? ['0x' + lastBlock.hash] : [];
+    }
+    case 'eth_getFilterLogs': {
+      return [];
+    }
+    case 'eth_uninstallFilter': {
+      return true;
+    }
+    // ── Wallet methods — wallet_addEthereumChain from MetaMask ─────────────────
+    case 'wallet_addEthereumChain':
+    case 'wallet_switchEthereumChain': {
+      // These are handled client-side by MetaMask; return null = success acknowledged
+      return null;
+    }
+    case 'wallet_getPermissions':
+    case 'eth_getCode': {
+      return '0x';
+    }
     case 'web3_clientVersion': {
       return 'SAYMAN/v7.0.0/javascript';
+    }
+    case 'eth_syncing': {
+      return false; // not syncing
+    }
+    case 'net_listening': {
+      return true;
+    }
+    case 'net_peerCount': {
+      return '0x' + (p2pServer ? p2pServer.peers.size : 0).toString(16);
     }
     default:
       throw new Error(`Method ${method} not supported`);

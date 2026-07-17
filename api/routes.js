@@ -288,9 +288,11 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   });
 
   // Address info with nonce
+  // Accepts both bare 40-char hex and 0x-prefixed EVM addresses (MetaMask compatibility)
   router.get('/address/:address', async (req, res) => {
     try {
-      const { address } = req.params;
+      let address = req.params.address.trim().toLowerCase();
+      if (address.startsWith('0x')) address = address.slice(2);
       
       const balance = blockchain.state.getBalance(address);
       const stake = blockchain.state.getStake(address);
@@ -299,7 +301,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       const nonce = blockchain.state.getNonce(address);
       
       const transactions = [];
-      const prefix = `addr:${address.toLowerCase()}:`;
+      const prefix = `addr:${address}:`;
       try {
         for await (const [key, txId] of blockchain.db.iterator({ gte: prefix, lte: prefix + '\xff' })) {
           const parts = key.split(':');
@@ -325,9 +327,14 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       const validatorInfo = validators.find(v => v.address === address);
       
       const reputation = blockchain.state.getReputation(address);
+      const symbol = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
+      const decimals = config.decimals || 100_000_000;
       res.json({
         address,
+        addressEVM: '0x' + address,   // always return 0x form for MetaMask display
         balance,
+        balanceHuman: (balance / decimals).toFixed(8),
+        symbol,
         stake,
         unstaking,
         unlockBlock,
@@ -342,18 +349,22 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     }
   });
 
-  // Balance (legacy)
+  // Balance (legacy) — 0x-prefix compatible
   router.get('/balance/:address', (req, res) => {
-    const { address } = req.params;
+    let address = req.params.address.trim().toLowerCase();
+    if (address.startsWith('0x')) address = address.slice(2);
     const balance = blockchain.state.getBalance(address);
     const stake = blockchain.state.getStake(address);
     const unstaking = blockchain.state.isUnstaking(address);
     const unlockBlock = blockchain.state.getUnlockBlock(address);
     const nonce = blockchain.state.getNonce(address);
+    const symbol = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
 
     res.json({
       address,
+      addressEVM: '0x' + address,
       balance,
+      symbol,
       stake,
       unstaking,
       unlockBlock,
@@ -620,21 +631,31 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   });
 
   // Faucet (TESTNET ONLY)
+  // Accepts both bare 40-char hex (PUKY/native) and 0x-prefixed 42-char (MetaMask/EVM wallets)
   router.post('/faucet', (req, res) => {
     try {
       if (!config.faucetEnabled) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Faucet is disabled on mainnet',
           message: 'Faucet is only available on testnet'
         });
       }
 
-      const { address } = req.body;
+      let { address } = req.body;
 
       if (!address) {
         return res.status(400).json({ error: 'Address required' });
       }
 
+      // Strip 0x prefix — MetaMask sends 0x-prefixed addresses; SAYMAN stores bare hex
+      address = address.trim().toLowerCase();
+      if (address.startsWith('0x')) address = address.slice(2);
+
+      if (address.length !== 40 || !/^[0-9a-f]+$/.test(address)) {
+        return res.status(400).json({ error: 'Invalid address format. Provide a 40-char hex address or 0x-prefixed EVM address.' });
+      }
+
+      const symbol = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
       const tx = new Transaction(
         'GENESIS',
         { to: address, amount: Number(config.faucetAmount) },
@@ -647,12 +668,14 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
 
       blockchain.mempool.push(tx);
 
-      console.log(`🚰 Faucet: ${config.faucetAmount} SAYN → ${address.substring(0, 8)}...`);
+      console.log(`🚰 Faucet: ${config.faucetAmount} ${symbol} → ${address.substring(0, 8)}...`);
 
       res.json({
         success: true,
         amount: config.faucetAmount,
-        message: `${config.faucetAmount} SAYN credited (pending in mempool)`
+        symbol,
+        address: '0x' + address,  // return 0x-prefixed for MetaMask display
+        message: `${config.faucetAmount} ${symbol} credited (pending in mempool)`
       });
     } catch (error) {
       res.status(400).json({ error: error.message });
