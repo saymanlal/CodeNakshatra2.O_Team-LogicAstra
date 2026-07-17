@@ -1,0 +1,4038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAYMAN Blockchain — Complete Documentation (Phase 22)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --accent: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --bg: #ffffff;
+    --surface: #f8fafc;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --code-bg: #1e293b;
+    --code-text: #e2e8f0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 11pt;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+    padding: 0;
+  }
+
+  /* Cover page */
+  .cover {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #312e81 100%);
+    color: white;
+    text-align: center;
+    padding: 60px 40px;
+    page-break-after: always;
+  }
+
+  .cover-logo {
+    font-size: 72px;
+    margin-bottom: 24px;
+  }
+
+  .cover h1 {
+    font-size: 42pt;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #818cf8, #34d399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .cover .subtitle {
+    font-size: 14pt;
+    color: #94a3b8;
+    margin-bottom: 40px;
+    max-width: 600px;
+  }
+
+  .cover .badge-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 48px;
+  }
+
+  .cover .badge {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .cover .badge.green { background: rgba(16,185,129,0.2); border-color: #10b981; color: #34d399; }
+  .cover .badge.purple { background: rgba(99,102,241,0.2); border-color: #6366f1; color: #818cf8; }
+  .cover .badge.blue { background: rgba(59,130,246,0.2); border-color: #3b82f6; color: #93c5fd; }
+
+  .cover-meta {
+    margin-top: 40px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    width: 100%;
+    max-width: 640px;
+  }
+
+  .cover-meta-item {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 16px 20px;
+    text-align: left;
+  }
+
+  .cover-meta-label {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    margin-bottom: 4px;
+  }
+
+  .cover-meta-value {
+    font-size: 11pt;
+    font-weight: 600;
+    color: #e2e8f0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .cover-footer {
+    margin-top: 60px;
+    font-size: 9pt;
+    color: #475569;
+  }
+
+  /* TOC */
+  .toc {
+    padding: 60px 72px;
+    page-break-after: always;
+  }
+
+  .toc h2 {
+    font-size: 24pt;
+    font-weight: 700;
+    margin-bottom: 32px;
+    color: var(--text);
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 12px;
+  }
+
+  .toc-entry {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px dotted var(--border);
+    font-size: 11pt;
+  }
+
+  .toc-entry .num {
+    font-weight: 700;
+    color: var(--primary);
+    min-width: 28px;
+    font-size: 10pt;
+  }
+
+  .toc-entry .title { flex: 1; color: var(--text); }
+  .toc-entry .file { font-family: 'JetBrains Mono', monospace; font-size: 8pt; color: var(--text-muted); }
+
+  /* Sections */
+  .section {
+    padding: 48px 72px;
+    position: relative;
+  }
+
+  .section-source {
+    position: absolute;
+    top: 20px;
+    right: 72px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+  }
+
+  .page-break { page-break-before: always; }
+  .section:first-child { page-break-before: avoid; }
+
+  /* Typography */
+  h1 {
+    font-size: 28pt;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    margin-bottom: 8px;
+    margin-top: 0;
+    line-height: 1.2;
+    border-bottom: 3px solid var(--primary);
+    padding-bottom: 12px;
+  }
+
+  h2 {
+    font-size: 18pt;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 36px;
+    margin-bottom: 14px;
+    letter-spacing: -0.02em;
+    border-left: 4px solid var(--primary);
+    padding-left: 14px;
+  }
+
+  h3 {
+    font-size: 13pt;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 24px;
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+  }
+
+  h4 {
+    font-size: 11pt;
+    font-weight: 600;
+    color: var(--primary);
+    margin-top: 16px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  p {
+    margin-bottom: 14px;
+    color: var(--text);
+  }
+
+  ul, ol {
+    margin: 10px 0 16px 24px;
+  }
+
+  li {
+    margin-bottom: 6px;
+    line-height: 1.6;
+  }
+
+  li > ul { margin-top: 4px; margin-bottom: 4px; }
+
+  /* Code */
+  code {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 9.5pt;
+    background: #f1f5f9;
+    color: #0f172a;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 16px 0;
+    overflow-x: auto;
+    border-left: 4px solid var(--primary);
+    font-size: 9pt;
+    line-height: 1.65;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 10pt;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  thead {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+  }
+
+  thead th {
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 9.5pt;
+    letter-spacing: 0.02em;
+  }
+
+  tbody tr:nth-child(even) { background: var(--surface); }
+  tbody tr:nth-child(odd) { background: var(--bg); }
+
+  tbody tr:hover { background: #eff6ff; }
+
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  /* Blockquote / callouts */
+  blockquote {
+    border-left: 4px solid var(--primary);
+    background: #f0f9ff;
+    margin: 16px 0;
+    padding: 14px 20px;
+    border-radius: 0 8px 8px 0;
+    color: #0369a1;
+    font-size: 10.5pt;
+  }
+
+  blockquote strong { color: #0c4a6e; }
+
+  /* Links */
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Horizontal rule */
+  hr {
+    border: none;
+    border-top: 2px solid var(--border);
+    margin: 32px 0;
+  }
+
+  strong { font-weight: 600; color: var(--text); }
+  em { font-style: italic; }
+
+  /* Print */
+  @media print {
+    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .page-break { page-break-before: always; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    a { color: var(--primary) !important; }
+  }
+
+  /* Page numbers via CSS counter */
+  @page { margin: 0; size: A4; }
+</style>
+</head>
+<body>
+
+<!-- ── Cover Page ── -->
+<div class="cover">
+  <div class="cover-logo">⛓️</div>
+  <h1>SAYMAN Blockchain</h1>
+  <p class="subtitle">Complete Technical Documentation — Phase 22<br>
+  JavaScript-native Smart Contracts · Proof-of-Stake · Multi-Layer Chains · EVM Compatible</p>
+
+  <div class="badge-row">
+    <span class="badge green">Phase 22</span>
+    <span class="badge purple">Public Testnet</span>
+    <span class="badge blue">Chain ID 82922</span>
+    <span class="badge green">MetaMask Ready</span>
+    <span class="badge purple">tSAYN</span>
+    <span class="badge blue">MIT License</span>
+  </div>
+
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">RPC Endpoint</div>
+      <div class="cover-meta-value">sayman.onrender.com</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Explorer</div>
+      <div class="cover-meta-value">sayman.up.railway.app</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Ticker (Testnet)</div>
+      <div class="cover-meta-value">tSAYN</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Block Time</div>
+      <div class="cover-meta-value">5 seconds</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Decimals</div>
+      <div class="cover-meta-value">8 (sprinkles)</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Faucet</div>
+      <div class="cover-meta-value">t.me/SaymanLal</div>
+    </div>
+  </div>
+
+  <div class="cover-footer">
+    © 2026 SAYMAN Blockchain · Vizkus Groups (Cybokrafts Universal Innovations Pvt. Ltd.)<br>
+    github.com/saymanlal/SAYMAN · MIT License · Generated 2026-07-17
+  </div>
+</div>
+
+<!-- ── Table of Contents ── -->
+<div class="toc">
+  <h2>📋 Table of Contents</h2>
+  <div class="toc-entry"><span class="num">01</span><span class="title">Overview & What's New in Phase 22</span><span class="file">README.md</span></div>
+  <div class="toc-entry"><span class="num">02</span><span class="title">Network Info & Wallet Connection (MetaMask, Trust Wallet, all EVM wallets)</span><span class="file">NETWORK_INFO.md</span></div>
+  <div class="toc-entry"><span class="num">03</span><span class="title">Installation & Quick Start Guide</span><span class="file">INSTALL.md</span></div>
+  <div class="toc-entry"><span class="num">04</span><span class="title">Operating a Multi-Peer Testnet</span><span class="file">summary.md</span></div>
+  <div class="toc-entry"><span class="num">05</span><span class="title">Blockchain Comparison & Phase-by-Phase Roadmap (Phase 1–22)</span><span class="file">comparison.md</span></div>
+  <div class="toc-entry"><span class="num">06</span><span class="title">Pitch Deck — Executive Summary & Go-To-Market Strategy</span><span class="file">pitch.md</span></div>
+  <div class="toc-entry"><span class="num">07</span><span class="title">Pull Request — Phase 22 Changes & Testing Checklist</span><span class="file">PULL_REQUEST.md</span></div>
+  <div class="toc-entry"><span class="num">08</span><span class="title">Developer Reference & Project Memory (AI.md)</span><span class="file">AI.md</span></div>
+  <div class="toc-entry"><span class="num">09</span><span class="title">About SAYMAN — The Complete Story</span><span class="file">ABOUT.md</span></div>
+</div>
+
+<!-- ── Markdown sections ── -->
+
+  <div class="section page-break">
+    <div class="section-source">README.md</div>
+    <h1>⛓️ SAYMAN BLOCKCHAIN — PHASE 22: FULL EVM/METAMASK COMPAT · tSAYN · NONCE MANAGER · EXPLORER 2.0</h1>
+<p><strong>JavaScript-native Smart Contracts · Proof-of-Stake · Multi-Layer Chains · Custom Tokens · NFTs · DEX · Memecoins · Staking Pools</strong></p>
+<p><a href="https://github.com/saymanlal/SAYMAN"><img src="https://img.shields.io/badge/Phase-22-brightgreen" alt="Phase"></a>
+<a href="https://sayman.onrender.com"><img src="https://img.shields.io/badge/Network-Public%20Testnet-blue" alt="Network"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License"></a></p>
+<hr>
+<h2>🎯 What&#39;s New in Phase 22</h2>
+<p>Phase 22 delivers <strong>full MetaMask &amp; EVM wallet compatibility</strong>, the <strong>tSAYN testnet symbol</strong> (following Ethereum convention), an <strong>atomic NonceManager</strong> that eliminates nonce race conditions, <strong>Explorer 2.0</strong> with dedicated Token/NFT/Memecoin/Address pages, and a unified search bar across all entity types.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Full MetaMask Compatibility</strong></td>
+<td>✅ <code>eth_getLogs</code>, <code>eth_newBlockFilter</code>, <code>eth_getFilterChanges</code>, <code>wallet_addEthereumChain</code>, 0x address stripping, correct balance scale (×10¹⁰), nonce pending-state tracking</td>
+</tr>
+<tr>
+<td><strong>tSAYN Testnet Symbol</strong></td>
+<td>✅ Testnet API returns <code>tSAYN</code>; mainnet returns <code>SAYN</code> — follows Ethereum convention (SepoliaETH, Mumbai MATIC)</td>
+</tr>
+<tr>
+<td><strong>Atomic Nonce Manager</strong></td>
+<td>✅ <code>core/nonce.js</code> — per-address in-memory nonce tracking with <code>getNonce/commitNonce/rollbackNonce</code>; <code>/api/nonce/:addr</code> endpoint; wallet fetches fresh nonce before every broadcast</td>
+</tr>
+<tr>
+<td><strong>Explorer 2.0 Pages</strong></td>
+<td>✅ Dedicated explorer pages: Tokens · NFTs · Memecoins · unified Address (balance + txs + tokens + NFTs + reputation in one view)</td>
+</tr>
+<tr>
+<td><strong>Unified Search</strong></td>
+<td>✅ Search bar resolves block index, tx hash, address, token name/symbol from a single input</td>
+</tr>
+<tr>
+<td><strong>Live L2 Layer Status</strong></td>
+<td>✅ <code>/layers</code> page shows real-time chain status for each registered L2/sidechain</td>
+</tr>
+<tr>
+<td><strong>Gas Fee Accuracy</strong></td>
+<td>✅ Explorer now shows &quot;Fee Paid&quot; in tSAYN (not raw gas units)</td>
+</tr>
+<tr>
+<td><strong>Contract State &amp; ABI Fix</strong></td>
+<td>✅ <code>_extractABI</code> correctly handles <code>methods:{...}</code> style contracts; state viewer rendered properly</td>
+</tr>
+<tr>
+<td><strong>SAYMAN Logo Asset</strong></td>
+<td>✅ 512×512 PNG served at <code>/assets/logo-512.png</code> for MetaMask network icon recognition</td>
+</tr>
+<tr>
+<td><strong>PUKY Wallet APK v22</strong></td>
+<td>✅ New signed APK — tSAYN display, fresh nonce on every broadcast, <code>addSaymanToMetaMask()</code> one-click function</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🔌 MetaMask &amp; Global Wallet Integration</h2>
+<p>SAYMAN supports standard <strong>Ethereum JSON-RPC 2.0</strong>. Connect MetaMask, Trust Wallet, Coinbase Wallet, or any EVM-compatible wallet using:</p>
+<h3>🌐 Network Connection Settings</h3>
+<table>
+<thead>
+<tr>
+<th align="left">Parameter</th>
+<th align="left">Public Testnet</th>
+<th align="left">Local Development</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Network Name</strong></td>
+<td align="left">Sayman Public Testnet</td>
+<td align="left">Sayman Local Testnet</td>
+</tr>
+<tr>
+<td align="left"><strong>New RPC URL</strong></td>
+<td align="left"><code>https://sayman.onrender.com</code></td>
+<td align="left"><code>http://localhost:10000</code></td>
+</tr>
+<tr>
+<td align="left"><strong>Chain ID</strong></td>
+<td align="left"><code>82922</code> (hex <code>0x143ea</code>)</td>
+<td align="left"><code>82923</code> (hex <code>0x143eb</code>)</td>
+</tr>
+<tr>
+<td align="left"><strong>Currency Symbol</strong></td>
+<td align="left"><code>tSAYN</code></td>
+<td align="left"><code>tSAYN</code></td>
+</tr>
+<tr>
+<td align="left"><strong>Block Explorer</strong></td>
+<td align="left"><code>https://sayman.up.railway.app</code></td>
+<td align="left"><code>http://localhost:10000</code></td>
+</tr>
+<tr>
+<td align="left"><strong>Logo</strong></td>
+<td align="left"><code>https://sayman.onrender.com/assets/logo-512.png</code></td>
+<td align="left">—</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>One-click setup:</strong> Visit <a href="https://sayman.up.railway.app">https://sayman.up.railway.app</a> → Network page → <strong>&quot;Add to MetaMask&quot;</strong> button.</p>
+</blockquote>
+<h3>🛠️ Supported JSON-RPC Methods (Phase 22)</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>eth_chainId</code> / <code>net_version</code></td>
+<td>Returns <code>82922</code> (testnet)</td>
+</tr>
+<tr>
+<td><code>eth_blockNumber</code></td>
+<td>Latest block height in hex</td>
+</tr>
+<tr>
+<td><code>eth_getBlockByNumber</code> / <code>eth_getBlockByHash</code></td>
+<td>Block data in EVM format</td>
+</tr>
+<tr>
+<td><code>eth_getBalance</code></td>
+<td>Balance in Wei-equivalent (base units × 10¹⁰)</td>
+</tr>
+<tr>
+<td><code>eth_getTransactionCount</code></td>
+<td>Account nonce (confirmed + pending)</td>
+</tr>
+<tr>
+<td><code>eth_sendRawTransaction</code></td>
+<td>EIP-155 / EIP-2930 / EIP-1559 tx, ECDSA recovery → SAYMAN mempool</td>
+</tr>
+<tr>
+<td><code>eth_getTransactionByHash</code> / <code>eth_getTransactionReceipt</code></td>
+<td>Tx details + receipt with <code>effectiveGasPrice</code></td>
+</tr>
+<tr>
+<td><code>eth_estimateGas</code></td>
+<td>Returns <code>0x5208</code> (21000)</td>
+</tr>
+<tr>
+<td><code>eth_gasPrice</code></td>
+<td>Gas price in Wei-equivalent</td>
+</tr>
+<tr>
+<td><code>eth_getLogs</code></td>
+<td>Returns <code>[]</code> (SAYMAN events not ABI-encoded)</td>
+</tr>
+<tr>
+<td><code>eth_newBlockFilter</code> / <code>eth_getFilterChanges</code></td>
+<td>Block filter poll — returns latest block hash</td>
+</tr>
+<tr>
+<td><code>eth_newPendingTransactionFilter</code> / <code>eth_uninstallFilter</code></td>
+<td>Filter lifecycle</td>
+</tr>
+<tr>
+<td><code>wallet_addEthereumChain</code> / <code>wallet_switchEthereumChain</code></td>
+<td>EIP-3085 handled — <code>null</code> = success</td>
+</tr>
+<tr>
+<td><code>eth_accounts</code> / <code>eth_requestAccounts</code></td>
+<td>Returns <code>[]</code> (non-custodial)</td>
+</tr>
+<tr>
+<td><code>eth_syncing</code></td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>net_listening</code></td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>net_peerCount</code></td>
+<td>Live peer count</td>
+</tr>
+<tr>
+<td><code>web3_clientVersion</code></td>
+<td><code>SAYMAN/v22.0.0/javascript</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🏗️ Architecture</h2>
+<pre><code>sayman/
+├── core/
+│   ├── blockchain.js       # PoS engine, NonceManager integration
+│   ├── nonce.js            # 🆕 Phase 22: Atomic per-address NonceManager
+│   ├── chain-factory.js    # ChainFactory: L2/Sidechain/Permissioned config builder
+│   ├── rollup.js           # L2 state root commitment to L1
+│   ├── state.js            # StateEngine: balances, stakes, reputation, contracts
+│   ├── contracts.js        # Sandboxed JS VM contract execution
+│   ├── gas.js              # Gas calculator
+│   └── ...
+├── contracts/
+│   ├── token.js            # ERC-20 style token
+│   ├── nft.js              # ERC-721 style NFT
+│   ├── token-factory.js    # Token factory
+│   ├── nft-factory.js      # NFT collection factory
+│   ├── memecoin-factory.js # Memecoin launcher (burn/tax/anti-whale)
+│   ├── dex.js              # AMM DEX (Uniswap V2 style)
+│   ├── staking-pool.js     # Delegated staking pool
+│   └── layer2Bridge.js     # L1 bridge for L2 deposits/withdrawals
+├── p2p/server.js           # P2P sync + peer reputation points
+├── api/routes.js           # REST API — tokens, NFTs, memecoins, address, nonce endpoints
+├── assets/                 # 🆕 Phase 22: logo-512.png served for MetaMask
+├── frontend/               # Explorer 2.0 — Tokens/NFTs/Memecoins/Address pages, unified search
+├── config/                 # Network configs (testnet, public-testnet, mainnet)
+└── server.js               # Entry point — EVM RPC handler + static asset serving
+</code></pre>
+<hr>
+<h2>🪙 Tokenomics &amp; Denomination</h2>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Testnet</th>
+<th>Mainnet</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Ticker</strong></td>
+<td><code>tSAYN</code></td>
+<td><code>SAYN</code></td>
+</tr>
+<tr>
+<td><strong>Base Unit</strong></td>
+<td>sprinkle (1 SAYN = 100,000,000 sprinkles)</td>
+<td>same</td>
+</tr>
+<tr>
+<td><strong>Decimals</strong></td>
+<td>8</td>
+<td>8</td>
+</tr>
+<tr>
+<td><strong>Block Time</strong></td>
+<td>5 seconds</td>
+<td>5 seconds</td>
+</tr>
+<tr>
+<td><strong>Block Reward</strong></td>
+<td>0.5 SAYN = 50,000,000 sprinkles</td>
+<td>0.2 SAYN</td>
+</tr>
+<tr>
+<td><strong>Min Stake</strong></td>
+<td>10 SAYN = 1,000,000,000 sprinkles</td>
+<td>500 SAYN</td>
+</tr>
+<tr>
+<td><strong>Max Supply</strong></td>
+<td>Unlimited (testnet)</td>
+<td>100,000,000 SAYN</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>API Clarity</strong>: All on-chain amounts are integers in base units (sprinkles).
+Call <code>GET /api/denomination</code> for the conversion table.</p>
+</blockquote>
+<hr>
+<h2>🔗 Multi-Layer Chains</h2>
+<pre><code class="language-javascript">import { ChainFactory } from &#39;./core/chain-factory.js&#39;;
+
+// Layer 2 Rollup (anchored to SAYMAN L1)
+const config = ChainFactory.createL2Config({
+  name: &#39;MyL2Chain&#39;,
+  chainId: &#39;my-l2-1&#39;,
+  l1RpcUrl: &#39;https://sayman.onrender.com&#39;,
+  l1Bridge: &#39;&lt;BRIDGE_CONTRACT_ADDRESS&gt;&#39;,
+  genesis: { &#39;&lt;YOUR_ADDRESS&gt;&#39;: 1_000_000_000 }
+});
+
+// Independent Sidechain
+const sideConfig = ChainFactory.createSidechainConfig({
+  name: &#39;GameChain&#39;,
+  chainId: &#39;gamechain-1&#39;,
+  blockReward: 10_000_000,
+});
+
+// Permissioned (private consortium)
+const permConfig = ChainFactory.createPermissionedConfig({
+  name: &#39;EnterpriseChain&#39;,
+  chainId: &#39;ent-1&#39;,
+  validators: [&#39;&lt;ADDR1&gt;&#39;, &#39;&lt;ADDR2&gt;&#39;]
+});
+</code></pre>
+<hr>
+<h2>💻 Running Locally</h2>
+<pre><code class="language-bash">git clone https://github.com/saymanlal/SAYMAN
+cd SAYMAN
+npm install
+
+# Start validator node
+node server.js --network testnet --mode validator
+
+# Sync-only observer
+node server.js --network testnet --mode observer
+</code></pre>
+<h3>Environment Variables</h3>
+<pre><code class="language-env">PORT=10000
+NETWORK=public-testnet
+MODE=validator
+BOOTSTRAP_PEERS=wss://peer1.example.com/p2p
+DB_PATH=./data/node-10000
+</code></pre>
+<h3>Explorer</h3>
+<p>Open <code>http://localhost:10000</code>. Explorer 2.0 includes:</p>
+<ul>
+<li>📊 Dashboard — TPS, denomination, APR, mempool</li>
+<li>🔍 Block &amp; transaction explorer with unified search</li>
+<li>👥 Validators — stake (tSAYN), reputation, missed blocks</li>
+<li>🪙 Tokens / NFTs / Memecoins — factory-deployed assets</li>
+<li>🏠 Address — balance + tx history + tokens + NFTs + reputation</li>
+<li>🧩 Layers — L2/sidechain live status</li>
+<li>🌐 Network — peers, node info, MetaMask one-click add</li>
+</ul>
+<hr>
+<h2>🌐 REST API</h2>
+<pre><code class="language-bash"># Network info (layer, decimals, denomination, ticker)
+curl https://sayman.onrender.com/api/network
+
+# SAYN conversion guide
+curl https://sayman.onrender.com/api/denomination
+
+# Fresh nonce for address (use before broadcast)
+curl https://sayman.onrender.com/api/nonce/&lt;address&gt;
+
+# Custom tokens list
+curl https://sayman.onrender.com/api/tokens
+
+# NFT collections
+curl https://sayman.onrender.com/api/nfts
+
+# Memecoins
+curl https://sayman.onrender.com/api/memecoins
+
+# Unified address view (balance + txs + tokens + NFTs + reputation)
+curl https://sayman.onrender.com/api/address/&lt;address&gt;
+
+# Submit transaction
+curl -X POST https://sayman.onrender.com/api/broadcast \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;type&quot;:&quot;TRANSFER&quot;,&quot;data&quot;:{...},&quot;signature&quot;:&quot;...&quot;,&quot;publicKey&quot;:&quot;...&quot;}&#39;
+</code></pre>
+<hr>
+<h2>📝 Smart Contracts</h2>
+<pre><code class="language-javascript">// Deploy a custom token:
+client.callContract({
+  contractAddress: TOKEN_FACTORY_ADDR,
+  method: &#39;createToken&#39;,
+  args: { name: &#39;DOGE ON SAYMAN&#39;, symbol: &#39;SDOGE&#39;, totalSupply: 1_000_000_000 }
+});
+
+// Launch a memecoin:
+client.callContract({
+  contractAddress: MEMECOIN_FACTORY_ADDR,
+  method: &#39;launch&#39;,
+  args: {
+    name: &#39;PepeSAYN&#39;, symbol: &#39;PSAYN&#39;, totalSupply: 420_000_000_000,
+    transferTaxPercent: 2, maxWalletPercent: 1, burnOnTransfer: true
+  }
+});
+
+// Add liquidity to DEX:
+client.callContract({
+  contractAddress: DEX_ADDR,
+  method: &#39;addLiquidity&#39;,
+  args: { tokenA: &#39;ADDR_A&#39;, tokenB: &#39;ADDR_B&#39;, amountA: 1000, amountB: 2000 }
+});
+</code></pre>
+<hr>
+<h2>📱 PUKY Mobile Wallet (v22)</h2>
+<p>Android APK at <code>/apk/puky.apk</code> (also mirrored at <code>github.com/saymanlal/puky</code>). Features:</p>
+<ul>
+<li>MetaMask-compatible: <code>addSaymanToMetaMask()</code> one-click network setup</li>
+<li>Fresh nonce fetched before every broadcast (no nonce race conditions)</li>
+<li>Balance displayed in <strong>tSAYN</strong> (testnet) / <strong>SAYN</strong> (mainnet)</li>
+<li>Multi-RPC failover (Railway + Render + local)</li>
+<li>Send / receive / stake / unstake</li>
+</ul>
+<hr>
+<h2>🤝 Contributing</h2>
+<p>See <code>ABOUT.md</code> for full project vision. PRs welcome on <code>main</code> branch.</p>
+<h3>Phase 22 Updates</h3>
+<ul>
+<li><strong>Full MetaMask EVM Compat</strong>: <code>eth_getLogs</code>, <code>eth_newBlockFilter</code>, <code>eth_getFilterChanges</code>, <code>wallet_addEthereumChain</code>, 0x address auto-stripping, balance scale fix, pending nonce tracking.</li>
+<li><strong>tSAYN Testnet Symbol</strong>: API, explorer, wallet all show <code>tSAYN</code> on testnet; <code>SAYN</code> on mainnet.</li>
+<li><strong>Atomic NonceManager</strong>: <code>core/nonce.js</code> — eliminates nonce race conditions; <code>/api/nonce/:addr</code> endpoint; wallet uses fresh nonce before every broadcast.</li>
+<li><strong>Explorer 2.0</strong>: Tokens, NFTs, Memecoins, unified Address pages; unified search; live L2 layer status; accurate gas fee in tSAYN; contract state &amp; ABI viewer fix.</li>
+<li><strong>PUKY APK v22</strong>: New signed build with all Phase 22 features.</li>
+</ul>
+<hr>
+<h2>📄 License</h2>
+<p>MIT — see <code>LICENSE</code> file.</p>
+<hr>
+<h2>🔗 Links</h2>
+<ul>
+<li><strong>Explorer</strong>: <a href="https://sayman.up.railway.app">https://sayman.up.railway.app</a></li>
+<li><strong>RPC</strong>: <a href="https://sayman.onrender.com">https://sayman.onrender.com</a></li>
+<li><strong>Wallet (web)</strong>: <a href="https://sayman-wallet-manager.vercel.app">https://sayman-wallet-manager.vercel.app</a></li>
+<li><strong>Faucet</strong>: <a href="https://sayman-faucet-site.vercel.app">https://sayman-faucet-site.vercel.app</a></li>
+<li><strong>Docs</strong>: <a href="https://sayman-docs.vercel.app">https://sayman-docs.vercel.app</a></li>
+<li><strong>GitHub</strong>: <a href="https://github.com/saymanlal/SAYMAN">https://github.com/saymanlal/SAYMAN</a></li>
+<li><strong>Telegram (bulk tokens)</strong>: <a href="https://t.me/SaymanLal">https://t.me/SaymanLal</a></li>
+<li><strong>IP Owner</strong>: <a href="https://vizkusgroups.me">Vizkus Groups</a> (Cybokrafts Universal Innovations Pvt. Ltd.)</li>
+</ul>
+
+  </div>
+  <div class="section page-break">
+    <div class="section-source">NETWORK_INFO.md</div>
+    <h1>🌐 SAYMAN Blockchain — Network Info &amp; Wallet Connection Guide</h1>
+<p><strong>Phase 22</strong> | Public Testnet | Chain ID: <code>82922</code><br><strong>RPC Endpoint:</strong> <code>https://sayman.onrender.com</code><br><strong>Block Explorer:</strong> <code>https://sayman.up.railway.app</code><br><strong>GitHub:</strong> <code>https://github.com/saymanlal/SAYMAN</code></p>
+<hr>
+<h2>🔌 Connect Your Wallet (MetaMask &amp; All Global Wallets)</h2>
+<p>SAYMAN supports the standard <strong>Ethereum JSON-RPC 2.0</strong> protocol. Any wallet that accepts custom networks (MetaMask, Trust Wallet, Coinbase Wallet, Rainbow, Rabby, imToken, Exodus, Brave Wallet, etc.) can connect using the parameters below.</p>
+<h3>📱 Public Testnet (Live Network)</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Network Name</strong></td>
+<td>Sayman Public Testnet</td>
+</tr>
+<tr>
+<td><strong>New RPC URL</strong></td>
+<td><code>https://sayman.onrender.com</code></td>
+</tr>
+<tr>
+<td><strong>Chain ID</strong></td>
+<td><code>82922</code></td>
+</tr>
+<tr>
+<td><strong>Currency Symbol</strong></td>
+<td><code>tSAYN</code></td>
+</tr>
+<tr>
+<td><strong>Block Explorer URL</strong></td>
+<td><code>https://sayman.up.railway.app</code></td>
+</tr>
+<tr>
+<td><strong>Network Hex ID</strong></td>
+<td><code>0x143ea</code></td>
+</tr>
+<tr>
+<td><strong>Logo</strong></td>
+<td><code>https://sayman.onrender.com/assets/logo-512.png</code></td>
+</tr>
+</tbody></table>
+<h3>💻 Local Development Node</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Network Name</strong></td>
+<td>Sayman Local Testnet</td>
+</tr>
+<tr>
+<td><strong>New RPC URL</strong></td>
+<td><code>http://localhost:10000</code></td>
+</tr>
+<tr>
+<td><strong>Chain ID</strong></td>
+<td><code>82923</code></td>
+</tr>
+<tr>
+<td><strong>Currency Symbol</strong></td>
+<td><code>tSAYN</code></td>
+</tr>
+<tr>
+<td><strong>Block Explorer URL</strong></td>
+<td><code>http://localhost:10000</code></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>⚡ <strong>One-click setup:</strong> Visit <a href="https://sayman.up.railway.app">https://sayman.up.railway.app</a> → Network page → <strong>&quot;Add to MetaMask&quot;</strong> button (EIP-3085 <code>wallet_addEthereumChain</code>).</p>
+</blockquote>
+<hr>
+<h2>🔧 Step-by-Step: Add SAYMAN to MetaMask</h2>
+<h3>Desktop (MetaMask Browser Extension)</h3>
+<ol>
+<li>Open MetaMask → click the network dropdown at the top</li>
+<li>Click <strong>&quot;Add network&quot;</strong></li>
+<li>Click <strong>&quot;Add a network manually&quot;</strong> at the bottom</li>
+<li>Fill in the fields:<ul>
+<li><strong>Network name:</strong> <code>Sayman Public Testnet</code></li>
+<li><strong>New RPC URL:</strong> <code>https://sayman.onrender.com</code></li>
+<li><strong>Chain ID:</strong> <code>82922</code></li>
+<li><strong>Currency symbol:</strong> <code>tSAYN</code></li>
+<li><strong>Block explorer URL:</strong> <code>https://sayman.up.railway.app</code></li>
+</ul>
+</li>
+<li>Click <strong>Save</strong> → then <strong>&quot;Switch to Sayman Public Testnet&quot;</strong></li>
+</ol>
+<h3>Mobile (MetaMask App)</h3>
+<ol>
+<li>Open MetaMask → tap the hamburger menu</li>
+<li>Tap <strong>Settings</strong> → <strong>Networks</strong> → <strong>Add Network</strong></li>
+<li>Enter the same values as above (use <code>tSAYN</code> as symbol)</li>
+<li>Tap <strong>Add</strong> to confirm</li>
+</ol>
+<hr>
+<h2>🌍 Add to Other Wallets</h2>
+<h3>Trust Wallet</h3>
+<ol>
+<li>Go to Settings → Preferences → Custom Network</li>
+<li>Enter: RPC URL <code>https://sayman.onrender.com</code>, Chain ID <code>82922</code>, Symbol <code>tSAYN</code></li>
+</ol>
+<h3>Coinbase Wallet</h3>
+<ol>
+<li>Settings → Active Networks → Add Custom Network</li>
+<li>Enter the same network details as above</li>
+</ol>
+<h3>Rabby / Rainbow / Brave Wallet</h3>
+<ul>
+<li>All support EIP-3085 (<code>wallet_addEthereumChain</code>) — use the same values above</li>
+</ul>
+<h3>WalletConnect</h3>
+<ul>
+<li>SAYMAN is EVM JSON-RPC 2.0 compatible; use Chain ID <code>82922</code> to connect</li>
+</ul>
+<hr>
+<h2>🛠️ Supported JSON-RPC Methods (Phase 22)</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>eth_chainId</code></td>
+<td>Returns <code>0x143ea</code> (82922 for public testnet)</td>
+</tr>
+<tr>
+<td><code>net_version</code></td>
+<td>Returns <code>&quot;82922&quot;</code></td>
+</tr>
+<tr>
+<td><code>eth_blockNumber</code></td>
+<td>Latest block height in hex</td>
+</tr>
+<tr>
+<td><code>eth_getBlockByNumber</code></td>
+<td>Block data (EVM-format) by number</td>
+</tr>
+<tr>
+<td><code>eth_getBlockByHash</code></td>
+<td>Block data (EVM-format) by hash</td>
+</tr>
+<tr>
+<td><code>eth_getBalance</code></td>
+<td>Address balance in Wei-equivalent (base units × 10¹⁰)</td>
+</tr>
+<tr>
+<td><code>eth_getTransactionCount</code></td>
+<td>Account nonce (confirmed + pending max)</td>
+</tr>
+<tr>
+<td><code>eth_sendRawTransaction</code></td>
+<td>Submit signed EIP-155/2930/1559 transaction</td>
+</tr>
+<tr>
+<td><code>eth_getTransactionByHash</code></td>
+<td>Transaction details by hash</td>
+</tr>
+<tr>
+<td><code>eth_getTransactionReceipt</code></td>
+<td>Transaction receipt (status, gas used, <code>effectiveGasPrice</code>)</td>
+</tr>
+<tr>
+<td><code>eth_estimateGas</code></td>
+<td>Gas estimate (returns <code>0x5208</code> = 21000)</td>
+</tr>
+<tr>
+<td><code>eth_gasPrice</code></td>
+<td>Current gas price in Wei-equivalent</td>
+</tr>
+<tr>
+<td><code>eth_getLogs</code></td>
+<td>Returns <code>[]</code> (SAYMAN events are not EVM ABI-encoded)</td>
+</tr>
+<tr>
+<td><code>eth_newBlockFilter</code></td>
+<td>Creates filter; returns <code>0x1</code></td>
+</tr>
+<tr>
+<td><code>eth_getFilterChanges</code></td>
+<td>Returns latest block hash for liveness polling</td>
+</tr>
+<tr>
+<td><code>eth_newPendingTransactionFilter</code></td>
+<td>Returns <code>0x2</code></td>
+</tr>
+<tr>
+<td><code>eth_newFilter</code></td>
+<td>Returns <code>0x3</code></td>
+</tr>
+<tr>
+<td><code>eth_getFilterLogs</code></td>
+<td>Returns <code>[]</code></td>
+</tr>
+<tr>
+<td><code>eth_uninstallFilter</code></td>
+<td>Returns <code>true</code></td>
+</tr>
+<tr>
+<td><code>eth_accounts</code></td>
+<td>Returns <code>[]</code> (non-custodial)</td>
+</tr>
+<tr>
+<td><code>eth_requestAccounts</code></td>
+<td>Returns <code>[]</code></td>
+</tr>
+<tr>
+<td><code>wallet_addEthereumChain</code></td>
+<td>EIP-3085 — acknowledged, returns <code>null</code></td>
+</tr>
+<tr>
+<td><code>wallet_switchEthereumChain</code></td>
+<td>Returns <code>null</code></td>
+</tr>
+<tr>
+<td><code>wallet_getPermissions</code></td>
+<td>Returns <code>[]</code></td>
+</tr>
+<tr>
+<td><code>eth_getCode</code></td>
+<td>Returns <code>0x</code></td>
+</tr>
+<tr>
+<td><code>eth_syncing</code></td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>net_listening</code></td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>net_peerCount</code></td>
+<td>Live peer count in hex</td>
+</tr>
+<tr>
+<td><code>web3_clientVersion</code></td>
+<td><code>SAYMAN/v22.0.0/javascript</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>💡 Example: curl JSON-RPC Calls</h2>
+<pre><code class="language-bash"># Get chain ID
+curl -X POST https://sayman.onrender.com \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;eth_chainId&quot;,&quot;params&quot;:[],&quot;id&quot;:1}&#39;
+# → {&quot;result&quot;:&quot;0x143ea&quot;}
+
+# Get latest block number
+curl -X POST https://sayman.onrender.com \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;eth_blockNumber&quot;,&quot;params&quot;:[],&quot;id&quot;:1}&#39;
+
+# Get balance (0x-prefixed MetaMask address works)
+curl -X POST https://sayman.onrender.com \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;eth_getBalance&quot;,&quot;params&quot;:[&quot;0xYOUR_ADDRESS&quot;,&quot;latest&quot;],&quot;id&quot;:1}&#39;
+
+# Get nonce (fresh — use before every broadcast to avoid conflicts)
+curl https://sayman.onrender.com/api/nonce/YOUR_ADDRESS
+</code></pre>
+<hr>
+<h2>🌐 Network Overview (Phase 22)</h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Network Name</strong></td>
+<td>Sayman Public Testnet</td>
+</tr>
+<tr>
+<td><strong>Chain ID (string)</strong></td>
+<td><code>sayman-public-testnet-1</code></td>
+</tr>
+<tr>
+<td><strong>Chain ID (numeric)</strong></td>
+<td><code>82922</code></td>
+</tr>
+<tr>
+<td><strong>Layer</strong></td>
+<td>L1 (Base chain)</td>
+</tr>
+<tr>
+<td><strong>Block Time</strong></td>
+<td>5 seconds</td>
+</tr>
+<tr>
+<td><strong>Block Reward</strong></td>
+<td>0.5 tSAYN (50,000,000 base units)</td>
+</tr>
+<tr>
+<td><strong>Min Stake</strong></td>
+<td>10 tSAYN (1,000,000,000 base units)</td>
+</tr>
+<tr>
+<td><strong>Max Supply (Testnet)</strong></td>
+<td>Unlimited</td>
+</tr>
+<tr>
+<td><strong>Max Supply (Mainnet)</strong></td>
+<td>100,000,000 SAYN</td>
+</tr>
+<tr>
+<td><strong>Ticker (Testnet)</strong></td>
+<td><code>tSAYN</code></td>
+</tr>
+<tr>
+<td><strong>Ticker (Mainnet)</strong></td>
+<td><code>SAYN</code></td>
+</tr>
+<tr>
+<td><strong>Base Unit</strong></td>
+<td>sprinkle (1 SAYN = 100,000,000 sprinkles)</td>
+</tr>
+<tr>
+<td><strong>Decimals</strong></td>
+<td>8</td>
+</tr>
+<tr>
+<td><strong>Gas Price</strong></td>
+<td>1 base unit per gas unit</td>
+</tr>
+<tr>
+<td><strong>Transfer Gas</strong></td>
+<td>21,000 gas</td>
+</tr>
+<tr>
+<td><strong>Faucet</strong></td>
+<td>✅ Enabled</td>
+</tr>
+<tr>
+<td><strong>Faucet Amount</strong></td>
+<td>1,000 tSAYN per drip</td>
+</tr>
+<tr>
+<td><strong>Faucet Cooldown</strong></td>
+<td>10 minutes</td>
+</tr>
+<tr>
+<td><strong>Bulk Tokens</strong></td>
+<td>Telegram @SaymanLal (up to 10M tSAYN for builders)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>⛽ Gas Model</h2>
+<h3>Gas Limits</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Min Gas Price</strong></td>
+<td>1 wei</td>
+</tr>
+<tr>
+<td><strong>Max Gas Per Transaction</strong></td>
+<td>10,000,000</td>
+</tr>
+<tr>
+<td><strong>Max Gas Per Block</strong></td>
+<td>100,000,000</td>
+</tr>
+<tr>
+<td><strong>Max Execution Time</strong></td>
+<td>5,000ms</td>
+</tr>
+<tr>
+<td><strong>Max State Size</strong></td>
+<td>500KB</td>
+</tr>
+<tr>
+<td><strong>Max Instructions</strong></td>
+<td>100,000</td>
+</tr>
+</tbody></table>
+<h3>Gas Costs</h3>
+<table>
+<thead>
+<tr>
+<th>Transaction Type</th>
+<th>Base Gas Cost</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>TRANSFER</strong></td>
+<td>21,000</td>
+</tr>
+<tr>
+<td><strong>STAKE</strong></td>
+<td>50,000</td>
+</tr>
+<tr>
+<td><strong>UNSTAKE</strong></td>
+<td>50,000</td>
+</tr>
+<tr>
+<td><strong>CONTRACT_DEPLOY</strong></td>
+<td>200,000 + code size</td>
+</tr>
+<tr>
+<td><strong>CONTRACT_CALL</strong></td>
+<td>50,000 + execution</td>
+</tr>
+<tr>
+<td><strong>CONTRACT_UPGRADE</strong></td>
+<td>300,000</td>
+</tr>
+<tr>
+<td><strong>STORAGE_READ</strong></td>
+<td>500</td>
+</tr>
+<tr>
+<td><strong>STORAGE_WRITE</strong></td>
+<td>2,000</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🔐 Security Features</h2>
+<h3>Anti-Spam Protections</h3>
+<ul>
+<li>✅ <strong>Atomic NonceManager</strong>: Per-address nonce tracking in <code>core/nonce.js</code> — prevents replay attacks and race conditions</li>
+<li>✅ <strong>Gas Fees</strong>: Economic cost to submit transactions (nearly free on testnet)</li>
+<li>✅ <strong>Mempool Limit</strong>: Maximum 1,000 pending transactions</li>
+<li>✅ <strong>Rate Limiting</strong>: Max 10 transactions per minute per address</li>
+<li>✅ <strong>EVM Signature Recovery</strong>: ECDSA secp256k1 sender recovery for EIP-155 raw tx</li>
+<li>✅ <strong>0x Address Handling</strong>: All endpoints strip <code>0x</code> prefix for compatibility with any wallet</li>
+</ul>
+<h3>Consensus Security</h3>
+<ul>
+<li>✅ <strong>Proof of Stake</strong>: Validator selection by staked SAYN balance</li>
+<li>✅ <strong>Minimum Stake</strong>: 10 tSAYN required per validator</li>
+<li>✅ <strong>Slashing</strong>: Validators penalized for missed blocks</li>
+<li>✅ <strong>Chain ID Validation</strong>: Prevents cross-network replay attacks</li>
+<li>✅ <strong>State Root Validation</strong>: Deterministic state root per block</li>
+</ul>
+<hr>
+<h2>💰 Economics</h2>
+<h3>Token Supply</h3>
+<ul>
+<li><strong>Max Supply (Testnet)</strong>: Unlimited</li>
+<li><strong>Max Supply (Mainnet)</strong>: 100,000,000 SAYN</li>
+<li><strong>Block Reward</strong>: 0.5 tSAYN per block (testnet)</li>
+<li><strong>Blocks Per Day</strong>: 17,280 (at 5s blocktime)</li>
+<li><strong>Daily Emission</strong>: 8,640 tSAYN/day</li>
+</ul>
+<h3>Staking</h3>
+<ul>
+<li><strong>Minimum Stake</strong>: 10 tSAYN (1,000,000,000 base units)</li>
+<li><strong>Unstake Delay</strong>: 50 blocks</li>
+<li><strong>Slash Percentage</strong>: 10% for missed blocks</li>
+</ul>
+<hr>
+<h2>🚀 Bootstrap Peers (P2P Network)</h2>
+<table>
+<thead>
+<tr>
+<th>Node</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Primary (Railway)</strong></td>
+<td><code>wss://sayman.up.railway.app/p2p</code></td>
+</tr>
+<tr>
+<td><strong>Render Node 1</strong></td>
+<td><code>wss://sayman.onrender.com/p2p</code></td>
+</tr>
+<tr>
+<td><strong>Render Node 2</strong></td>
+<td><code>wss://sayman-1.onrender.com/p2p</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🔧 REST API Endpoints (Phase 22)</h2>
+<p><strong>Base URL:</strong> <code>https://sayman.onrender.com/api</code></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/network</code></td>
+<td>Network configuration (ticker, chainId, layer)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/stats</code></td>
+<td>Network statistics</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/blocks</code></td>
+<td>List blocks (paginated)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/block/:index</code></td>
+<td>Get block by index</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/block/hash/:hash</code></td>
+<td>Get block by hash</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/transactions/:id</code></td>
+<td>Get transaction</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/address/:address</code></td>
+<td>Unified address view — balance + txs + tokens + NFTs + reputation</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/nonce/:address</code></td>
+<td>🆕 Fresh nonce for address (use before every broadcast)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/validators</code></td>
+<td>List validators</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/contracts</code></td>
+<td>List contracts</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/tokens</code></td>
+<td>🆕 All factory-deployed tokens</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/nfts</code></td>
+<td>🆕 All factory-deployed NFT collections</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/memecoins</code></td>
+<td>🆕 All factory-deployed memecoins</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/mempool</code></td>
+<td>Current mempool</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/tps</code></td>
+<td>Live TPS estimate</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/denomination</code></td>
+<td>SAYN/sprinkle conversion table</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/layers</code></td>
+<td>🆕 L2/sidechain live status</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/broadcast</code></td>
+<td>Submit signed transaction</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/estimate-gas</code></td>
+<td>Estimate gas cost</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/faucet</code></td>
+<td>Request test tokens (accepts 0x-prefixed addresses)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/search/:query</code></td>
+<td>Unified search — block/tx/address/token</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>📦 Archive &amp; Recovery</h2>
+<p>SAYMAN uses a GitHub-backed archive system (<code>github.com/saymanlal/sayman-archive</code>) for block persistence:</p>
+<ul>
+<li>Blocks archived in chunks of 1,000 blocks per file</li>
+<li>State snapshots (<code>snapshot-&lt;height&gt;.json</code>) saved every 100 blocks</li>
+<li>On startup, nodes sync from archive using <strong>batched parallel download</strong> (10 concurrent chunks)</li>
+<li>After crash &amp; restart, archive data loaded in <strong>&lt; 10 seconds</strong> from CDN</li>
+</ul>
+<hr>
+<h2>🌱 Getting Started</h2>
+<h3>1. Run a Node</h3>
+<pre><code class="language-bash">git clone https://github.com/saymanlal/SAYMAN
+cd SAYMAN
+npm install
+node server.js --network public-testnet --mode validator
+</code></pre>
+<h3>2. Get Test Tokens (Faucet)</h3>
+<pre><code class="language-bash"># Regular drip — 1,000 tSAYN
+curl -X POST https://sayman.onrender.com/api/faucet \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;address&quot;:&quot;YOUR_ADDRESS&quot;}&#39;
+
+# Or visit: https://sayman-faucet-site.vercel.app
+# Bulk tokens (up to 10M tSAYN): Telegram @SaymanLal
+</code></pre>
+<h3>3. Connect MetaMask</h3>
+<ul>
+<li>Visit <a href="https://sayman.up.railway.app">https://sayman.up.railway.app</a> → Network → <strong>&quot;Add to MetaMask&quot;</strong></li>
+<li>Or manually: RPC <code>https://sayman.onrender.com</code>, Chain <code>82922</code>, Symbol <code>tSAYN</code></li>
+</ul>
+<h3>4. Send a Transaction via MetaMask</h3>
+<p>Once connected, MetaMask sends signed EIP-155 transactions directly to the SAYMAN node via <code>eth_sendRawTransaction</code>. Confirmations show in the block explorer at <code>https://sayman.up.railway.app</code>.</p>
+<hr>
+<h2>📊 Current Status (Phase 22)</h2>
+<ul>
+<li><strong>Network Health</strong>: ✅ Operational</li>
+<li><strong>Phase</strong>: 22 — Full EVM/MetaMask Compat · tSAYN · NonceManager · Explorer 2.0</li>
+<li><strong>MetaMask Support</strong>: ✅ Full EVM JSON-RPC 2.0 with all MetaMask polling methods</li>
+<li><strong>Address Format</strong>: ✅ 0x-prefixed addresses accepted everywhere</li>
+<li><strong>Nonce Safety</strong>: ✅ Atomic NonceManager — no race conditions</li>
+<li><strong>Explorer</strong>: ✅ Tokens · NFTs · Memecoins · Address · Layers pages</li>
+<li><strong>APK</strong>: ✅ PUKY Wallet v22 signed build</li>
+</ul>
+<hr>
+<p><em>Last updated: Phase 22 — July 2026</em><br><em>IP Owner: <a href="https://vizkusgroups.me">Vizkus Groups</a> (Cybokrafts Universal Innovations Pvt. Ltd.)</em></p>
+
+  </div>
+  <div class="section page-break">
+    <div class="section-source">INSTALL.md</div>
+    <h1>Sayman Phase 22 - Complete Installation Guide</h1>
+<h2>Prerequisites</h2>
+<ul>
+<li><strong>Node.js</strong>: v20.0.0 or higher</li>
+<li><strong>npm</strong>: v9.0.0 or higher</li>
+<li><strong>Git</strong>: For cloning repository</li>
+<li><strong>Terminal</strong>: Bash/Zsh (Linux/Mac) or WSL (Windows)</li>
+</ul>
+<p>Check versions:</p>
+<pre><code class="language-bash">node --version    # Should be &gt;= 20.0.0
+npm --version     # Should be &gt;= 9.0.0
+</code></pre>
+<hr>
+<h2>Quick Start (5 Minutes)</h2>
+<pre><code class="language-bash"># 1. Clone or navigate to project
+cd sayman-blockchain
+
+# 2. Install dependencies
+npm install
+
+# 3. Run testnet
+npm run testnet
+
+# 4. Open browser
+# http://localhost:3000
+
+# 5. Install CLI (optional)
+npm run install-cli
+</code></pre>
+<hr>
+<h2>Detailed Installation</h2>
+<h3>Step 1: Install Node.js</h3>
+<p><strong>Linux (Ubuntu/Debian):</strong></p>
+<pre><code class="language-bash">curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+</code></pre>
+<p><strong>Mac:</strong></p>
+<pre><code class="language-bash">brew install node@20
+</code></pre>
+<p><strong>Windows:</strong>
+Download from: <a href="https://nodejs.org/">https://nodejs.org/</a></p>
+<h3>Step 2: Clone Project</h3>
+<pre><code class="language-bash">git clone https://github.com/yourusername/sayman-blockchain.git
+cd sayman-blockchain
+</code></pre>
+<p>Or if you have the files:</p>
+<pre><code class="language-bash">cd sayman-blockchain
+</code></pre>
+<h3>Step 3: Install Dependencies</h3>
+<pre><code class="language-bash">npm install
+</code></pre>
+<p>This installs:</p>
+<ul>
+<li><code>express</code> - Web server</li>
+<li><code>elliptic</code> - Cryptography</li>
+<li><code>level</code> - Database</li>
+<li><code>uuid</code> - IDs</li>
+<li><code>ws</code> - WebSocket</li>
+<li><code>node-fetch</code> - HTTP client</li>
+</ul>
+<h3>Step 4: Install CLI Tool (Optional)</h3>
+<pre><code class="language-bash">npm run install-cli
+</code></pre>
+<p>Or manually:</p>
+<pre><code class="language-bash">cd cli
+npm install
+npm link
+cd ..
+</code></pre>
+<p>Verify:</p>
+<pre><code class="language-bash">sayman --version
+# Should show: 16.0.0
+</code></pre>
+<hr>
+<h2>Running the Network</h2>
+<h3>Testnet (Default)</h3>
+<pre><code class="language-bash">npm run testnet
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code>╔════════════════════════════════════════╗
+║   SAYMAN BLOCKCHAIN - PHASE 22         ║
+║   Full EVM/MetaMask Compat · tSAYN    ║
+╚════════════════════════════════════════╝
+
+🌐 NETWORK: TESTNET
+📛 Network Name: Sayman Testnet
+🔗 Chain ID: sayman-testnet-1
+⛽ Gas: ENABLED
+🚰 Faucet: ENABLED ✅
+💱 Ticker: tSAYN (testnet)
+
+✅ API server running on http://localhost:3000
+</code></pre>
+<h3>Mainnet</h3>
+<pre><code class="language-bash">npm run mainnet
+</code></pre>
+<p>Differences:</p>
+<ul>
+<li>No faucet</li>
+<li>Higher minimum stake</li>
+<li>Longer block time</li>
+<li>Production settings</li>
+</ul>
+<h3>Multi-Node Network</h3>
+<p><strong>Terminal 1 (Bootstrap):</strong></p>
+<pre><code class="language-bash">npm run node1
+</code></pre>
+<p><strong>Terminal 2 (Peer 1):</strong></p>
+<pre><code class="language-bash">npm run node2
+</code></pre>
+<p><strong>Terminal 3 (Peer 2):</strong></p>
+<pre><code class="language-bash">npm run node3
+</code></pre>
+<p>Access:</p>
+<ul>
+<li>Node 1: <a href="http://localhost:3000">http://localhost:3000</a></li>
+<li>Node 2: <a href="http://localhost:3001">http://localhost:3001</a></li>
+<li>Node 3: <a href="http://localhost:3002">http://localhost:3002</a></li>
+</ul>
+<hr>
+<h2>Using the CLI</h2>
+<h3>First Time Setup</h3>
+<pre><code class="language-bash"># Create wallet
+sayman wallet create
+
+# Output:
+# ✅ Wallet created successfully!
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Address:     abc123...def456
+# Private Key: 0x1234567890abcdef...
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ⚠️  Never share your private key with anyone!
+
+# Your wallet is saved at: ~/.sayman/wallet.json
+</code></pre>
+<h3>Get Test Tokens (Testnet Only)</h3>
+<p><strong>Via CLI:</strong></p>
+<pre><code class="language-bash"># Get your address
+sayman wallet info
+
+# Request from faucet (via browser or curl)
+curl -X POST http://localhost:3000/api/faucet \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;address&quot;:&quot;YOUR_ADDRESS&quot;}&#39;  # Accepts both 0x-prefixed and bare hex
+</code></pre>
+<p><strong>Via UI:</strong></p>
+<ul>
+<li>Open <a href="http://localhost:3000">http://localhost:3000</a></li>
+<li>Click &quot;Faucet&quot;</li>
+<li>Paste your address</li>
+<li>Click &quot;Claim 1000 SAYN&quot;</li>
+</ul>
+<h3>Check Balance</h3>
+<pre><code class="language-bash">sayman balance
+
+# Output:
+# ━━━ Account Balance ━━━
+# Address:  abc123...
+# Balance:  1000 SAYN
+# Staked:   0 SAYN
+# Nonce:    0
+# ━━━━━━━━━━━━━━━━━━━━━━
+</code></pre>
+<h3>Send Tokens</h3>
+<pre><code class="language-bash">sayman send 0xRECIPIENT_ADDRESS 100
+
+# With custom gas:
+sayman send 0xRECIPIENT_ADDRESS 100 --gas-limit 50000 --gas-price 2
+
+# Output:
+# ━━━ Transaction Details ━━━
+# From:      abc123...
+# To:        def456...
+# Amount:    100 SAYN
+# Gas Limit: 50000
+# Gas Price: 2
+# Max Cost:  100.0001 SAYN
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ✅ Transaction broadcast successfully!
+# TX ID: 550e8400-e29b-41d4-a716-446655440000
+</code></pre>
+<h3>Stake Tokens</h3>
+<pre><code class="language-bash">sayman stake 500
+
+# Output:
+# ━━━ Staking Transaction ━━━
+# Address:   abc123...
+# Amount:    500 SAYN
+# Gas Limit: 100000
+# Gas Price: 1
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ✅ Stake transaction broadcast!
+# You will become a validator once the block is mined.
+</code></pre>
+<h3>View Network</h3>
+<pre><code class="language-bash">sayman network
+
+# Output:
+# ━━━ Network Information ━━━
+# Network:     Sayman Testnet
+# Chain ID:    sayman-testnet-1
+# Block Height:150
+# Validators:  4
+# Total Stake: 2000 SAYN
+# Block Time:  5s
+# Block Reward:10 SAYN
+# Min Stake:   100 SAYN
+# Faucet:      ✓ Enabled
+</code></pre>
+<h3>List Validators</h3>
+<pre><code class="language-bash">sayman validators
+
+# Output:
+# ━━━ Active Validators ━━━
+# ┌────────────────┬───────────┬──────┬────────┐
+# │ Address        │ Stake     │ %    │ Missed │
+# ├────────────────┼───────────┼──────┼────────┤
+# │ abc123...      │ 500 SAYN  │ 25%  │ 0      │
+# │ def456...      │ 300 SAYN  │ 15%  │ 1      │
+# │ ghi789...      │ 1200 SAYN │ 60%  │ 0      │
+# └────────────────┴───────────┴──────┴────────┘
+</code></pre>
+<hr>
+<h2>Using the Web UI</h2>
+<h3>Dashboard</h3>
+<p>Open <a href="http://localhost:3000">http://localhost:3000</a></p>
+<p>Features:</p>
+<ul>
+<li>Live network statistics</li>
+<li>Real-time block feed (updates every 5s)</li>
+<li>Validator monitoring</li>
+<li>Gas usage tracking</li>
+</ul>
+<h3>Create Wallet</h3>
+<ol>
+<li>Click &quot;Wallet&quot; tab</li>
+<li>Click &quot;Create New Wallet&quot;</li>
+<li><strong>SAVE YOUR PRIVATE KEY!</strong></li>
+<li>Copy your address</li>
+</ol>
+<h3>Get Test Tokens</h3>
+<ol>
+<li>Click &quot;Faucet&quot; tab (or visit <a href="https://sayman-faucet-site.vercel.app">https://sayman-faucet-site.vercel.app</a>)</li>
+<li>Paste your address (0x-prefixed MetaMask addresses supported)</li>
+<li>Click &quot;Claim 1000 tSAYN&quot;</li>
+<li>Wait ~6 seconds for block</li>
+</ol>
+<h3>Send Transaction</h3>
+<ol>
+<li>Click &quot;Wallet&quot; tab</li>
+<li>Scroll to &quot;Send SAYN&quot;</li>
+<li>Enter recipient address</li>
+<li>Enter amount</li>
+<li>Enter your private key</li>
+<li>Click &quot;Send Transaction&quot;</li>
+</ol>
+<p><strong>Note:</strong> Gas is calculated automatically.</p>
+<h3>Stake</h3>
+<ol>
+<li>Click &quot;Wallet&quot; tab</li>
+<li>Scroll to &quot;Stake SAYN&quot;</li>
+<li>Enter amount (min: 100 SAYN)</li>
+<li>Enter your private key</li>
+<li>Click &quot;Stake&quot;</li>
+</ol>
+<h3>Deploy Contract</h3>
+<ol>
+<li>Click &quot;Contracts&quot; tab</li>
+<li>Write contract code:</li>
+</ol>
+<pre><code class="language-javascript">function increment() {
+  state.count = (state.count || 0) + 1;
+}
+
+function getCount() {
+  return state.count || 0;
+}
+</code></pre>
+<ol start="3">
+<li>Enter your private key</li>
+<li>Click &quot;Deploy Contract&quot;</li>
+<li>Wait for confirmation</li>
+</ol>
+<h3>Call Contract</h3>
+<ol>
+<li>After deployment, copy contract address</li>
+<li>Scroll to &quot;Call Contract&quot;</li>
+<li>Paste contract address</li>
+<li>Enter method: <code>increment</code></li>
+<li>Arguments: <code>{}</code></li>
+<li>Enter private key</li>
+<li>Click &quot;Call Contract&quot;</li>
+</ol>
+<hr>
+<h2>Generate Documentation</h2>
+<pre><code class="language-bash">npm run docs
+</code></pre>
+<p>Generates <code>NETWORK_INFO.md</code> in the root directory with:</p>
+<ul>
+<li>Current network stats</li>
+<li>Gas configuration</li>
+<li>Validator list</li>
+<li>API reference</li>
+<li>Economics data</li>
+</ul>
+<hr>
+<h2>Testing</h2>
+<h3>Run Automated Tests</h3>
+<pre><code class="language-bash">chmod +x test-phase6.sh
+./test-phase6.sh
+</code></pre>
+<p>Tests:</p>
+<ul>
+<li>✅ Network configuration</li>
+<li>✅ Gas model</li>
+<li>✅ Nonce system</li>
+<li>✅ API endpoints</li>
+<li>✅ Documentation generator</li>
+<li>✅ Mempool limits</li>
+<li>✅ Validators</li>
+<li>✅ Contracts</li>
+</ul>
+<h3>Manual Testing</h3>
+<p><strong>1. Test Wallet:</strong></p>
+<pre><code class="language-bash">sayman wallet create
+sayman balance
+</code></pre>
+<p><strong>2. Test Transactions:</strong></p>
+<pre><code class="language-bash"># Get test tokens first (via faucet)
+sayman send 0xTEST_ADDRESS 10
+</code></pre>
+<p><strong>3. Test Staking:</strong></p>
+<pre><code class="language-bash">sayman stake 100
+sayman validators
+</code></pre>
+<p><strong>4. Test Gas Estimation:</strong></p>
+<pre><code class="language-bash">sayman estimate TRANSFER &#39;{&quot;from&quot;:&quot;0x...&quot;,&quot;to&quot;:&quot;0x...&quot;,&quot;amount&quot;:100}&#39;
+</code></pre>
+<p><strong>5. Test Nonce:</strong></p>
+<pre><code class="language-bash"># Check nonce
+sayman balance
+# Shows: Nonce: 0
+
+# Send transaction
+sayman send 0x... 10
+# Nonce increments to 1
+
+# Check again
+sayman balance
+# Shows: Nonce: 1
+</code></pre>
+<hr>
+<h2>Configuration</h2>
+<h3>Change API Endpoint (CLI)</h3>
+<pre><code class="language-bash">sayman config http://localhost:3001/api
+</code></pre>
+<h3>Environment Variables</h3>
+<pre><code class="language-bash"># Change port
+PORT=4000 npm run testnet
+
+# Change P2P port
+P2P_PORT=7001 npm run testnet
+
+# Add peers
+PEERS=ws://peer1:6001,ws://peer2:6002 npm run testnet
+
+# Use mainnet
+NODE_ENV=mainnet npm start
+</code></pre>
+<h3>Custom Network</h3>
+<p>Edit <code>config/testnet.js</code> or <code>config/mainnet.js</code>:</p>
+<pre><code class="language-javascript">export default {
+  networkName: &#39;My Custom Network&#39;,
+  chainId: &#39;custom-1&#39;,
+  blockTime: 3000,      // 3 seconds
+  blockReward: 20,      // 20 SAYN
+  minStake: 50,         // 50 SAYN minimum
+  faucetEnabled: true,
+  faucetAmount: 2000,   // 2000 SAYN per request
+  
+  // Gas configuration
+  gasLimits: {
+    minGasPrice: 2,     // Higher minimum
+    maxGasPerTx: 10000000
+  }
+};
+</code></pre>
+<hr>
+<h2>Troubleshooting</h2>
+<h3>Port Already in Use</h3>
+<pre><code>Error: listen EADDRINUSE: address already in use :::3000
+</code></pre>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-bash"># Use different port
+PORT=3001 npm run testnet
+
+# Or kill process using port 3000
+lsof -ti:3000 | xargs kill
+</code></pre>
+<h3>CLI Not Found</h3>
+<pre><code>sayman: command not found
+</code></pre>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-bash"># Reinstall CLI
+cd cli
+npm link
+
+# Or use npx
+npx sayman wallet create
+</code></pre>
+<h3>Database Corruption</h3>
+<pre><code>Error: LEVEL_CORRUPTION
+</code></pre>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-bash"># Delete and rebuild
+rm -rf data/
+npm start
+</code></pre>
+<h3>Out of Gas Errors</h3>
+<pre><code>Error: Out of gas
+</code></pre>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-bash"># Increase gas limit
+sayman send 0x... 100 --gas-limit 100000
+
+# Or estimate first
+sayman estimate TRANSFER &#39;{&quot;from&quot;:&quot;...&quot;,&quot;to&quot;:&quot;...&quot;,&quot;amount&quot;:100}&#39;
+</code></pre>
+<h3>Invalid Nonce</h3>
+<pre><code>Error: Invalid nonce. Expected: 5, Got: 3
+</code></pre>
+<p><strong>Solution:</strong> The wallet now fetches a fresh nonce from <code>/api/nonce/:address</code> before every broadcast automatically. If using CLI manually:</p>
+<pre><code class="language-bash"># Fetch current nonce
+curl https://sayman.onrender.com/api/nonce/YOUR_ADDRESS
+
+# Or check balance which includes nonce
+sayman balance
+</code></pre>
+<h3>Rate Limit Exceeded</h3>
+<pre><code>Error: Rate limit exceeded. Please wait.
+</code></pre>
+<p><strong>Solution:</strong> Wait 1 minute and retry.</p>
+<hr>
+<h2>Uninstalling</h2>
+<h3>Remove CLI</h3>
+<pre><code class="language-bash">cd cli
+npm unlink
+</code></pre>
+<h3>Remove Node Modules</h3>
+<pre><code class="language-bash">rm -rf node_modules
+rm -rf cli/node_modules
+</code></pre>
+<h3>Remove Database</h3>
+<pre><code class="language-bash">rm -rf data/
+</code></pre>
+<h3>Remove Wallet</h3>
+<pre><code class="language-bash">rm -rf ~/.sayman/
+</code></pre>
+<hr>
+<h2>Next Steps</h2>
+<h3>Learn More</h3>
+<ol>
+<li>Read <code>README.md</code> for detailed features</li>
+<li>Check <code>NETWORK_INFO.md</code> for network details</li>
+<li>Review smart contract examples</li>
+<li>Explore API endpoints</li>
+</ol>
+<h3>Join the Network</h3>
+<ol>
+<li>Run a validator node</li>
+<li>Stake tokens</li>
+<li>Deploy contracts</li>
+<li>Help secure the network</li>
+</ol>
+<h3>Contribute</h3>
+<ol>
+<li>Report issues</li>
+<li>Submit improvements</li>
+<li>Write documentation</li>
+<li>Create tutorials</li>
+</ol>
+<hr>
+<h2>Support</h2>
+<ul>
+<li><strong>Documentation</strong>: README.md</li>
+<li><strong>Network Info</strong>: <code>npm run docs</code></li>
+<li><strong>CLI Help</strong>: <code>sayman --help</code></li>
+<li><strong>Issues</strong>: GitHub Issues</li>
+</ul>
+<hr>
+<p><strong>Congratulations! You&#39;ve successfully installed Sayman Phase 22.</strong></p>
+<p>Start exploring with:</p>
+<pre><code class="language-bash">sayman network
+sayman validators
+sayman balance
+</code></pre>
+<p>Happy blockchain building! 🚀⛓️</p>
+
+  </div>
+  <div class="section page-break">
+    <div class="section-source">summary.md</div>
+    <h1>⚙️ Operating the SAYMAN Multi-Peer Testnet (Phase 22)</h1>
+<p>This guide explains how to run, connect, and validate a decentralized multi-peer network of SAYMAN nodes on a testnet. Complete this checklist before hosting a <strong>Buildathon</strong> or deploying to production.</p>
+<hr>
+<h2>🗺️ Network Architecture</h2>
+<p>A standard testnet topology consists of at least three nodes to ensure proper peer synchronization, consensus agreement, and fault tolerance:</p>
+<pre><code>                  +--------------------+
+                  |    Bootstrap /     |
+                  |  Validator Node 1  | (Port 3000, P2P 6001)
+                  +---------+----------+
+                            |
+             +--------------+--------------+
+             |                             |
+             v                             v
++------------+-------+            +--------+-----------+
+|     Validator      |            |     Observer       |
+|      Node 2        |            |      Node 3        | (Port 3002, P2P 6003)
++--------------------+            +--------------------+
+(Port 3001, P2P 6002)
+</code></pre>
+<hr>
+<h2>🛠️ Step 1: Configuring Local Environments</h2>
+<p>To run multiple nodes on the same host without port or database conflicts, use isolated directory configurations:</p>
+<h3>Node 1 (Bootstrap)</h3>
+<pre><code class="language-env">NODE_ENV=testnet
+PORT=3000
+P2P_PORT=6001
+DB_PATH=./data/node-3000
+BOOTSTRAP_PEERS=
+</code></pre>
+<h3>Node 2 (Validator)</h3>
+<pre><code class="language-env">NODE_ENV=testnet
+PORT=3001
+P2P_PORT=6002
+DB_PATH=./data/node-3001
+BOOTSTRAP_PEERS=http://localhost:3000
+</code></pre>
+<h3>Node 3 (Observer)</h3>
+<pre><code class="language-env">NODE_ENV=testnet
+PORT=3002
+P2P_PORT=6003
+DB_PATH=./data/node-3002
+BOOTSTRAP_PEERS=http://localhost:3000,http://localhost:3001
+</code></pre>
+<hr>
+<h2>🚀 Step 2: Starting the Nodes</h2>
+<h3>1. Start Node 1 (Bootstrap &amp; Validator 1)</h3>
+<pre><code class="language-bash">PORT=3000 P2P_PORT=6001 DB_PATH=./data/node-3000 BOOTSTRAP_PEERS=&quot;&quot; \
+node server.js --network testnet --mode validator
+</code></pre>
+<ul>
+<li><strong>Verify</strong>: Visit <code>http://localhost:3000/api/stats</code> to verify Node 1 is running and creating blocks.</li>
+</ul>
+<h3>2. Start Node 2 (Validator 2)</h3>
+<pre><code class="language-bash">PORT=3001 P2P_PORT=6002 DB_PATH=./data/node-3001 BOOTSTRAP_PEERS=&quot;http://localhost:3000&quot; \
+node server.js --network testnet --mode validator
+</code></pre>
+<ul>
+<li><strong>Verify</strong>: Node 2 logs should show <code>Connected to peer</code> and <code>Synchronized stateRoot</code>.</li>
+</ul>
+<h3>3. Start Node 3 (Observer / Full Node)</h3>
+<pre><code class="language-bash">PORT=3002 P2P_PORT=6003 DB_PATH=./data/node-3002 BOOTSTRAP_PEERS=&quot;http://localhost:3000&quot; \
+node server.js --network testnet --mode observer
+</code></pre>
+<ul>
+<li>Node 3 does not stake or mine, but syncs the entire chain ledger locally.</li>
+</ul>
+<hr>
+<h2>🔍 Step 3: Connecting MetaMask (Phase 22)</h2>
+<p>With Phase 22&#39;s full EVM RPC compatibility, connect MetaMask to your local node:</p>
+<ol>
+<li>MetaMask → Add Network → Manual</li>
+<li><strong>RPC URL</strong>: <code>http://localhost:3000</code> (local) or <code>https://sayman.onrender.com</code> (public)</li>
+<li><strong>Chain ID</strong>: <code>82922</code> (public testnet) or <code>82923</code> (local testnet)</li>
+<li><strong>Symbol</strong>: <code>tSAYN</code></li>
+<li><strong>Explorer</strong>: <code>https://sayman.up.railway.app</code></li>
+</ol>
+<p>Or use the <strong>&quot;Add to MetaMask&quot;</strong> button in the Explorer → Network page.</p>
+<hr>
+<h2>🔍 Step 4: Health Checking &amp; Verification</h2>
+<p>Before opening the network to buildathon participants:</p>
+<ol>
+<li><p><strong>Height Alignment Check</strong>:</p>
+<pre><code class="language-bash">curl http://localhost:3000/api/stats | grep height
+curl http://localhost:3001/api/stats | grep height
+curl http://localhost:3002/api/stats | grep height
+</code></pre>
+</li>
+<li><p><strong>State Root Uniformity Check</strong>:</p>
+<pre><code class="language-bash">curl http://localhost:3000/api/block/latest
+</code></pre>
+<p>Confirm that the <code>stateRoot</code> hash matches across all peers.</p>
+</li>
+<li><p><strong>Nonce Endpoint Check</strong> (Phase 22):</p>
+<pre><code class="language-bash">curl http://localhost:3000/api/nonce/YOUR_ADDRESS
+</code></pre>
+<p>Should return the current pending nonce for the address.</p>
+</li>
+<li><p><strong>EVM RPC Check</strong>:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:3000 \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;eth_chainId&quot;,&quot;params&quot;:[],&quot;id&quot;:1}&#39;
+# Should return: {&quot;result&quot;:&quot;0x143ea&quot;} or {&quot;result&quot;:&quot;0x143eb&quot;}
+</code></pre>
+</li>
+<li><p><strong>Failover Validation</strong>:</p>
+<ul>
+<li>Open the PUKY Wallet and perform a transaction.</li>
+<li>Terminate Node 1 (port 3000).</li>
+<li>Verify that the wallet continues to work by falling back to Node 2.</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>📋 Phase 22 Quick Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MetaMask EVM RPC</td>
+<td>✅ Full compat (27 methods)</td>
+</tr>
+<tr>
+<td>tSAYN testnet symbol</td>
+<td>✅ All endpoints</td>
+</tr>
+<tr>
+<td><code>/api/nonce/:address</code></td>
+<td>✅ Fresh nonce endpoint</td>
+</tr>
+<tr>
+<td>Atomic NonceManager</td>
+<td>✅ No race conditions</td>
+</tr>
+<tr>
+<td>Explorer Tokens page</td>
+<td>✅ <code>/tokens</code></td>
+</tr>
+<tr>
+<td>Explorer NFTs page</td>
+<td>✅ <code>/nfts</code></td>
+</tr>
+<tr>
+<td>Explorer Memecoins</td>
+<td>✅ <code>/memecoins</code></td>
+</tr>
+<tr>
+<td>Unified Address page</td>
+<td>✅ <code>/address/:addr</code></td>
+</tr>
+<tr>
+<td>Unified search</td>
+<td>✅ Block/tx/address/token</td>
+</tr>
+<tr>
+<td>Gas fee in tSAYN</td>
+<td>✅ Explorer accuracy</td>
+</tr>
+<tr>
+<td>PUKY APK v22</td>
+<td>✅ Signed build</td>
+</tr>
+</tbody></table>
+
+  </div>
+  <div class="section page-break">
+    <div class="section-source">comparison.md</div>
+    <h1>SAYMAN Blockchain: Phase-by-Phase Roadmap Comparison</h1>
+<p>This document provides a high-level comparison of the development roadmap of the <strong>SAYMAN Blockchain</strong> and <strong>PUKY Wallet</strong> ecosystem from Phase 1 to Phase 22.</p>
+<hr>
+<h2>📊 Summary Comparison Table</h2>
+<table>
+<thead>
+<tr>
+<th align="left">Phase</th>
+<th align="left">Milestone Name</th>
+<th align="left">Core Deliverables (Simplified)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Phase 1</strong></td>
+<td align="left"><strong>Genesis &amp; PoS Core</strong></td>
+<td align="left">Created the genesis block, PoS consensus structures, and basic block hashing.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 2</strong></td>
+<td align="left"><strong>CLI, Wallet, &amp; SDK</strong></td>
+<td align="left">Built the command-line wallet manager, SDK, and keypair generator.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 3</strong></td>
+<td align="left"><strong>P2P Networking</strong></td>
+<td align="left">Launched peer-to-peer gossip protocol for network handshake and block sharing.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 4</strong></td>
+<td align="left"><strong>JS Smart Contracts</strong></td>
+<td align="left">Deployed a sandboxed JavaScript execution VM for smart contract runs.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 5</strong></td>
+<td align="left"><strong>Gas Model</strong></td>
+<td align="left">Charged execution fees (&quot;sprinkles&quot; gas) for CPU instructions and writes.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 6</strong></td>
+<td align="left"><strong>Merkle State Trees</strong></td>
+<td align="left">Implemented Merkle Patricia Trees for state-root verification and proofs.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 7</strong></td>
+<td align="left"><strong>Halving &amp; Slashing</strong></td>
+<td align="left">Added block reward halving and validator double-sign slashing.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 8</strong></td>
+<td align="left"><strong>Database Persistence</strong></td>
+<td align="left">Integrated LevelDB to save blockchain blocks and state to disk.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 9</strong></td>
+<td align="left"><strong>Validator Reputation</strong></td>
+<td align="left">Built validator reputation scoring and event logger.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 10</strong></td>
+<td align="left"><strong>Report Systems</strong></td>
+<td align="left">Integrated report creation and community verification transaction types.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 11</strong></td>
+<td align="left"><strong>Explorer UI</strong></td>
+<td align="left">Developed a browser-based blockchain explorer with stats and block feeds.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 12</strong></td>
+<td align="left"><strong>Fee Sponsorship</strong></td>
+<td align="left">Allowed dApp creators to sponsor user transaction gas fees (free runs).</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 13</strong></td>
+<td align="left"><strong>Fork Protection</strong></td>
+<td align="left">Fixed P2P sync race conditions and introduced fork-choice rules.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 14</strong></td>
+<td align="left"><strong>Multi-Layer &amp; DeFi</strong></td>
+<td align="left">Added L2 Rollups, Sidechain factory, custom Token/NFT factories, and Uniswap AMM DEX.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 15</strong></td>
+<td align="left"><strong>Android APK Build</strong></td>
+<td align="left">Configured Capacitor/Gradle to compile the PUKY Wallet APK.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 16</strong></td>
+<td align="left"><strong>Sandbox Hardening</strong></td>
+<td align="left">Frozen JS prototypes in VM to prevent escapes; added PDF doc generator.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 17</strong></td>
+<td align="left"><strong>Constructor State Fix</strong></td>
+<td align="left">Fixed VM constructor execution (prototype pre-binding); added Dark Theme &amp; SPA routing.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 19</strong></td>
+<td align="left"><strong>Pipelined Concurrency &amp; Database Security</strong></td>
+<td align="left">Implemented parallel scheduling, snapshot-accelerated block replay (no more event-loop blocking), atomic block persistence (preventing data loss/corruption), self-connection blacklisting, and WebSocket leak fixes.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 20</strong></td>
+<td align="left"><strong>Robust Archive Recovery &amp; Integrated Explorer</strong></td>
+<td align="left">Implemented concurrency-safe archive lock, exponential backoff (starting at 5s up to 5 min), pipelined sync checks to pause archiver during active block download, validation cache fixes, and dedicated transaction page with validator rewards filters.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 21</strong></td>
+<td align="left"><strong>EVM JSON-RPC Wallet Integration, Parallel Archive Sync &amp; Memory Safety</strong></td>
+<td align="left">Full EVM JSON-RPC 2.0 server for MetaMask/Trust Wallet/Coinbase Wallet/all wallets, batched parallel archive sync (10 concurrent chunks), ChainProxy 100-block LRU memory model backed by LevelDB (no OOM ever), O(1) indexed block/tx/address DB lookups, root NETWORK_INFO.md wallet guide.</td>
+</tr>
+<tr>
+<td align="left"><strong>Phase 22</strong></td>
+<td align="left"><strong>Full EVM/MetaMask Compat · tSAYN · Atomic NonceManager · Explorer 2.0</strong></td>
+<td align="left"><code>tSAYN</code> testnet symbol (Ethereum convention), all MetaMask polling methods (<code>eth_getLogs</code>, <code>eth_newBlockFilter</code>, <code>eth_getFilterChanges</code>), <code>wallet_addEthereumChain</code> EIP-3085, 0x address stripping on all endpoints, atomic <code>NonceManager</code> (<code>core/nonce.js</code>) with <code>/api/nonce/:addr</code> endpoint, Explorer 2.0 with Tokens/NFTs/Memecoins/unified Address pages, unified search bar, live L2 layer status, gas fee displayed in tSAYN, contract ABI/state viewer fix, SAYMAN logo at <code>/assets/logo-512.png</code>, PUKY APK v22 signed build.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🔍 In-Depth Details per Phase</h2>
+<h3>Phase 1: Genesis &amp; PoS Core</h3>
+<ul>
+<li><strong>Consensus</strong>: Developed Proof-of-Stake core logic where validator slot allocation depends on stake.</li>
+<li><strong>Blocks</strong>: Formulated block validation schemas (hash, validator signature, difficulty).</li>
+</ul>
+<h3>Phase 2: CLI, Wallet, &amp; SDK</h3>
+<ul>
+<li><strong>Command Line</strong>: Enabled key generation, sending transactions, and checking balances via terminal.</li>
+<li><strong>JS SDK</strong>: Created cryptographic wrappers for signing transactions in browser clients.</li>
+</ul>
+<h3>Phase 3: P2P Networking</h3>
+<ul>
+<li><strong>Gossip Protocol</strong>: Connected nodes via WebSockets to broadcast new blocks/transactions.</li>
+<li><strong>Syncing</strong>: Built download handshakes so late-joining nodes catch up with the chain.</li>
+</ul>
+<h3>Phase 4: JS Smart Contracts</h3>
+<ul>
+<li><strong>V8 Sandbox</strong>: Smart contracts are written in plain JavaScript and executed in isolated sandboxed contexts (no EVM assembly needed).</li>
+</ul>
+<h3>Phase 5: Gas Model</h3>
+<ul>
+<li><strong>Instruction Cost</strong>: Prevents infinite loops by charging gas per CPU tick and storage write.</li>
+<li><strong>Denomination</strong>: Stored on-chain values in base units (&quot;sprinkles&quot; where 1 SAYN = 10^8 sprinkles).</li>
+</ul>
+<h3>Phase 6: Merkle State Trees</h3>
+<ul>
+<li><strong>Verification</strong>: Computes cryptographic state roots so light clients can verify balances and proofs without reading the entire chain.</li>
+</ul>
+<h3>Phase 7: Halving &amp; Slashing</h3>
+<ul>
+<li><strong>Inflation Control</strong>: Automatically splits block rewards in half every ~2 years.</li>
+<li><strong>Slashing</strong>: Burned stakes of rogue validators double-signing blocks.</li>
+</ul>
+<h3>Phase 8: Database Persistence</h3>
+<ul>
+<li><strong>Disk Storage</strong>: Switched from in-memory arrays to LevelDB database storage so nodes survive restarts.</li>
+</ul>
+<h3>Phase 9: Validator Reputation</h3>
+<ul>
+<li><strong>Reputation Points</strong>: Validators earn reputation points for valid blocks, displayed in explorer.</li>
+<li><strong>Event Log</strong>: Emitted on-chain execution events for dApp listeners.</li>
+</ul>
+<h3>Phase 10: Report Systems</h3>
+<ul>
+<li><strong>Use Case Integration</strong>: Added specialized transaction types to create and verify decentralized reports.</li>
+</ul>
+<h3>Phase 11: Explorer UI</h3>
+<ul>
+<li><strong>Visuals</strong>: Launched dashboard charts showing blocks, gas limits, validators, and transactions.</li>
+</ul>
+<h3>Phase 12: Fee Sponsorship</h3>
+<ul>
+<li><strong>Gas Abstraction</strong>: Enabled dApps to pay transaction fees for users, removing the requirement for users to hold native SAYN tokens.</li>
+</ul>
+<h3>Phase 13: Fork Protection</h3>
+<ul>
+<li><strong>Sync Resolution</strong>: Re-syncs only when a valid longer chain is presented, resolving network splits.</li>
+</ul>
+<h3>Phase 14: Multi-Layer &amp; DeFi</h3>
+<ul>
+<li><strong>L2 Rollups</strong>: Pushed commitments from sidechains/L2s back to the L1 base chain.</li>
+<li><strong>DeFi Primitives</strong>: Deployed standard AMM swap pools, ERC20 tokens, and NFT collections.</li>
+</ul>
+<h3>Phase 15: Android APK Build</h3>
+<ul>
+<li><strong>APK package</strong>: Recompiled Capacitor resources to bundle the PUKY Wallet into a mobile APK binary.</li>
+</ul>
+<h3>Phase 16: Sandbox Hardening</h3>
+<ul>
+<li><strong>VM Security</strong>: Frozen global prototype objects to block V8 context breakouts.</li>
+</ul>
+<h3>Phase 17: Constructor State Fix</h3>
+<ul>
+<li><strong>VM Reliability</strong>: Bound state helpers to contract prototypes <em>before</em> constructor instantiation to fix constructor runtime crashes and enable contract state updates.</li>
+<li><strong>UX/UI</strong>: SPA routing fallbacks for <code>/block/:id</code>, <code>/tx/:hash</code>, <code>/contract/:address</code> and built-in Moon/Sun dark theme.</li>
+</ul>
+<h3>Phase 19: Pipelined Concurrency &amp; Database Security</h3>
+<ul>
+<li><strong>Parallel Execution</strong>: Dependency analysis on read/write sets schedules independent transactions into layers to run concurrently.</li>
+<li><strong>Atomic Block Persistence</strong>: Saves blocks individually (<code>block:${index}</code>) to prevent database corruption or full history loss during power cuts or peer crashes. Migrates legacy chain keys on startup.</li>
+<li><strong>Snapshot Rollbacks</strong>: Accelerates fork syncing by loading historical state snapshots instead of replaying the entire chain from block 0.</li>
+<li><strong>Non-Blocking Replays</strong>: Yields execution control periodically to the event loop during replay, preventing heartbeats from timing out.</li>
+<li><strong>Self-Connection Blacklist</strong>: Keeps nodes from trying to connect to themselves, resolving reconnect loop spam.</li>
+<li><strong>Socket Safety</strong>: Patched P2P WebSocket cleanups to close connections on removal, preventing file descriptor leaks.</li>
+</ul>
+<h3>Phase 20: Robust Archive Recovery &amp; Integrated Explorer</h3>
+<ul>
+<li><strong>Archive Lock Mutex</strong>: Added a processing flag to prevent concurrent archive runs when blocks are queued rapidly, solving resource exhaustion.</li>
+<li><strong>Exponential Backoff</strong>: Introduced automatic retry backoff starting at 5 seconds and scaling up to 5 minutes for remote Github archive errors, replacing infinite failure loops.</li>
+<li><strong>Pipelined Syncing Pause</strong>: Pauses the archive system during active synchronization from peers to prioritize CPU, network bandwidth, and memory for blockchain catchup.</li>
+<li><strong>Cache Safety Fix</strong>: Prevented permanent verification failures caused by caching false results on database/system read errors.</li>
+<li><strong>Dedicated Transaction Explorer</strong>: Expanded explorer with a transactions view, rewards filter, and real-time statistics.</li>
+<li><strong>Repository Cleanups</strong>: Removed deprecated client, SDK, faucet, and faucet-site folders to isolate base chain components.</li>
+</ul>
+<h3>Phase 21: EVM JSON-RPC Wallet Integration, Parallel Archive Synchronization &amp; Memory Safety</h3>
+<ul>
+<li><strong>EVM JSON-RPC Server</strong>: Full JSON-RPC server supporting <code>eth_chainId</code>, <code>eth_blockNumber</code>, <code>eth_getBalance</code>, <code>eth_getTransactionCount</code>, <code>eth_sendRawTransaction</code>, <code>eth_getTransactionByHash</code>, <code>eth_getTransactionReceipt</code>, etc. — MetaMask, Trust Wallet, Coinbase Wallet, and <strong>all EVM wallets globally</strong> connect natively.</li>
+<li><strong>Parallel Archive Synchronization</strong>: Sequential batched parallel download (10 chunks per batch) — restores nodes to target height in seconds.</li>
+<li><strong>ChainProxy Memory Model</strong>: 100-block LRU cache backed by LevelDB. No OOM crashes. Handles billions of blocks.</li>
+<li><strong>LevelDB Index Tables</strong>: O(1) lookups for blocks, transactions, and addresses instead of O(N) full scans.</li>
+</ul>
+<h3>Phase 22: Full EVM/MetaMask Compat · tSAYN · Atomic NonceManager · Explorer 2.0</h3>
+<ul>
+<li><strong>tSAYN Testnet Symbol</strong>: Testnet API, explorer, and wallet all return <code>tSAYN</code>; mainnet returns <code>SAYN</code>. Follows Ethereum convention (SepoliaETH, Mumbai MATIC).</li>
+<li><strong>Complete MetaMask Polling Support</strong>: Added <code>eth_getLogs</code>, <code>eth_newBlockFilter</code>, <code>eth_getFilterChanges</code>, <code>eth_newPendingTransactionFilter</code>, <code>eth_uninstallFilter</code>, <code>eth_getFilterLogs</code> — MetaMask no longer throws &quot;unsupported method&quot; errors.</li>
+<li><strong>EIP-3085 <code>wallet_addEthereumChain</code></strong>: Explorer &quot;Add to MetaMask&quot; button triggers one-click network setup. <code>wallet_switchEthereumChain</code> also acknowledged.</li>
+<li><strong>0x Address Auto-Stripping</strong>: All API endpoints (<code>/address</code>, <code>/balance</code>, <code>/faucet</code>, <code>/broadcast</code>) accept both <code>0x1234...</code> (MetaMask format) and bare <code>1234...</code> hex — stripped automatically.</li>
+<li><strong>Pending Nonce in <code>eth_getTransactionCount</code></strong>: Returns <code>max(confirmedNonce, pendingNonce)</code> so MetaMask sequences transactions correctly across rapid broadcasts.</li>
+<li><strong><code>effectiveGasPrice</code> in Receipt</strong>: <code>eth_getTransactionReceipt</code> now includes <code>effectiveGasPrice</code> — required by MetaMask for fee display.</li>
+<li><strong>Atomic NonceManager</strong> (<code>core/nonce.js</code>): Per-address <code>getNonce/commitNonce/rollbackNonce</code> tracking prevents nonce race conditions. <code>/api/nonce/:address</code> endpoint returns the pending nonce. PUKY Wallet fetches fresh nonce before every broadcast.</li>
+<li><strong>Explorer 2.0 Pages</strong>: Dedicated Tokens, NFTs, Memecoins pages; unified Address page (balance + tx history + tokens + NFTs + reputation); unified search bar resolves block/tx/address/token from one input.</li>
+<li><strong>Live L2 Layer Status</strong>: <code>/layers</code> page shows real-time chain status (height, peers, TPS) for each registered L2/sidechain.</li>
+<li><strong>Gas Fee Accuracy</strong>: Explorer &quot;Fee Paid&quot; now shows tSAYN value (not raw gas units).</li>
+<li><strong>Contract ABI/State Fix</strong>: <code>_extractABI</code> correctly handles <code>methods: { ... }</code> style contracts; state viewer rendered correctly.</li>
+<li><strong>SAYMAN Logo Asset</strong>: 512×512 PNG at <code>/assets/logo-512.png</code> — MetaMask uses this for the network icon.</li>
+<li><strong>PUKY Wallet APK v22</strong>: New signed build — <code>addSaymanToMetaMask()</code> one-click function, tSAYN display, fresh nonce before every broadcast. SHA256: <code>77fc05fa8eaf910e30ceedb99ed5e42e198db8eb2af4e2d33ac76dab7e1de44f</code>.</li>
+</ul>
+
+  </div>
+  <div class="section page-break">
+    <div class="section-source">pitch.md</div>
+    <h1>⛓️ SAYMAN: The General-Purpose JS Smart Contract Blockchain</h1>
+<blockquote>
+<p><strong>Hardened JavaScript-Native Sandboxing · Proof-of-Stake Consensus · EVM Compatible · Multi-Layer Web3 Platform</strong></p>
+</blockquote>
+<hr>
+<h2>🎯 Executive Summary</h2>
+<p>Traditional blockchains force developers to learn Solidity/Rust and pay exorbitant fees — creating massive adoption barriers. <strong>SAYMAN</strong> eliminates both.</p>
+<p><strong>SAYMAN</strong> is a high-speed, general-purpose <strong>Proof-of-Stake Layer 1 blockchain</strong> featuring:</p>
+<ul>
+<li>A <strong>Hardened JavaScript Smart Contract VM</strong> — any of the 20M+ JS developers can deploy dApps on day one</li>
+<li><strong>Full EVM JSON-RPC 2.0 compatibility</strong> — MetaMask, Trust Wallet, Coinbase Wallet, and every EVM wallet work globally out of the box</li>
+<li>A <strong>complete Web3 ecosystem</strong> — Token Factory, NFT Factory, Memecoin Factory, AMM DEX, Staking Pools, L2 Rollups, and sidechains</li>
+</ul>
+<p>Its flagship decentralized application, <strong>CivicChain</strong>, demonstrates civic intelligence on-chain at scale — decentralized public ledger actions, citizen participation, and real-time AI-verified civic updates.</p>
+<hr>
+<h2>💡 Core Problems &amp; SAYMAN Solutions</h2>
+<h3>1. The Smart Contract Barrier</h3>
+<ul>
+<li><strong>Problem</strong>: Solidity and Rust are complex, specialized, and error-prone. Bottleneck for enterprise, web, and NGO developers.</li>
+<li><strong>SAYMAN Solution</strong>: Sandboxed <strong>JavaScript smart contracts</strong>. Write contracts as standard JS classes or functions — zero new language to learn.</li>
+</ul>
+<h3>2. Wallet Compatibility — MetaMask &amp; Global Access</h3>
+<ul>
+<li><strong>Problem</strong>: Custom chains either require proprietary wallets or months of integration work to reach global wallet users.</li>
+<li><strong>SAYMAN Solution (Phase 22)</strong>: Full <strong>EVM JSON-RPC 2.0</strong> server at <code>https://sayman.onrender.com</code>. MetaMask connects with one click. Chain ID <code>82922</code>, symbol <code>tSAYN</code>. EIP-3085 <code>wallet_addEthereumChain</code> is supported — the Explorer has an <strong>&quot;Add to MetaMask&quot;</strong> button. Every EVM wallet on Earth can use SAYMAN instantly.</li>
+</ul>
+<h3>3. Sandbox Security Trust (V8 Hardening)</h3>
+<ul>
+<li><strong>Problem</strong>: Standard JS VMs are vulnerable to prototype walk-up exploits that can escape the sandbox to the host OS.</li>
+<li><strong>SAYMAN Solution</strong>: <ul>
+<li><strong>Prototype Freezing</strong>: <code>Object.freeze()</code> on all standard prototype chains — prevents prototype pollution and VM escapes.</li>
+<li><strong>Constructor Overriding</strong>: Detects all hidden constructors (AsyncFunction, GeneratorFunction, typed arrays) and overrides <code>.constructor</code> to <code>undefined</code>.</li>
+<li><strong>Resource Limits</strong>: 5,000ms CPU timeout, instruction caps, and gas limits against DoS.</li>
+</ul>
+</li>
+</ul>
+<h3>4. High Gas Fees</h3>
+<ul>
+<li><strong>Problem</strong>: Ethereum L1/L2 gas makes mass-market consumer dApps unviable.</li>
+<li><strong>SAYMAN Solution</strong>: A standard transfer costs <strong>21,000 base units</strong> (~$0.00021 tSAYN). Sponsor Fee Policies allow dApp creators to pay gas for users — making interactions completely free for end users.</li>
+</ul>
+<h3>5. Nonce Race Conditions</h3>
+<ul>
+<li><strong>Problem</strong>: Multiple concurrent transactions from the same wallet cause stale-nonce conflicts and dropped transactions.</li>
+<li><strong>SAYMAN Solution (Phase 22)</strong>: Atomic <strong>NonceManager</strong> (<code>core/nonce.js</code>) with <code>getNonce/commitNonce/rollbackNonce</code> per address. Wallet fetches a fresh nonce via <code>/api/nonce/:address</code> before every broadcast — zero race conditions.</li>
+</ul>
+<hr>
+<h2>🪙 Tokenomics</h2>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Testnet</th>
+<th>Mainnet</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Ticker</strong></td>
+<td><code>tSAYN</code></td>
+<td><code>SAYN</code></td>
+</tr>
+<tr>
+<td><strong>Precision</strong></td>
+<td>8 decimals</td>
+<td>8 decimals</td>
+</tr>
+<tr>
+<td><strong>Hard Cap</strong></td>
+<td>Unlimited (testnet)</td>
+<td><strong>100,000,000 SAYN</strong></td>
+</tr>
+<tr>
+<td><strong>Halving</strong></td>
+<td>Every 12,614,400 blocks (~2 years)</td>
+<td>same</td>
+</tr>
+<tr>
+<td><strong>Block Time</strong></td>
+<td>5 seconds</td>
+<td>5 seconds</td>
+</tr>
+<tr>
+<td><strong>Block Reward</strong></td>
+<td>0.5 tSAYN</td>
+<td>0.2 SAYN</td>
+</tr>
+<tr>
+<td><strong>Min Validator Stake</strong></td>
+<td>10 tSAYN</td>
+<td>500 SAYN</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Following Ethereum convention, testnet tokens are labeled <code>tSAYN</code> to prevent value confusion (like SepoliaETH vs ETH).</p>
+</blockquote>
+<hr>
+<h2>🏗️ Architecture &amp; Resiliency</h2>
+<pre><code>+--------------------------------------------------------+
+|                      SAYMAN DApps                      |
+|   (MetaMask · PUKY Wallet · Explorer · CivicChain)     |
++--------------------------------------------------------+
+                           |
+                           v  (EVM JSON-RPC 2.0)
++--------------------------------------------------------+
+|              EVM-Compatible RPC Layer                  |
+|   eth_sendRawTransaction · eth_getBalance · 27+ methods|
++--------------------------------------------------------+
+                           |
+                           v
++--------------------------------------------------------+
+|               Automatic Failover Mesh                  |
+|   (Railway.app &lt;-&gt; Render.com &lt;-&gt; Local nodes)         |
++--------------------------------------------------------+
+                           |
+                           v
++--------------------------------------------------------+
+|                  Decentralized Nodes                   |
+|   (Validator · Full · Observer · Bootstrap Nodes)      |
++--------------------------------------------------------+
+</code></pre>
+<h3>Core Reliability Features</h3>
+<ol>
+<li><strong>Full EVM RPC Compatibility</strong>: 27 EVM JSON-RPC methods — MetaMask polls work (eth_newBlockFilter, eth_getFilterChanges, eth_getLogs), receipts include <code>effectiveGasPrice</code>, nonces track pending state.</li>
+<li><strong>Atomic NonceManager</strong>: Per-address nonce tracking prevents replay attacks and concurrent broadcast race conditions.</li>
+<li><strong>ChainProxy Memory Model</strong>: 100-block LRU cache backed by LevelDB — nodes handle billions of blocks without OOM.</li>
+<li><strong>P2P Archive Recovery</strong>: Batched parallel download from GitHub archive — recovers 30K+ blocks in seconds.</li>
+<li><strong>Seamless RPC Failover</strong>: SDK, Explorer, and PUKY Wallet auto-reroute to alternative endpoints if primary node is down.</li>
+<li><strong>In-App APK Auto-Updates</strong>: PUKY Wallet checks GitHub for new APK builds and notifies users in real-time.</li>
+</ol>
+<hr>
+<h2>🌐 Phase 22 — EVM Ecosystem Status</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MetaMask one-click add</td>
+<td>✅ EIP-3085 <code>wallet_addEthereumChain</code></td>
+</tr>
+<tr>
+<td>0x address support everywhere</td>
+<td>✅ All endpoints strip prefix automatically</td>
+</tr>
+<tr>
+<td><code>eth_sendRawTransaction</code></td>
+<td>✅ EIP-155 / EIP-2930 / EIP-1559</td>
+</tr>
+<tr>
+<td><code>eth_getLogs</code> / block filters</td>
+<td>✅ MetaMask polling methods</td>
+</tr>
+<tr>
+<td><code>eth_getTransactionReceipt</code></td>
+<td>✅ With <code>effectiveGasPrice</code></td>
+</tr>
+<tr>
+<td>Token/NFT/Memecoin explorer</td>
+<td>✅ Dedicated pages</td>
+</tr>
+<tr>
+<td>Unified address view</td>
+<td>✅ Balance + txs + tokens + NFTs + reputation</td>
+</tr>
+<tr>
+<td>Unified search</td>
+<td>✅ Block/tx/address/token in one bar</td>
+</tr>
+<tr>
+<td>Gas fee in tSAYN</td>
+<td>✅ Accurate display (not raw gas units)</td>
+</tr>
+<tr>
+<td>PUKY APK v22</td>
+<td>✅ Signed, <code>addSaymanToMetaMask()</code> built-in</td>
+</tr>
+<tr>
+<td><code>/api/nonce/:address</code></td>
+<td>✅ Fresh nonce endpoint</td>
+</tr>
+<tr>
+<td>Logo at <code>/assets/logo-512.png</code></td>
+<td>✅ MetaMask network icon</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🚀 Go-To-Market &amp; Launch Strategy</h2>
+<h3>Phase A: Public Testnet &amp; Validator Bootstrap (Done)</h3>
+<ul>
+<li>Live at <code>https://sayman.onrender.com</code> — 30K+ blocks mined.</li>
+<li>Explorer, faucet, wallet, and documentation fully deployed.</li>
+<li>MetaMask and all EVM wallets connected globally.</li>
+</ul>
+<h3>Phase B: The Global Buildathon (Now Open)</h3>
+<ul>
+<li>Virtual hackathon: <strong>&quot;Build on SAYMAN — JS Smart Contracts for Everyone&quot;</strong></li>
+<li>Prize tracks: DeFi, NFTs, Gaming, Civic dApps, Memecoins.</li>
+<li>Developers use the SAYMAN JavaScript SDK or direct EVM RPC.</li>
+<li>Bulk testnet tokens for builders: <strong>Telegram @SaymanLal</strong> (up to 10M tSAYN).</li>
+<li>Faucet: <code>https://sayman-faucet-site.vercel.app</code></li>
+</ul>
+<h3>Phase C: Chainlist &amp; Ecosystem Expansion</h3>
+<ul>
+<li>Submit <code>eip155-82922.json</code> to <code>ethereum-lists/chains</code> (Chainlist).</li>
+<li>Governance contract deployment.</li>
+<li>Cross-chain SAYN bridge.</li>
+</ul>
+<h3>Phase D: Mainnet Genesis</h3>
+<ul>
+<li>100,000,000 SAYN hard cap genesis.</li>
+<li>Bitcoin-style halving block rewards.</li>
+<li>Tokens to initial validators, treasury, buildathon winners.</li>
+</ul>
+<hr>
+<h2>📊 Current Deployments</h2>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>RPC / Explorer</strong></td>
+<td><a href="https://sayman.onrender.com">https://sayman.onrender.com</a></td>
+</tr>
+<tr>
+<td><strong>Block Explorer</strong></td>
+<td><a href="https://sayman.up.railway.app">https://sayman.up.railway.app</a></td>
+</tr>
+<tr>
+<td><strong>Documentation</strong></td>
+<td><a href="https://sayman-docs.vercel.app">https://sayman-docs.vercel.app</a></td>
+</tr>
+<tr>
+<td><strong>Faucet</strong></td>
+<td><a href="https://sayman-faucet-site.vercel.app">https://sayman-faucet-site.vercel.app</a></td>
+</tr>
+<tr>
+<td><strong>Web Wallet</strong></td>
+<td><a href="https://sayman-wallet-manager.vercel.app">https://sayman-wallet-manager.vercel.app</a></td>
+</tr>
+<tr>
+<td><strong>Android APK</strong></td>
+<td><a href="https://github.com/saymanlal/puky">https://github.com/saymanlal/puky</a></td>
+</tr>
+<tr>
+<td><strong>Bulk Tokens</strong></td>
+<td><a href="https://t.me/SaymanLal">https://t.me/SaymanLal</a></td>
+</tr>
+<tr>
+<td><strong>GitHub</strong></td>
+<td><a href="https://github.com/saymanlal/SAYMAN">https://github.com/saymanlal/SAYMAN</a></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🏢 IP &amp; Ownership</h2>
+<blockquote>
+<p><strong>IP Owner</strong>: Vizkus Groups (Cybokrafts Universal Innovations Pvt. Ltd.)<br>SAYMAN and PUKY are products developed under Vizkus Groups. All intellectual property, trademarks, and chain genesis rights are owned by Vizkus Groups.</p>
+</blockquote>
+
+  </div>
+  <div class="section page-break">
+    <div class="section-source">PULL_REQUEST.md</div>
+    <h1>Pull Request: Phase 22 — Full EVM/MetaMask Compat · tSAYN · Atomic NonceManager · Explorer 2.0</h1>
+<h2>🎯 Description</h2>
+<p>This Pull Request marks the completion of <strong>Phase 22</strong>, delivering complete MetaMask and EVM wallet compatibility, the <code>tSAYN</code> testnet symbol, an atomic NonceManager to eliminate nonce race conditions, Explorer 2.0 with dedicated Token/NFT/Memecoin/Address pages, and a new signed PUKY APK v22 build.</p>
+<hr>
+<h2>🛠️ Key Improvements &amp; Fixes</h2>
+<h3>1. Full MetaMask / EVM Wallet Compatibility (<code>server.js</code>)</h3>
+<ul>
+<li><strong>Added RPC Methods</strong>: <code>eth_getLogs</code>, <code>eth_newBlockFilter</code>, <code>eth_getFilterChanges</code>, <code>eth_newPendingTransactionFilter</code>, <code>eth_newFilter</code>, <code>eth_getFilterLogs</code>, <code>eth_uninstallFilter</code> — eliminates all &quot;unsupported method&quot; errors from MetaMask polling.</li>
+<li><strong>EIP-3085 <code>wallet_addEthereumChain</code></strong>: Returns <code>null</code> (success) — enables Explorer &quot;Add to MetaMask&quot; one-click button.</li>
+<li><strong><code>wallet_switchEthereumChain</code></strong>: Acknowledged.</li>
+<li><strong>Pending Nonce</strong>: <code>eth_getTransactionCount</code> returns <code>max(confirmedNonce, pendingNonce)</code> so MetaMask sequences concurrent txs correctly.</li>
+<li><strong><code>effectiveGasPrice</code> in Receipt</strong>: <code>eth_getTransactionReceipt</code> now includes <code>effectiveGasPrice</code> — required by MetaMask.</li>
+<li><strong>0x Address Stripping</strong>: All RPC and REST endpoints strip <code>0x</code> prefix automatically — bare hex and <code>0x</code>-prefixed MetaMask addresses work everywhere.</li>
+</ul>
+<h3>2. tSAYN Testnet Symbol (<code>config/</code>, <code>api/routes.js</code>, <code>frontend/</code>)</h3>
+<ul>
+<li>Testnet returns <code>networkTicker: &#39;tSAYN&#39;</code>; mainnet returns <code>networkTicker: &#39;SAYN&#39;</code>.</li>
+<li>Explorer, validator toasts, gas fee display, and API all use <code>networkTicker</code> consistently.</li>
+<li>Follows Ethereum convention (SepoliaETH, Mumbai MATIC, etc.).</li>
+</ul>
+<h3>3. Atomic NonceManager (<code>core/nonce.js</code>)</h3>
+<ul>
+<li>New <code>NonceManager</code> class with <code>getNonce(addr)</code>, <code>commitNonce(addr)</code>, <code>rollbackNonce(addr)</code> per address.</li>
+<li>Integrated into <code>/broadcast</code> route — nonce committed on mempool accept, rolled back on rejection.</li>
+<li>New REST endpoint: <code>GET /api/nonce/:address</code> returns pending nonce for the address.</li>
+<li>PUKY Wallet fetches from this endpoint before every broadcast — zero nonce race conditions.</li>
+</ul>
+<h3>4. Explorer 2.0 (<code>frontend/app.js</code>, <code>frontend/index.html</code>)</h3>
+<ul>
+<li><strong>Tokens page</strong>: Lists all factory-deployed fungible tokens with symbol, supply, creator.</li>
+<li><strong>NFTs page</strong>: Lists all factory-deployed NFT collections with mint count.</li>
+<li><strong>Memecoins page</strong>: Lists all factory-deployed memecoins with tax/burn config.</li>
+<li><strong>Address page</strong>: Unified view — balance in tSAYN, tx history, held tokens, NFTs, reputation score.</li>
+<li><strong>Unified search</strong>: Single search bar resolves block index, tx hash, address, and token name/symbol.</li>
+<li><strong>Live L2 status</strong>: Layers page shows real-time height, peers, and TPS for each registered chain.</li>
+<li><strong>Gas fee in tSAYN</strong>: Explorer &quot;Fee Paid&quot; shows tSAYN value (not raw gas units).</li>
+</ul>
+<h3>5. Contract ABI/State Fix (<code>api/routes.js</code>)</h3>
+<ul>
+<li><code>_extractABI</code> now correctly handles <code>methods: { increment(_args) {...} }</code> style contracts.</li>
+<li>Contract state viewer renders properly for all deployed contracts.</li>
+</ul>
+<h3>6. SAYMAN Logo Asset (<code>assets/logo-512.png</code>, <code>server.js</code>)</h3>
+<ul>
+<li>512×512 PNG logo served at <code>/assets/logo-512.png</code>.</li>
+<li>MetaMask uses this URL as the network icon via <code>wallet_addEthereumChain</code>.</li>
+<li><code>/assets</code> directory served statically in <code>server.js</code>.</li>
+</ul>
+<h3>7. PUKY Wallet APK v22 (<code>wallet-manager/</code>)</h3>
+<ul>
+<li>New signed APK — <code>addSaymanToMetaMask()</code> global function for EIP-3085 one-click setup.</li>
+<li>Balance displays <code>tSAYN</code> (testnet) / <code>SAYN</code> (mainnet) via <code>networkTicker</code>.</li>
+<li>Fresh nonce fetched from <code>/api/nonce/:address</code> before every broadcast.</li>
+<li>SHA256: <code>77fc05fa8eaf910e30ceedb99ed5e42e198db8eb2af4e2d33ac76dab7e1de44f</code></li>
+</ul>
+<h3>8. Faucet Site Update (<code>sayman-faucet-site</code>)</h3>
+<ul>
+<li>Added <strong>Telegram @SaymanLal bulk token request</strong> section (up to 10M tSAYN for builders).</li>
+<li>Telegram link added to footer.</li>
+<li><code>maxlength=&quot;42&quot;</code> confirmed for 0x-prefixed MetaMask addresses.</li>
+</ul>
+<h3>9. Documentation (<code>*.md</code>, <code>docs/</code>)</h3>
+<ul>
+<li>All MD files updated to Phase 22: README, NETWORK_INFO, INSTALL, AI, summary, comparison, pitch, PULL_REQUEST.</li>
+<li><code>docs/NETWORK_INFO.md</code> synced from root.</li>
+<li><code>docs.js</code> updated: MetaMask setup guide, tSAYN FAQ, Telegram bulk tokens, Phase 22 roadmap.</li>
+<li><code>docs.pdf</code> generated — full polished A4 PDF of all documentation.</li>
+</ul>
+<hr>
+<h2>📋 Files Changed</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>server.js</code></td>
+<td>Added 8 new EVM RPC methods, static <code>/assets</code> serving</td>
+</tr>
+<tr>
+<td><code>api/routes.js</code></td>
+<td><code>/nonce</code>, <code>/tokens</code>, <code>/nfts</code>, <code>/memecoins</code>, <code>/layers</code>, <code>/address</code> unified, 0x stripping</td>
+</tr>
+<tr>
+<td><code>core/nonce.js</code></td>
+<td>New Atomic NonceManager</td>
+</tr>
+<tr>
+<td><code>core/blockchain.js</code></td>
+<td>NonceManager integration</td>
+</tr>
+<tr>
+<td><code>frontend/app.js</code></td>
+<td>Tokens/NFTs/Memecoins/Address/Layers pages, unified search, addSaymanToMetaMask</td>
+</tr>
+<tr>
+<td><code>frontend/index.html</code></td>
+<td>New nav items, search bar</td>
+</tr>
+<tr>
+<td><code>assets/logo-512.png</code></td>
+<td>New SAYMAN 512×512 logo</td>
+</tr>
+<tr>
+<td><code>config/*.js</code></td>
+<td><code>networkTicker</code> field (tSAYN/SAYN)</td>
+</tr>
+<tr>
+<td><code>README.md</code></td>
+<td>Full Phase 22 rewrite</td>
+</tr>
+<tr>
+<td><code>NETWORK_INFO.md</code></td>
+<td>Full Phase 22 rewrite — 27 RPC methods, tSAYN, bulk tokens</td>
+</tr>
+<tr>
+<td><code>INSTALL.md</code></td>
+<td>Phase 22 header, tSAYN, nonce endpoint, MetaMask section</td>
+</tr>
+<tr>
+<td><code>AI.md</code></td>
+<td>Phase 22 current phase, tSAYN ticker, nonce.js in structure</td>
+</tr>
+<tr>
+<td><code>summary.md</code></td>
+<td>Phase 22 rewrite — MetaMask steps, nonce health check, EVM RPC check</td>
+</tr>
+<tr>
+<td><code>comparison.md</code></td>
+<td>Phase 22 row + in-depth detail section</td>
+</tr>
+<tr>
+<td><code>pitch.md</code></td>
+<td>Full Phase 22 rewrite — MetaMask compat section, tSAYN table, GTM update</td>
+</tr>
+<tr>
+<td><code>PULL_REQUEST.md</code></td>
+<td>This file — Phase 22 PR</td>
+</tr>
+<tr>
+<td><code>docs.html</code></td>
+<td>Generated docs HTML</td>
+</tr>
+<tr>
+<td><code>docs.pdf</code></td>
+<td>Generated A4 docs PDF</td>
+</tr>
+<tr>
+<td><code>generate-docs-pdf.mjs</code></td>
+<td>PDF generator script</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>✅ Testing Checklist</h2>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> MetaMask connects to <code>https://sayman.onrender.com</code> with Chain ID <code>82922</code>, symbol <code>tSAYN</code></li>
+<li><input checked="" disabled="" type="checkbox"> MetaMask &quot;Add to MetaMask&quot; button in Explorer works (EIP-3085)</li>
+<li><input checked="" disabled="" type="checkbox"> MetaMask can send transactions via <code>eth_sendRawTransaction</code></li>
+<li><input checked="" disabled="" type="checkbox"> MetaMask balance shows correctly (base units × 10¹⁰ → Wei)</li>
+<li><input checked="" disabled="" type="checkbox"> <code>eth_newBlockFilter</code> + <code>eth_getFilterChanges</code> polling returns latest block hash</li>
+<li><input checked="" disabled="" type="checkbox"> <code>eth_getTransactionReceipt</code> includes <code>effectiveGasPrice</code></li>
+<li><input checked="" disabled="" type="checkbox"> <code>/api/nonce/:address</code> returns pending nonce</li>
+<li><input checked="" disabled="" type="checkbox"> PUKY Wallet broadcast uses fresh nonce — no nonce conflicts</li>
+<li><input checked="" disabled="" type="checkbox"> Faucet accepts <code>0x</code>-prefixed MetaMask addresses</li>
+<li><input checked="" disabled="" type="checkbox"> Explorer Tokens/NFTs/Memecoins pages render</li>
+<li><input checked="" disabled="" type="checkbox"> Explorer Address page shows unified view</li>
+<li><input checked="" disabled="" type="checkbox"> Unified search resolves block/tx/address/token</li>
+<li><input checked="" disabled="" type="checkbox"> Gas fee displayed in tSAYN in explorer</li>
+<li><input checked="" disabled="" type="checkbox"> APK v22 builds successfully (SHA256 verified)</li>
+<li><input checked="" disabled="" type="checkbox"> All MD files updated to Phase 22</li>
+<li><input checked="" disabled="" type="checkbox"> docs.pdf generated successfully</li>
+</ul>
+
+  </div>
+  <div class="section page-break">
+    <div class="section-source">AI.md</div>
+    <h1>🧠 SAYMAN Blockchain: Complete Project Memory &amp; Developer Reference Manual</h1>
+<p>This file serves as the unified project memory and context sheet for the <strong>SAYMAN Blockchain</strong> and <strong>PUKY Wallet</strong> ecosystem. If a new session is started, you are switching AI models, or your free trial limit is reached, feed this entire file to the new AI agent as a prompt to resume development immediately.</p>
+<hr>
+<h2>📋 1. Project Overview &amp; Architecture</h2>
+<p>SAYMAN is a Proof-of-Stake (PoS) Layer 1 blockchain built in Node.js, designed for Civic Intelligence, decentralized city reporting, and community-level AI verification. From Phase 14, it also supports custom multi-layer chains, user-deployed tokens, NFT collections, memecoins, DEX/AMM, and staking pools — essentially a full Web3 platform.</p>
+<h3>Current Phase: <strong>Phase 22 — Full EVM/MetaMask Compat · tSAYN · NonceManager · Explorer 2.0</strong></h3>
+<ul>
+<li>Branch: <code>main</code></li>
+<li>Git origin: <code>https://github.com/saymanlal/SAYMAN</code></li>
+</ul>
+<h3>🪙 Tokenomics</h3>
+<ul>
+<li><strong>Ticker (Testnet)</strong>: <code>tSAYN</code> (1 SAYN = 100,000,000 base units — called &quot;sprinkles&quot;)</li>
+<li><strong>Ticker (Mainnet)</strong>: <code>SAYN</code></li>
+<li><strong>Decimals</strong>: 8 (i.e. <code>decimals = 100_000_000</code>)</li>
+<li><strong>Block Time</strong>: 5 seconds</li>
+<li><strong>Block Reward</strong>: 0.5 tSAYN = 50,000,000 base units (testnet), 0.2 SAYN = 20,000,000 (mainnet)</li>
+<li><strong>Min Stake</strong>: 10 tSAYN (testnet), 500 SAYN (mainnet)</li>
+<li><strong>Halving Schedule</strong>: Every 12,614,400 blocks (~2 years)</li>
+<li><strong>Max Supply</strong>: Unlimited (testnet); 100,000,000 SAYN (mainnet)</li>
+</ul>
+<h3>⚠️ SAYN vs Base Units — Critical for Explorers and APIs</h3>
+<p>All on-chain balances are stored as integers in <strong>base units (sprinkles)</strong>. Divide by <code>decimals</code> (default: <code>100_000_000</code>) to convert to SAYN.</p>
+<ul>
+<li><code>GET /api/denomination</code> — returns a complete guide including conversion examples</li>
+<li><code>GET /api/tps</code> — returns live TPS, decimals, and denomination info</li>
+<li>In the explorer: every balance is shown as <code>X.XXXX SAYN (Y base units)</code> to prevent confusion</li>
+</ul>
+<hr>
+<h2>🏗️ 2. Repository Structure</h2>
+<pre><code>sayman/
+├── core/
+│   ├── blockchain.js       # PoS engine, NonceManager integration, block production
+│   ├── nonce.js            # 🆕 Phase 22: Atomic NonceManager — getNonce/commitNonce/rollbackNonce per address
+│   ├── state.js            # StateEngine (balances, stakes, reputation, contracts)
+│   ├── block.js            # Block class
+│   ├── transaction.js      # Transaction types
+│   ├── pos.js              # Proof-of-Stake validator selection
+│   ├── contracts.js        # Smart contract VM (sandboxed JS execution)
+│   ├── gas.js              # Gas calculator
+│   ├── stateTree.js        # Merkle state tree
+│   ├── chain-factory.js    # Phase 14: ChainFactory for L2/Sidechain/Permissioned chains
+│   ├── rollup.js           # Phase 14: L2 rollup state commitment to L1
+│   └── env.js              # .env loader
+├── contracts/
+│   ├── token.js            # ERC-20 style custom token contract
+│   ├── nft.js              # ERC-721 style NFT contract
+│   ├── token-factory.js    # Factory: anyone deploys their own token in one call
+│   ├── nft-factory.js      # Factory: NFT collection creator
+│   ├── memecoin-factory.js # Phase 14: Memecoin launcher (burn, tax, anti-whale, registry)
+│   ├── dex.js              # Phase 14: AMM DEX (Uniswap V2 x*y=k, 0.3% fee)
+│   ├── staking-pool.js     # Phase 14: Delegated staking pool (earn rewards without running a node)
+│   ├── layer2Bridge.js     # L1 bridge for L2 state anchoring, deposits, withdrawals
+│   └── example.js          # Example contract
+├── p2p/
+│   ├── server.js           # P2P WebSocket server (discovery, sync, reputation for peers)
+│   └── peerManager.js      # Peer list manager
+├── api/
+│   └── routes.js           # REST API — Phase 22: /nonce, /tokens, /nfts, /memecoins, /address, /layers, /search, full EVM RPC
+├── wallet/
+│   └── wallet.js           # Wallet (key gen, sign, address derive)
+├── sdk/
+│   └── client.js           # SaymanClient SDK with RPC failover
+├── cli/
+│   └── sayman-cli.js       # CLI wallet
+├── frontend/
+│   ├── index.html          # Explorer UI — Phase 22: Tokens/NFTs/Memecoins/Address pages, unified search, MetaMask button
+│   ├── app.js              # Explorer JS — loadTokens, loadNFTs, loadMemecoins, loadAddress, addSaymanToMetaMask
+│   └── style.css           # Dark theme UI styles
+├── assets/                 # 🆕 Phase 22: logo-512.png served for MetaMask network icon
+├── config/
+│   ├── index.js            # Config loader
+│   ├── testnet.js          # Local testnet config
+│   ├── public-testnet.js   # Public testnet config (Render deployment)
+│   └── mainnet.js          # Mainnet config
+├── server.js               # Express + P2P bootstrap server (Phase 14: sequencer mode, rollup)
+└── AI.md                   # This file — always keep updated
+</code></pre>
+<hr>
+<h2>🗳️ 3. Proof-of-Stake Consensus</h2>
+<ul>
+<li>Validators stake tokens to participate in block production.</li>
+<li>Block proposer is deterministically selected each round using the previous block hash as a VRF seed:<pre><code class="language-javascript">const seed = hash(lastBlockHash);
+const idx  = parseInt(seed.substring(0, 16), 16) % totalStake;
+</code></pre>
+</li>
+<li><code>addBlock(block)</code> verifies: index, previousHash, chainId, validator selection, hash integrity, stateRoot.</li>
+<li>Peers who help sync blocks earn <strong>+2 reputation per block</strong> synced (in <code>p2p/server.js</code>).</li>
+<li>Validators earn <strong>+10 reputation per block</strong> produced (in <code>blockchain.applyBlock</code>).</li>
+<li>Peer reputation points are earned dynamically for consensus contributions.</li>
+</ul>
+<hr>
+<h2>🔗 4. Multi-Layer Architecture (Phase 14)</h2>
+<p>SAYMAN supports a full multi-layer blockchain ecosystem:</p>
+<h3>Layer Types</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>L1</td>
+<td>Main chain</td>
+<td>SAYMAN itself — anchors all L2 state roots via bridge</td>
+</tr>
+<tr>
+<td>L2 Rollup</td>
+<td>Anchored to L1</td>
+<td>Fast blocks (0.5s), commits state roots every N blocks to L1Bridge contract</td>
+</tr>
+<tr>
+<td>Sidechain</td>
+<td>Independent L1-style</td>
+<td>Own tokenomics, optionally bridged. Good for games/NFT platforms</td>
+</tr>
+<tr>
+<td>Permissioned</td>
+<td>Private consortium</td>
+<td>Invited validators only</td>
+</tr>
+</tbody></table>
+<h3>Creating a New Chain</h3>
+<pre><code class="language-javascript">import { ChainFactory } from &#39;./core/chain-factory.js&#39;;
+import Blockchain from &#39;./core/blockchain.js&#39;;
+
+// Layer 2 Rollup
+const config = ChainFactory.createL2Config({
+  name: &#39;MyL2Chain&#39;,
+  chainId: &#39;my-l2-1&#39;,
+  apiPort: 11000,
+  l1RpcUrl: &#39;https://sayman.onrender.com&#39;,
+  l1Bridge: &#39;&lt;BRIDGE_CONTRACT_ADDRESS&gt;&#39;,
+  genesis: { &#39;&lt;YOUR_ADDRESS&gt;&#39;: 1_000_000_000 }
+});
+const chain = new Blockchain(config, &#39;./data/my-l2&#39;);
+await chain.initialize();
+
+// Sidechain
+const sideConfig = ChainFactory.createSidechainConfig({
+  name: &#39;GameChain&#39;,
+  chainId: &#39;gamechain-1&#39;,
+  blockReward: 10_000_000,
+  genesis: { &#39;&lt;DEV_WALLET&gt;&#39;: 100_000_000_000 }
+});
+
+// Permissioned
+const permConfig = ChainFactory.createPermissionedConfig({
+  name: &#39;Enterprise&#39;,
+  chainId: &#39;ent-1&#39;,
+  validators: [&#39;&lt;ADDR1&gt;&#39;, &#39;&lt;ADDR2&gt;&#39;]
+});
+</code></pre>
+<h3>Running Sequencer Mode (L2)</h3>
+<pre><code class="language-bash">node server.js --network public-testnet --mode sequencer
+</code></pre>
+<p>Every 5 blocks, the sequencer calls <code>rollup.js</code> → <code>submitRollupToL1()</code> → commits <code>stateRoot</code> to the L1 Bridge contract.</p>
+<hr>
+<h2>💻 5. Smart Contract Development Guide</h2>
+<p>Contracts are written in plain JavaScript and run in a secure sandboxed VM. No imports allowed.</p>
+<h3>Available Built-ins</h3>
+<table>
+<thead>
+<tr>
+<th>Method/Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>getState(key)</code></td>
+<td>Read from contract&#39;s persistent state</td>
+</tr>
+<tr>
+<td><code>setState(key, val)</code></td>
+<td>Write to contract&#39;s persistent state</td>
+</tr>
+<tr>
+<td><code>transfer(toAddress, amount)</code></td>
+<td>Transfer SAYN (base units) from contract to address</td>
+</tr>
+<tr>
+<td><code>getBalance(address)</code></td>
+<td>Get SAYN balance of any address</td>
+</tr>
+<tr>
+<td><code>msg.sender</code></td>
+<td>Transaction sender address</td>
+</tr>
+<tr>
+<td><code>blockTimestamp</code></td>
+<td>Current block timestamp (ms)</td>
+</tr>
+<tr>
+<td><code>emit(event, data)</code></td>
+<td>Emit a contract event</td>
+</tr>
+<tr>
+<td><code>hash(data)</code></td>
+<td>SHA-256 hash of any JSON-serializable value</td>
+</tr>
+<tr>
+<td><code>generateAddress(seed)</code></td>
+<td>Derive a deterministic 40-char hex address</td>
+</tr>
+<tr>
+<td><code>require(cond, msg)</code></td>
+<td>Assert or revert</td>
+</tr>
+<tr>
+<td><code>console.log(...)</code></td>
+<td>Debug log to validator terminal</td>
+</tr>
+</tbody></table>
+<h3>🪙 Token Factory (create your own token)</h3>
+<pre><code class="language-javascript">// Deploy the token-factory.js contract once, then:
+client.callContract({
+  contractAddress: TOKEN_FACTORY_ADDR,
+  method: &#39;createToken&#39;,
+  args: { name: &#39;My Token&#39;, symbol: &#39;MTK&#39;, totalSupply: 1_000_000 },
+  wallet: myWallet
+});
+</code></pre>
+<h3>🐸 Memecoin Launcher (with burn, tax, anti-whale)</h3>
+<pre><code class="language-javascript">client.callContract({
+  contractAddress: MEMECOIN_FACTORY_ADDR,
+  method: &#39;launch&#39;,
+  args: {
+    name: &#39;DogeSAYN&#39;, symbol: &#39;DSAYN&#39;, totalSupply: 1_000_000_000,
+    iconUrl: &#39;https://example.com/icon.png&#39;,
+    maxWalletPercent: 2,      // 2% max wallet anti-whale
+    transferTaxPercent: 1,    // 1% routed to treasury
+    treasury: &#39;&lt;ADDR&gt;&#39;,
+    burnOnTransfer: false,
+  }
+});
+</code></pre>
+<h3>🎨 NFT Collections</h3>
+<pre><code class="language-javascript">// Step 1: Create collection
+client.callContract({
+  contractAddress: NFT_FACTORY_ADDR,
+  method: &#39;createCollection&#39;,
+  args: { name: &#39;CoolNFTs&#39;, symbol: &#39;COOL&#39;, maxSupply: 10000 }
+});
+
+// Step 2: Mint to someone
+client.callContract({
+  contractAddress: NFT_FACTORY_ADDR,
+  method: &#39;mint&#39;,
+  args: { collAddr: &#39;&lt;COLL_ADDR&gt;&#39;, to: &#39;&lt;RECIPIENT&gt;&#39;, tokenURI: &#39;ipfs://...&#39; }
+});
+</code></pre>
+<h3>💱 DEX / AMM</h3>
+<pre><code class="language-javascript">// Add liquidity
+client.callContract({
+  contractAddress: DEX_ADDR,
+  method: &#39;addLiquidity&#39;,
+  args: { tokenA: &#39;ADDR_A&#39;, tokenB: &#39;ADDR_B&#39;, amountA: 1000, amountB: 2000 }
+});
+
+// Swap (x*y=k, 0.3% fee)
+client.callContract({
+  contractAddress: DEX_ADDR,
+  method: &#39;swap&#39;,
+  args: { tokenIn: &#39;ADDR_A&#39;, tokenOut: &#39;ADDR_B&#39;, amountIn: 100, minAmountOut: 190 }
+});
+</code></pre>
+<h3>🏊 Staking Pool (delegate without running a node)</h3>
+<pre><code class="language-javascript">client.callContract({
+  contractAddress: POOL_ADDR,
+  method: &#39;delegate&#39;,
+  args: { amount: 1_000_000 }  // base units
+});
+// Claim rewards
+client.callContract({ contractAddress: POOL_ADDR, method: &#39;claimRewards&#39;, args: {} });
+</code></pre>
+<hr>
+<h2>🌐 6. REST API Reference</h2>
+<h3>System &amp; Stats</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/network</code></td>
+<td>Network info (chainId, layer, ticker, decimals, denomination guide)</td>
+</tr>
+<tr>
+<td><code>GET /api/stats</code></td>
+<td>Block count, mempool, validators, TPS, gasLimits, gasCosts</td>
+</tr>
+<tr>
+<td><code>GET /api/tps</code></td>
+<td>Live TPS + denomination info</td>
+</tr>
+<tr>
+<td><code>GET /api/denomination</code></td>
+<td>Explicit SAYN/base-unit conversion guide</td>
+</tr>
+<tr>
+<td><code>GET /api/network/stats</code></td>
+<td>Node stats (nodeId, mode, uptime, peers)</td>
+</tr>
+</tbody></table>
+<h3>Blocks</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/blocks?page=1&amp;limit=50</code></td>
+<td>Paginated block list</td>
+</tr>
+<tr>
+<td><code>GET /api/block/:index</code></td>
+<td>Block by height</td>
+</tr>
+<tr>
+<td><code>GET /api/block/hash/:hash</code></td>
+<td>Block by hash (prefix supported)</td>
+</tr>
+<tr>
+<td><code>GET /api/light/block/:height</code></td>
+<td>Light-client header only</td>
+</tr>
+<tr>
+<td><code>GET /api/proof/:address</code></td>
+<td>Merkle state proof</td>
+</tr>
+<tr>
+<td><code>POST /api/proof/verify</code></td>
+<td>Verify a Merkle proof</td>
+</tr>
+</tbody></table>
+<h3>Accounts</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/address/:address</code></td>
+<td>Balance, stake, nonce, txs, reputation</td>
+</tr>
+<tr>
+<td><code>GET /api/balance/:address</code></td>
+<td>Balance only (legacy)</td>
+</tr>
+<tr>
+<td><code>GET /api/reputation/:address</code></td>
+<td>Reputation score</td>
+</tr>
+</tbody></table>
+<h3>Transactions</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /api/broadcast</code></td>
+<td>Submit signed transaction</td>
+</tr>
+<tr>
+<td><code>POST /api/estimate-gas</code></td>
+<td>Estimate gas for a tx type</td>
+</tr>
+<tr>
+<td><code>GET /api/mempool</code></td>
+<td>Pending transactions</td>
+</tr>
+<tr>
+<td><code>GET /api/transactions/:id</code></td>
+<td>Transaction by ID</td>
+</tr>
+</tbody></table>
+<h3>Validators &amp; Contracts</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/validators</code></td>
+<td>Active validators with stake, reputation, percentage</td>
+</tr>
+<tr>
+<td><code>GET /api/contracts</code></td>
+<td>All deployed contracts</td>
+</tr>
+<tr>
+<td><code>GET /api/contracts/:address</code></td>
+<td>Single contract</td>
+</tr>
+</tbody></table>
+<h3>Web3 Platform (Phase 14)</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/tokens</code></td>
+<td>All custom tokens (from token-factory and memecoin-factory)</td>
+</tr>
+<tr>
+<td><code>GET /api/nfts</code></td>
+<td>All NFT collections (from nft-factory)</td>
+</tr>
+<tr>
+<td><code>GET /api/staking-pools</code></td>
+<td>All staking pool contracts</td>
+</tr>
+</tbody></table>
+<h3>Faucet &amp; Admin</h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /api/faucet</code></td>
+<td>Testnet faucet (body: <code>{ address }</code>)</td>
+</tr>
+<tr>
+<td><code>POST /api/admin/fund</code></td>
+<td>Admin fund endpoint (body: <code>{ address, amount, secret }</code>)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>⚡ 7. SDK Reference (<code>sdk/client.js</code>)</h2>
+<p>The <code>SaymanClient</code> SDK includes built-in RPC failover.</p>
+<pre><code class="language-javascript">import { SaymanClient } from &#39;./sdk/client.js&#39;;
+const client = new SaymanClient({
+  rpcUrl: &#39;https://sayman.up.railway.app,https://sayman.onrender.com,http://localhost:10000&#39;
+});
+</code></pre>
+<h3>Core Methods</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>deployContract({ name, version, code, abi, feePolicy, wallet, gasLimit, gasPrice })</code></td>
+<td>Deploy a contract</td>
+</tr>
+<tr>
+<td><code>callContract({ contractAddress, method, args, wallet, gasLimit, gasPrice })</code></td>
+<td>Call a contract method</td>
+</tr>
+<tr>
+<td><code>readState(contractAddress, key)</code></td>
+<td>Read a single state key</td>
+</tr>
+<tr>
+<td><code>readAllState(contractAddress)</code></td>
+<td>Read all state</td>
+</tr>
+<tr>
+<td><code>transfer({ to, amount, wallet, gasLimit, gasPrice })</code></td>
+<td>Send SAYN (amount in SAYN float, SDK scales to base units)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🛠️ 8. CLI Reference (<code>cli/sayman-cli.js</code>)</h2>
+<pre><code class="language-bash">sayman init            # Initialize wallet
+sayman create          # New wallet
+sayman import &lt;key&gt;    # Import private key
+sayman balance         # Show balance, stake, nonces
+sayman send &lt;addr&gt; &lt;amount&gt;   # Transfer SAYN
+sayman stake &lt;amount&gt;         # Stake tokens
+sayman unstake &lt;amount&gt;       # Unstake
+sayman config &lt;rpc_url&gt;       # Set RPC
+</code></pre>
+<hr>
+<h2>🚀 9. Deployment</h2>
+<h3>Environment Variables</h3>
+<pre><code class="language-env">NETWORK=public-testnet       # or testnet, mainnet
+MODE=validator               # or sequencer, full, observer
+PORT=10000
+P2P_PORT=                    # leave blank to share HTTP port at /p2p
+BOOTSTRAP_PEERS=wss://...    # comma-separated peer WS URLs
+VALIDATOR_ADDRESS=           # optional — only produce blocks when selected
+DB_PATH=./data/node-10000
+# L2 Rollup (sequencer mode only)
+L1_RPC_URL=https://sayman.onrender.com
+L1_BRIDGE_CONTRACT=&lt;addr&gt;
+L1_SEQUENCER_PRIVATE_KEY=&lt;hex&gt;
+</code></pre>
+<h3>Procfile (Render/Railway)</h3>
+<pre><code>web: node server.js --network public-testnet --mode validator
+</code></pre>
+<hr>
+<h2>🔁 10. P2P Network &amp; Reputation</h2>
+<ul>
+<li><strong>Heartbeat &amp; Keep-Alive</strong>: Every 15s, each node sends a WebSocket ping (heartbeat) to every connected peer to maintain the connection. Dead or unresponsive sockets are closed and pruned.</li>
+<li><strong>Catch-up Sync</strong>: Handshake checks determine if a connecting node is lagging behind. If a peer is behind us, the node immediately sends them the missing blocks to get them up to speed.</li>
+<li><strong>Auto-discovery</strong>: Every 30s, each node requests peer lists from all connected peers.</li>
+<li><strong>Reconnect</strong>: Dead peers are retried every 15s. After 1h offline, a deploy webhook fires (if configured).</li>
+<li><strong>Self-healing</strong>: Inactive connections (no message for 90s) are pruned.</li>
+<li><strong>Reputation for peers</strong>: When a peer sends valid blocks during sync, it earns <code>+2 reputation per block</code>.</li>
+<li><strong>Reputation addresses</strong>: Peer reputation is tracked using <code>SHA-256(&#39;peer:&#39; + nodeId).slice(0, 40)</code>.</li>
+<li><strong>Block validators</strong>: Each block producer earns <code>+10 reputation</code> per block via <code>applyBlock</code>.</li>
+<li><strong>Reputation API</strong>: <code>GET /api/reputation/:address</code> returns the current score.</li>
+</ul>
+<hr>
+<h2>🎯 11. How to Resume Work in a New AI Session</h2>
+<p>Copy-paste this prompt:</p>
+<blockquote>
+<p><strong>PROMPT</strong>: &quot;I am working on the SAYMAN Blockchain project (Phase 19). Please read the file <code>AI.md</code> located in the root of the workspace to load the entire project context, API routes, CLI commands, SDK signatures, smart contract guide, and multi-layer architecture. Once loaded, confirm you are ready to continue building.&quot;</p>
+</blockquote>
+<hr>
+<h2>📋 12. Phase History</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Key Features</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Phase 1</td>
+<td>Genesis, PoS, basic blocks</td>
+</tr>
+<tr>
+<td>Phase 2</td>
+<td>Wallet, CLI, SDK</td>
+</tr>
+<tr>
+<td>Phase 3</td>
+<td>P2P networking</td>
+</tr>
+<tr>
+<td>Phase 4</td>
+<td>Smart contracts (JS VM)</td>
+</tr>
+<tr>
+<td>Phase 5</td>
+<td>Gas model</td>
+</tr>
+<tr>
+<td>Phase 6</td>
+<td>Merkle state tree, proofs</td>
+</tr>
+<tr>
+<td>Phase 7</td>
+<td>Halving, slashing</td>
+</tr>
+<tr>
+<td>Phase 8</td>
+<td>Snapshots, DB persistence</td>
+</tr>
+<tr>
+<td>Phase 9</td>
+<td>Reputation engine, events</td>
+</tr>
+<tr>
+<td>Phase 10</td>
+<td>Report system (civic intelligence)</td>
+</tr>
+<tr>
+<td>Phase 11</td>
+<td>Explorer UI overhaul</td>
+</tr>
+<tr>
+<td>Phase 12</td>
+<td>Sponsorship fee policy</td>
+</tr>
+<tr>
+<td>Phase 13</td>
+<td>P2P sync fixes, anti-fork protection</td>
+</tr>
+<tr>
+<td>Phase 14</td>
+<td>Multi-layer chains, custom tokens, NFTs, memecoins, DEX/AMM, staking pools, TPS tracking, denomination clarity, peer reputation</td>
+</tr>
+<tr>
+<td>Phase 15</td>
+<td>P2P heartbeat keep-alive, handshake catch-up sync, stake amount normalization, gas decimal fixes, faucet/genesis transaction history remap, and rebuilt Android APK</td>
+</tr>
+<tr>
+<td>Phase 17</td>
+<td>Constructor state execution fix (prototype pre-binding), Render RPC prioritization, Explorer SPA path-based fallbacks, mobile UX polishing, Dark Theme persist, and 7,000 simulated TPS upgrades</td>
+</tr>
+<tr>
+<td><strong>Phase 19</strong></td>
+<td><strong>Pipelined parallel execution compatibility, transaction access set dependency analysis, deterministic conflict-free parallel bucket scheduling, and live parallel efficiency metrics in the explorer UI</strong></td>
+</tr>
+</tbody></table>
+
+  </div>
+  <div class="section page-break">
+    <div class="section-source">ABOUT.md</div>
+    <h1>About Sayman Blockchain - The Complete Story</h1>
+<h2>What is Sayman?</h2>
+<p>Sayman is a <strong>complete, working blockchain</strong> built from scratch for education. It&#39;s not a toy - it&#39;s a real blockchain with proper architecture, just simplified enough to understand.</p>
+<p><strong>Think of it like this:</strong></p>
+<ul>
+<li>🚗 <strong>Real Car</strong>: Tesla Model S (production blockchain)</li>
+<li>🏎️ <strong>Race Car</strong>: Formula 1 (Sayman - educational but real)</li>
+<li>🚙 <strong>Toy Car</strong>: Fisher-Price (most tutorials)</li>
+</ul>
+<p>Sayman is the Formula 1 - stripped down, but every component is real and works properly.</p>
+<hr>
+<h2>The Journey: Three Phases</h2>
+<h3>Phase 1: Foundation (Basic Blockchain)</h3>
+<p><strong>What we built:</strong></p>
+<ul>
+<li>Blocks linked by hashes</li>
+<li>Transactions with digital signatures</li>
+<li>Simple Proof of Stake</li>
+<li>Wallet system</li>
+<li>Persistent storage</li>
+</ul>
+<p><strong>Architecture problems:</strong></p>
+<ul>
+<li>❌ Single node only</li>
+<li>❌ Manual block creation</li>
+<li>❌ State partially in-memory</li>
+<li>❌ No peer networking</li>
+</ul>
+<p><strong>It worked, but not like a real blockchain.</strong></p>
+<hr>
+<h3>Phase 2: Multi-Node Network</h3>
+<p><strong>What we added:</strong></p>
+<ul>
+<li>WebSocket P2P networking</li>
+<li>Multi-node synchronization</li>
+<li>Complete validator system</li>
+<li>Block rewards</li>
+<li>Slashing mechanism</li>
+<li>Automatic block production</li>
+</ul>
+<p><strong>Architecture problems:</strong></p>
+<ul>
+<li>❌ <strong>CRITICAL:</strong> Private keys sent to server</li>
+<li>❌ Server signs transactions (centralized!)</li>
+<li>❌ State not fully deterministic</li>
+<li>❌ Validators partially off-chain</li>
+</ul>
+<p><strong>It was distributed, but not trustless.</strong></p>
+<hr>
+<h3>Phase 3: Real Blockchain Architecture</h3>
+<p><strong>What we fixed:</strong></p>
+<h4>1. Client-Side Cryptography ✅</h4>
+<p><strong>Before:</strong></p>
+<pre><code class="language-javascript">// User sends private key to server
+fetch(&#39;/api/stake&#39;, {
+  body: JSON.stringify({
+    privateKey: &quot;abc123...&quot;,  // ❌ DANGER!
+    amount: 100
+  })
+})
+</code></pre>
+<p><strong>After:</strong></p>
+<pre><code class="language-javascript">// User signs transaction IN BROWSER
+const wallet = new SaymanWallet(privateKey);
+const signature = await wallet.signTransaction(tx);
+
+// Send ONLY signed transaction
+fetch(&#39;/api/broadcast&#39;, {
+  body: JSON.stringify({
+    signature: &quot;...&quot;,  // ✅ Safe
+    publicKey: &quot;...&quot;   // ✅ Public (safe to share)
+  })
+})
+</code></pre>
+<p><strong>Why this matters:</strong> Private keys never leave your device. This is how Bitcoin, Ethereum, and all real blockchains work.</p>
+<h4>2. Deterministic State ✅</h4>
+<p><strong>Before:</strong> State partially stored outside blockchain.</p>
+<p><strong>After:</strong> 100% of state derived from blockchain:</p>
+<pre><code class="language-javascript">// On every restart
+loadBlockchain();
+clearState();
+for (block of blockchain) {
+  for (tx of block) {
+    applyTransaction(tx);  // Rebuild everything
+  }
+}
+// State now identical to before restart
+</code></pre>
+<h4>3. Transaction-Based Everything ✅</h4>
+<p><strong>Before:</strong> Some actions (staking, rewards) happened outside blockchain.</p>
+<p><strong>After:</strong> Every state change is a transaction:</p>
+<ul>
+<li><code>GENESIS</code> - Initial token distribution</li>
+<li><code>TRANSFER</code> - Send tokens</li>
+<li><code>STAKE</code> - Become validator</li>
+<li><code>UNSTAKE</code> - Leave validator set</li>
+<li><code>REWARD</code> - Block rewards (automatic)</li>
+<li><code>CONTRACT_DEPLOY</code> - Deploy smart contract</li>
+<li><code>CONTRACT_CALL</code> - Execute contract</li>
+<li><code>SLASH</code> - Penalty for bad validator</li>
+</ul>
+<h4>4. Smart Contracts ✅</h4>
+<p>JavaScript contracts running in sandboxed VM:</p>
+<pre><code class="language-javascript">function transfer(args) {
+  const { to, amount } = args;
+  const from = msg.sender;
+  
+  state.balances[from] -= amount;
+  state.balances[to] += amount;
+}
+</code></pre>
+<p><strong>Now Sayman is a real, trustless, deterministic blockchain.</strong></p>
+<hr>
+<h2>Key Concepts for Non-Technical People</h2>
+<h3>What is a Blockchain?</h3>
+<p>Imagine a notebook that:</p>
+<ol>
+<li>Everyone has a copy of</li>
+<li>You can only add pages, never change old ones</li>
+<li>Everyone agrees on what&#39;s written</li>
+<li>No one person controls it</li>
+</ol>
+<p><strong>That&#39;s a blockchain.</strong></p>
+<pre><code>Page 1: Alice gives Bob $10
+  ↓
+Page 2: Bob gives Carol $5
+  ↓
+Page 3: Carol gives Alice $3
+  ↓
+[Everyone has the same notebook]
+</code></pre>
+<h3>What is Proof of Stake?</h3>
+<p>Instead of solving puzzles (Bitcoin mining):</p>
+<p><strong>Proof of Work (Bitcoin):</strong></p>
+<pre><code>Who can solve this math puzzle fastest? → You win!
+(Wastes tons of electricity)
+</code></pre>
+<p><strong>Proof of Stake (Sayman, Ethereum):</strong></p>
+<pre><code>Who has the most &quot;skin in the game&quot;? → You win!
+(No electricity waste)
+</code></pre>
+<p><strong>Example:</strong></p>
+<ul>
+<li>Alice stakes 500 SAYN → 50% chance to create next block</li>
+<li>Bob stakes 300 SAYN → 30% chance</li>
+<li>Carol stakes 200 SAYN → 20% chance</li>
+</ul>
+<p>More stake = more responsibility = more rewards.</p>
+<h3>What are Digital Signatures?</h3>
+<p>Like signing a check:</p>
+<pre><code>1. You write a message: &quot;Send $100 to Bob&quot;
+2. You sign with your secret signature (private key)
+3. Everyone can verify it&#39;s really you (using public key)
+4. But only YOU can create the signature
+</code></pre>
+<p><strong>In Sayman:</strong></p>
+<pre><code class="language-javascript">// You create transaction IN YOUR BROWSER
+const tx = { from: &quot;Alice&quot;, to: &quot;Bob&quot;, amount: 100 };
+
+// You sign it WITH YOUR PRIVATE KEY (never shared)
+const signature = wallet.sign(tx);
+
+// You send the SIGNED transaction
+// Server can verify it&#39;s you, but can&#39;t forge your signature
+</code></pre>
+<h3>What are Smart Contracts?</h3>
+<p>Programs that run on the blockchain:</p>
+<p><strong>Traditional app:</strong></p>
+<pre><code>Code runs on company server
+→ Company controls it
+→ Company can change it
+→ You must trust company
+</code></pre>
+<p><strong>Smart contract:</strong></p>
+<pre><code>Code runs on blockchain
+→ No one controls it
+→ Can&#39;t be changed
+→ Everyone can verify it
+→ No trust needed
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-javascript">// Escrow contract
+function release() {
+  if (goodsReceived &amp;&amp; msg.sender === buyer) {
+    transfer(seller, amount);  // Automatic payment
+  }
+}
+</code></pre>
+<p>Money released automatically when conditions met. No middleman needed.</p>
+<h3>What is Client-Side Signing?</h3>
+<p><strong>Your private key is like the key to your house. You should NEVER give it to anyone.</strong></p>
+<p><strong>Bad way (Phase 1 &amp; 2):</strong></p>
+<pre><code>You → Give house key to property manager
+Property manager → Opens your door
+[You must trust the manager]
+</code></pre>
+<p><strong>Good way (Phase 3):</strong></p>
+<pre><code>You → Open your own door
+No one else touches your key
+[You don&#39;t need to trust anyone]
+</code></pre>
+<p><strong>In Sayman Phase 3:</strong></p>
+<pre><code>Your private key → STAYS IN YOUR BROWSER
+You sign transactions → IN YOUR BROWSER
+Server receives → SIGNED transactions only
+Server NEVER sees → Your private key
+</code></pre>
+<p>This is how all real blockchains work.</p>
+<hr>
+<h2>How Sayman Actually Works</h2>
+<h3>1. You Create a Wallet (In Browser)</h3>
+<pre><code class="language-javascript">// Happens entirely in your browser
+const wallet = generateWallet();
+// Creates:
+// - Private key (secret, stays in browser)
+// - Public key (derived from private)
+// - Address (derived from public key)
+</code></pre>
+<p><strong>Your private key NEVER leaves your browser.</strong></p>
+<h3>2. You Get Some Tokens</h3>
+<pre><code>Faucet → Sends tokens to your address
+[Transaction added to mempool]
+</code></pre>
+<h3>3. You Decide to Stake</h3>
+<pre><code>// In browser:
+1. Create transaction: { type: &quot;STAKE&quot;, amount: 500 }
+2. Sign with private key → Signature created
+3. Send to server: { transaction + signature }
+
+// Server:
+4. Verify signature (proves it&#39;s you)
+5. Add to mempool
+6. Wait for next block
+</code></pre>
+<h3>4. Blockchain Creates Block (Every 5 Seconds)</h3>
+<pre><code class="language-javascript">// Automatically:
+1. Select validator (weighted by stake)
+2. Take transactions from mempool
+3. Create block
+4. Add REWARD transaction (10 SAYN to validator)
+5. Broadcast to all nodes
+6. Apply transactions to state
+</code></pre>
+<h3>5. You&#39;re Now a Validator</h3>
+<pre><code>Next block selection:
+- Total stake: 1000 SAYN
+- Your stake: 500 SAYN
+- Your chance: 50%
+
+If selected:
+- You create the block
+- You earn 10 SAYN reward
+- Your responsibility: Don&#39;t go offline!
+</code></pre>
+<h3>6. Slashing Keeps You Honest</h3>
+<pre><code>If you miss 3 blocks:
+- 10% of your stake slashed (50 SAYN penalty)
+- If below 100 SAYN minimum → Kicked out
+</code></pre>
+<h3>7. State Replay on Restart</h3>
+<pre><code>Node restarts:
+1. Load all blocks from database
+2. Clear all state
+3. Replay every transaction from genesis
+   Block 0: GENESIS → Create initial tokens
+   Block 1: STAKE → Create validators
+   Block 2: TRANSFER → Move tokens
+   Block 3: REWARD → Give rewards
+   ...
+4. State rebuilt, identical to before
+
+This is deterministic: Same blocks → Same state (always)
+</code></pre>
+<hr>
+<h2>What Makes Phase 3 Special</h2>
+<h3>Comparison: Phase 2 vs Phase 3</h3>
+<h4>Security Architecture</h4>
+<p><strong>Phase 2 (INSECURE):</strong></p>
+<pre><code>Browser → Sends private key → Server signs → Blockchain
+          [DANGER ZONE]
+</code></pre>
+<p><strong>Phase 3 (SECURE):</strong></p>
+<pre><code>Browser → Signs locally → Sends signature → Server verifies → Blockchain
+          [PRIVATE KEY NEVER LEAVES]
+</code></pre>
+<h4>Trust Model</h4>
+<p><strong>Phase 2:</strong></p>
+<pre><code>You must trust the server
+Server can steal your funds
+Server can impersonate you
+</code></pre>
+<p><strong>Phase 3:</strong></p>
+<pre><code>Zero trust required
+Server can&#39;t steal (no private key)
+Server can&#39;t impersonate (no private key)
+True decentralization
+</code></pre>
+<h4>State Management</h4>
+<p><strong>Phase 2:</strong></p>
+<pre><code>State = Blockchain + In-Memory Data + API Calls
+(Not fully deterministic)
+</code></pre>
+<p><strong>Phase 3:</strong></p>
+<pre><code>State = Blockchain ONLY
+(100% deterministic)
+</code></pre>
+<hr>
+<h2>Real-World Comparison</h2>
+<h3>How Does Sayman Compare?</h3>
+<h4>Sayman vs Bitcoin</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Bitcoin</th>
+<th>Sayman</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Client signing</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Trustless</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Consensus</td>
+<td>PoW (mining)</td>
+<td>PoS (staking)</td>
+</tr>
+<tr>
+<td>Smart contracts</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Language</td>
+<td>C++</td>
+<td>JavaScript</td>
+</tr>
+<tr>
+<td>Purpose</td>
+<td>Currency</td>
+<td>Education</td>
+</tr>
+</tbody></table>
+<h4>Sayman vs Ethereum</h4>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Ethereum</th>
+<th>Sayman</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Client signing</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Trustless</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Smart contracts</td>
+<td>✅ (Solidity)</td>
+<td>✅ (JavaScript)</td>
+</tr>
+<tr>
+<td>Consensus</td>
+<td>PoS</td>
+<td>PoS</td>
+</tr>
+<tr>
+<td>Complexity</td>
+<td>Very high</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Purpose</td>
+<td>DApps</td>
+<td>Education</td>
+</tr>
+</tbody></table>
+<h4>What Sayman Has</h4>
+<p>✅ Client-side cryptography<br>✅ Digital signatures<br>✅ Proof of Stake consensus<br>✅ Multi-validator network<br>✅ Weighted selection<br>✅ Slashing mechanism<br>✅ Smart contracts<br>✅ Deterministic state<br>✅ P2P networking<br>✅ Zero-trust architecture  </p>
+<h4>What Sayman Lacks (For Production)</h4>
+<p>❌ Byzantine fault tolerance<br>❌ Advanced economic security<br>❌ Formal verification<br>❌ Cryptographic randomness<br>❌ Sharding<br>❌ Zero-knowledge proofs<br>❌ Cross-chain bridges<br>❌ MEV protection<br>❌ Professional audit  </p>
+<p><strong>Sayman is architecturally correct, but simplified.</strong></p>
+<hr>
+<h2>Testing Results</h2>
+<p>We&#39;ve verified all critical features work:</p>
+<h3>✅ Client-Side Signing</h3>
+<p><strong>Test:</strong> Network monitor shows no private key transmission<br><strong>Result:</strong> Private keys stay in browser ✅</p>
+<h3>✅ Multi-Validator Competition</h3>
+<p><strong>Test:</strong> 4 validators with different stakes<br><strong>Result:</strong> All 4 create blocks proportionally ✅</p>
+<h3>✅ Weighted Selection</h3>
+<p><strong>Test:</strong> 500 SAYN vs 300 SAYN vs 200 SAYN<br><strong>Result:</strong> 50% vs 30% vs 20% block distribution ✅</p>
+<h3>✅ Validator Rotation</h3>
+<p><strong>Test:</strong> Watch consecutive blocks<br><strong>Result:</strong> Alternating validators, rare repeats ✅</p>
+<h3>✅ Slashing Mechanism</h3>
+<p><strong>Test:</strong> Stop validator node<br><strong>Result:</strong> Slashed after 3 missed blocks ✅</p>
+<h3>✅ Deterministic Rebuild</h3>
+<p><strong>Test:</strong> Restart node<br><strong>Result:</strong> Identical state restored ✅</p>
+<h3>✅ Smart Contracts</h3>
+<p><strong>Test:</strong> Deploy counter, increment 5 times<br><strong>Result:</strong> State.count = 5 ✅</p>
+<h3>✅ Contract Persistence</h3>
+<p><strong>Test:</strong> Restart node after contract calls<br><strong>Result:</strong> Contract state unchanged ✅</p>
+<h3>✅ Multi-Node Sync</h3>
+<p><strong>Test:</strong> Deploy contract on Node 1, check Node 2<br><strong>Result:</strong> Identical across nodes ✅</p>
+<h3>✅ Security</h3>
+<p><strong>Test:</strong> Monitor all API requests<br><strong>Result:</strong> No private key in any request ✅</p>
+<p><strong>All tests passed. Sayman Phase 3 is a real, working blockchain.</strong></p>
+<hr>
+<h2>Use Cases</h2>
+<h3>✅ Perfect For:</h3>
+<ul>
+<li>Learning blockchain fundamentals</li>
+<li>Understanding Proof of Stake</li>
+<li>Teaching cryptography</li>
+<li>Prototyping DApps</li>
+<li>Educational projects</li>
+<li>Hackathons</li>
+<li>Research</li>
+</ul>
+<h3>❌ NOT For:</h3>
+<ul>
+<li>Production applications</li>
+<li>Real money</li>
+<li>Financial services</li>
+<li>Mission-critical systems</li>
+<li>Public networks (without hardening)</li>
+</ul>
+<hr>
+<h2>The Evolution Timeline</h2>
+<h3>Phase 1 (Foundation)</h3>
+<p><strong>Built:</strong> Basic blockchain<br><strong>Problem:</strong> Single node, centralized<br><strong>Status:</strong> Working but limited  </p>
+<h3>Phase 2 (Networking)</h3>
+<p><strong>Built:</strong> Multi-node P2P<br><strong>Problem:</strong> Private keys sent to server<br><strong>Status:</strong> Distributed but not trustless  </p>
+<h3>Phase 3 (Real Architecture)</h3>
+<p><strong>Built:</strong> Client-side crypto, deterministic state, smart contracts<br><strong>Problem:</strong> None architecturally<br><strong>Status:</strong> ✅ Complete and correct  </p>
+<hr>
+<h2>What You Learn from Sayman</h2>
+<h3>Technical Concepts</h3>
+<ol>
+<li><strong>Blockchain Structure</strong> - How blocks link together</li>
+<li><strong>Cryptography</strong> - Digital signatures, hashing</li>
+<li><strong>Consensus</strong> - Proof of Stake algorithm</li>
+<li><strong>Networking</strong> - P2P block propagation</li>
+<li><strong>State Machines</strong> - Deterministic state transitions</li>
+<li><strong>Smart Contracts</strong> - Turing-complete execution</li>
+<li><strong>Security</strong> - Client-side signing, zero-trust</li>
+</ol>
+<h3>Architectural Patterns</h3>
+<ol>
+<li><strong>Client-Side Cryptography</strong> - Keep keys private</li>
+<li><strong>Deterministic Replay</strong> - Rebuild state from history</li>
+<li><strong>Transaction-Based State</strong> - Everything is a transaction</li>
+<li><strong>Weighted Selection</strong> - Fair validator lottery</li>
+<li><strong>Economic Incentives</strong> - Rewards and penalties</li>
+<li><strong>Sandbox Execution</strong> - Safe contract execution</li>
+<li><strong>P2P Synchronization</strong> - Multi-node consensus</li>
+</ol>
+<hr>
+<h2>Frequently Asked Questions</h2>
+<h3>Q: Is this a real blockchain?</h3>
+<p><strong>A:</strong> Yes! It has all the components:</p>
+<ul>
+<li>Blocks linked by hashes</li>
+<li>Digital signatures</li>
+<li>Consensus mechanism</li>
+<li>P2P network</li>
+<li>Smart contracts</li>
+<li>Deterministic state</li>
+</ul>
+<h3>Q: Can I use this in production?</h3>
+<p><strong>A:</strong> No. It&#39;s educational. Missing:</p>
+<ul>
+<li>Byzantine fault tolerance</li>
+<li>Advanced security</li>
+<li>Professional audit</li>
+<li>Economic security analysis</li>
+</ul>
+<h3>Q: How does it compare to Ethereum?</h3>
+<p><strong>A:</strong> Same architecture, simpler implementation:</p>
+<ul>
+<li>Both use client-side signing ✅</li>
+<li>Both are trustless ✅</li>
+<li>Both have smart contracts ✅</li>
+<li>Ethereum uses Solidity, Sayman uses JavaScript</li>
+<li>Ethereum has years of battle-testing</li>
+</ul>
+<h3>Q: Is my private key safe?</h3>
+<p><strong>A:</strong> In Phase 3, yes!</p>
+<ul>
+<li>Generated in browser</li>
+<li>Signed in browser</li>
+<li>Never transmitted</li>
+<li>Only you have access</li>
+</ul>
+<p><strong>In Phase 1 &amp; 2, no!</strong></p>
+<ul>
+<li>Sent to server</li>
+<li>Server could steal it</li>
+<li>Centralized</li>
+</ul>
+<h3>Q: Can I make money with this?</h3>
+<p><strong>A:</strong> No. It&#39;s for learning only.</p>
+<h3>Q: What&#39;s the token supply?</h3>
+<p><strong>A:</strong> 1,000,000 SAYN on testnet (configurable)</p>
+<h3>Q: Who controls Sayman?</h3>
+<p><strong>A:</strong> No one! It&#39;s decentralized:</p>
+<ul>
+<li>No company</li>
+<li>No admins</li>
+<li>Validators collectively manage</li>
+<li>Code is open source</li>
+</ul>
+<h3>Q: Can I fork this?</h3>
+<p><strong>A:</strong> Yes! MIT license. Build on it!</p>
+<h3>Q: Is JavaScript good for blockchains?</h3>
+<p><strong>A:</strong> For learning, yes. For production, no.</p>
+<ul>
+<li>Easy to understand</li>
+<li>Runs everywhere</li>
+<li>Not as efficient as C++/Rust</li>
+<li>Real blockchains use C++, Go, Rust</li>
+</ul>
+<h3>Q: Why not use Bitcoin/Ethereum directly?</h3>
+<p><strong>A:</strong> Too complex to learn from:</p>
+<ul>
+<li>Millions of lines of code</li>
+<li>Decades of optimizations</li>
+<li>Production concerns obscure basics</li>
+</ul>
+<p>Sayman is simple enough to understand completely.</p>
+<hr>
+<h2>Credits</h2>
+<h3>Technologies Used</h3>
+<ul>
+<li><strong>Node.js</strong> - JavaScript runtime</li>
+<li><strong>Express</strong> - Web framework</li>
+<li><strong>elliptic</strong> - Cryptography (secp256k1)</li>
+<li><strong>LevelDB</strong> - Storage</li>
+<li><strong>WebSocket</strong> - P2P networking</li>
+<li><strong>SubtleCrypto</strong> - Browser crypto API</li>
+</ul>
+<h3>Inspired By</h3>
+<ul>
+<li>Bitcoin (Satoshi Nakamoto) - First blockchain</li>
+<li>Ethereum (Vitalik Buterin) - Smart contracts</li>
+<li>Cosmos (Jae Kwon) - PoS consensus</li>
+<li>Educational blockchain tutorials</li>
+</ul>
+<h3>Built For</h3>
+<ul>
+<li>Students learning blockchain</li>
+<li>Developers prototyping DApps</li>
+<li>Researchers experimenting</li>
+<li>Anyone curious about how blockchains work</li>
+</ul>
+<hr>
+<h2>Final Words</h2>
+<p>Sayman Phase 3 is <strong>architecturally identical</strong> to real blockchains like Bitcoin and Ethereum:</p>
+<p>✅ Client-side signing<br>✅ Zero-trust architecture<br>✅ Deterministic consensus<br>✅ Smart contract execution<br>✅ Multi-node synchronization  </p>
+<p>It&#39;s simplified, but every component is <strong>real and works correctly.</strong></p>
+<p><strong>Use it to learn. Use it to experiment. Don&#39;t use it for real money.</strong></p>
+<p>But remember: <strong>You now understand how blockchain works at a deep level.</strong></p>
+<p>From wallet generation to block production to smart contract execution to state replay - you&#39;ve seen it all, and it&#39;s all working code you can read and modify.</p>
+<p><strong>That&#39;s the power of building from scratch.</strong> 🎓⛓️</p>
+<hr>
+<p><em>Sayman Blockchain - Phase 3 Complete</em><br><em>Educational blockchain with production-grade architecture</em><br><em>Built with ❤️ for learning</em></p>
+<p><strong>Version 3.0.0 - January 2025</strong></p>
+
+  </div>
+
+</body>
+</html>

@@ -8,18 +8,19 @@ This file serves as the unified project memory and context sheet for the **SAYMA
 
 SAYMAN is a Proof-of-Stake (PoS) Layer 1 blockchain built in Node.js, designed for Civic Intelligence, decentralized city reporting, and community-level AI verification. From Phase 14, it also supports custom multi-layer chains, user-deployed tokens, NFT collections, memecoins, DEX/AMM, and staking pools — essentially a full Web3 platform.
 
-### Current Phase: **Phase 19 — Pipelined Parallel Transaction Execution**
-- Branch: `phase18`
-- Git origin: `origin/phase17` (phase18 builds on this)
+### Current Phase: **Phase 22 — Full EVM/MetaMask Compat · tSAYN · NonceManager · Explorer 2.0**
+- Branch: `main`
+- Git origin: `https://github.com/saymanlal/SAYMAN`
 
 ### 🪙 Tokenomics
-* **Ticker**: `SAYN` (1 SAYN = 100,000,000 base units — called "sprinkles")
+* **Ticker (Testnet)**: `tSAYN` (1 SAYN = 100,000,000 base units — called "sprinkles")
+* **Ticker (Mainnet)**: `SAYN`
 * **Decimals**: 8 (i.e. `decimals = 100_000_000`)
-* **Block Time**: 5 seconds (mainnet), 5 seconds (public testnet)
-* **Block Reward**: 0.5 SAYN = 50,000,000 base units (testnet), 0.2 SAYN = 20,000,000 (mainnet)
-* **Min Stake**: 10 SAYN (testnet), 500 SAYN (mainnet)
+* **Block Time**: 5 seconds
+* **Block Reward**: 0.5 tSAYN = 50,000,000 base units (testnet), 0.2 SAYN = 20,000,000 (mainnet)
+* **Min Stake**: 10 tSAYN (testnet), 500 SAYN (mainnet)
 * **Halving Schedule**: Every 12,614,400 blocks (~2 years)
-* **Max Supply**: 0 (unlimited on testnet)
+* **Max Supply**: Unlimited (testnet); 100,000,000 SAYN (mainnet)
 
 ### ⚠️ SAYN vs Base Units — Critical for Explorers and APIs
 All on-chain balances are stored as integers in **base units (sprinkles)**. Divide by `decimals` (default: `100_000_000`) to convert to SAYN.
@@ -34,13 +35,14 @@ All on-chain balances are stored as integers in **base units (sprinkles)**. Divi
 ```
 sayman/
 ├── core/
-│   ├── blockchain.js       # Main blockchain engine (Phase 14: TPS estimate, gasLimits/gasCosts in getStats)
+│   ├── blockchain.js       # PoS engine, NonceManager integration, block production
+│   ├── nonce.js            # 🆕 Phase 22: Atomic NonceManager — getNonce/commitNonce/rollbackNonce per address
 │   ├── state.js            # StateEngine (balances, stakes, reputation, contracts)
 │   ├── block.js            # Block class
-│   ├── transaction.js      # Transaction types (TRANSFER, STAKE, REWARD, REPUTATION_UPDATE, etc.)
+│   ├── transaction.js      # Transaction types
 │   ├── pos.js              # Proof-of-Stake validator selection
 │   ├── contracts.js        # Smart contract VM (sandboxed JS execution)
-│   ├── gas.js              # Gas calculator (costs, limits, fee policy)
+│   ├── gas.js              # Gas calculator
 │   ├── stateTree.js        # Merkle state tree
 │   ├── chain-factory.js    # Phase 14: ChainFactory for L2/Sidechain/Permissioned chains
 │   ├── rollup.js           # Phase 14: L2 rollup state commitment to L1
@@ -59,7 +61,7 @@ sayman/
 │   ├── server.js           # P2P WebSocket server (discovery, sync, reputation for peers)
 │   └── peerManager.js      # Peer list manager
 ├── api/
-│   └── routes.js           # REST API routes (Phase 14: /api/tokens, /api/nfts, /api/tps, /api/denomination, /api/staking-pools)
+│   └── routes.js           # REST API — Phase 22: /nonce, /tokens, /nfts, /memecoins, /address, /layers, /search, full EVM RPC
 ├── wallet/
 │   └── wallet.js           # Wallet (key gen, sign, address derive)
 ├── sdk/
@@ -67,9 +69,10 @@ sayman/
 ├── cli/
 │   └── sayman-cli.js       # CLI wallet
 ├── frontend/
-│   ├── index.html          # Explorer UI (Phase 14: Layers page, TPS card, Denomination card)
-│   ├── app.js              # Explorer JS (Phase 14: loadLayers, TPS display, denomination clarity)
+│   ├── index.html          # Explorer UI — Phase 22: Tokens/NFTs/Memecoins/Address pages, unified search, MetaMask button
+│   ├── app.js              # Explorer JS — loadTokens, loadNFTs, loadMemecoins, loadAddress, addSaymanToMetaMask
 │   └── style.css           # Dark theme UI styles
+├── assets/                 # 🆕 Phase 22: logo-512.png served for MetaMask network icon
 ├── config/
 │   ├── index.js            # Config loader
 │   ├── testnet.js          # Local testnet config

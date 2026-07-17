@@ -51,6 +51,7 @@
     "ws": "^8.14.2"
   },
   "devDependencies": {
+    "marked": "^18.0.6",
     "nodemon": "^3.0.2"
   },
   "engines": {

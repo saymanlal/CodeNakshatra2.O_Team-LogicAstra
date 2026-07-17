@@ -1,6 +1,6 @@
 # SAYMAN Blockchain: Phase-by-Phase Roadmap Comparison
 
-This document provides a simple, high-level comparison of the development roadmap of the **SAYMAN Blockchain** and **PUKY Wallet** ecosystem from Phase 1 to Phase 20.
+This document provides a high-level comparison of the development roadmap of the **SAYMAN Blockchain** and **PUKY Wallet** ecosystem from Phase 1 to Phase 22.
 
 ---
 
@@ -28,6 +28,7 @@ This document provides a simple, high-level comparison of the development roadma
 | **Phase 19** | **Pipelined Concurrency & Database Security** | Implemented parallel scheduling, snapshot-accelerated block replay (no more event-loop blocking), atomic block persistence (preventing data loss/corruption), self-connection blacklisting, and WebSocket leak fixes. |
 | **Phase 20** | **Robust Archive Recovery & Integrated Explorer** | Implemented concurrency-safe archive lock, exponential backoff (starting at 5s up to 5 min), pipelined sync checks to pause archiver during active block download, validation cache fixes, and dedicated transaction page with validator rewards filters. |
 | **Phase 21** | **EVM JSON-RPC Wallet Integration, Parallel Archive Sync & Memory Safety** | Full EVM JSON-RPC 2.0 server for MetaMask/Trust Wallet/Coinbase Wallet/all wallets, batched parallel archive sync (10 concurrent chunks), ChainProxy 100-block LRU memory model backed by LevelDB (no OOM ever), O(1) indexed block/tx/address DB lookups, root NETWORK_INFO.md wallet guide. |
+| **Phase 22** | **Full EVM/MetaMask Compat · tSAYN · Atomic NonceManager · Explorer 2.0** | `tSAYN` testnet symbol (Ethereum convention), all MetaMask polling methods (`eth_getLogs`, `eth_newBlockFilter`, `eth_getFilterChanges`), `wallet_addEthereumChain` EIP-3085, 0x address stripping on all endpoints, atomic `NonceManager` (`core/nonce.js`) with `/api/nonce/:addr` endpoint, Explorer 2.0 with Tokens/NFTs/Memecoins/unified Address pages, unified search bar, live L2 layer status, gas fee displayed in tSAYN, contract ABI/state viewer fix, SAYMAN logo at `/assets/logo-512.png`, PUKY APK v22 signed build. |
 
 ---
 
@@ -109,10 +110,23 @@ This document provides a simple, high-level comparison of the development roadma
 * **Repository Cleanups**: Removed deprecated client, SDK, faucet, and faucet-site folders to isolate base chain components.
 
 ### Phase 21: EVM JSON-RPC Wallet Integration, Parallel Archive Synchronization & Memory Safety
-* **EVM JSON-RPC Server**: Full JSON-RPC server (supporting `eth_chainId`, `net_version`, `eth_blockNumber`, `eth_getBlockByNumber`, `eth_getBlockByHash`, `eth_getBalance`, `eth_getTransactionCount`, `eth_gasPrice`, `eth_estimateGas`, `eth_sendRawTransaction`, `eth_getTransactionByHash`, `eth_getTransactionReceipt`, etc.) allowing MetaMask, Trust Wallet, Coinbase Wallet, and **all other EVM-compatible wallets globally** to connect, display balances, and send/receive transactions natively using standard Ethereum RPC protocol.
-* **Parallel Archive Synchronization**: Replaced old 15-concurrency-all-at-once pool with sequential batched parallel download (10 chunks per batch), restoring nodes to target height in seconds with controlled memory footprint. Each batch downloads, writes to LevelDB, and updates the chain proxy length atomically before moving to the next batch — preventing any OOM burst.
-* **ChainProxy Memory Model**: Replaced the in-memory `this.chain = []` array with a `createChainProxy(blockchain)` Proxy that wraps a 100-block LRU cache backed by LevelDB. Blocks older than 100 are automatically evicted from memory. This eliminates the Render 512 MB OOM crash permanently — node can handle **billions of blocks** without accumulating RAM.
-* **LevelDB Index Tables**: Every `chain.push(block)` now atomically writes: `block:<N>` (full block JSON), `hash:<hash>` (block index lookup), `tx:<txId>` (block+tx index lookup), and `addr:<address>:<blockIndex>:<txIndex>` (per-address transaction index). All API queries (`/blocks`, `/transactions/:id`, `/address/:address`, `/search/:query`) now use these O(1) indexed lookups instead of O(N) full chain scans.
-* **Async Route Handlers**: All Express route handlers in `api/routes.js` converted to `async/await` using `getBlock(index)` which serves from LRU cache or fetches from LevelDB on demand, ensuring zero memory pressure from serving large block ranges.
-* **p2p/server.js Optimized**: `_handleGetBlocks`, `_handleNewBlock`, `_handleNewTransaction`, `_handleBlocks` all updated to use async `getBlock()` and the LevelDB `tx:<id>` index — no more O(N) scans over the full chain when handling peer requests.
-* **NETWORK_INFO.md Root File**: Moved network documentation from `docs/NETWORK_INFO.md` to root `NETWORK_INFO.md` with complete MetaMask wallet connection guide, all JSON-RPC methods, network parameters, bootstrap peers, API endpoints, and economics data.
+* **EVM JSON-RPC Server**: Full JSON-RPC server supporting `eth_chainId`, `eth_blockNumber`, `eth_getBalance`, `eth_getTransactionCount`, `eth_sendRawTransaction`, `eth_getTransactionByHash`, `eth_getTransactionReceipt`, etc. — MetaMask, Trust Wallet, Coinbase Wallet, and **all EVM wallets globally** connect natively.
+* **Parallel Archive Synchronization**: Sequential batched parallel download (10 chunks per batch) — restores nodes to target height in seconds.
+* **ChainProxy Memory Model**: 100-block LRU cache backed by LevelDB. No OOM crashes. Handles billions of blocks.
+* **LevelDB Index Tables**: O(1) lookups for blocks, transactions, and addresses instead of O(N) full scans.
+
+### Phase 22: Full EVM/MetaMask Compat · tSAYN · Atomic NonceManager · Explorer 2.0
+* **tSAYN Testnet Symbol**: Testnet API, explorer, and wallet all return `tSAYN`; mainnet returns `SAYN`. Follows Ethereum convention (SepoliaETH, Mumbai MATIC).
+* **Complete MetaMask Polling Support**: Added `eth_getLogs`, `eth_newBlockFilter`, `eth_getFilterChanges`, `eth_newPendingTransactionFilter`, `eth_uninstallFilter`, `eth_getFilterLogs` — MetaMask no longer throws "unsupported method" errors.
+* **EIP-3085 `wallet_addEthereumChain`**: Explorer "Add to MetaMask" button triggers one-click network setup. `wallet_switchEthereumChain` also acknowledged.
+* **0x Address Auto-Stripping**: All API endpoints (`/address`, `/balance`, `/faucet`, `/broadcast`) accept both `0x1234...` (MetaMask format) and bare `1234...` hex — stripped automatically.
+* **Pending Nonce in `eth_getTransactionCount`**: Returns `max(confirmedNonce, pendingNonce)` so MetaMask sequences transactions correctly across rapid broadcasts.
+* **`effectiveGasPrice` in Receipt**: `eth_getTransactionReceipt` now includes `effectiveGasPrice` — required by MetaMask for fee display.
+* **Atomic NonceManager** (`core/nonce.js`): Per-address `getNonce/commitNonce/rollbackNonce` tracking prevents nonce race conditions. `/api/nonce/:address` endpoint returns the pending nonce. PUKY Wallet fetches fresh nonce before every broadcast.
+* **Explorer 2.0 Pages**: Dedicated Tokens, NFTs, Memecoins pages; unified Address page (balance + tx history + tokens + NFTs + reputation); unified search bar resolves block/tx/address/token from one input.
+* **Live L2 Layer Status**: `/layers` page shows real-time chain status (height, peers, TPS) for each registered L2/sidechain.
+* **Gas Fee Accuracy**: Explorer "Fee Paid" now shows tSAYN value (not raw gas units).
+* **Contract ABI/State Fix**: `_extractABI` correctly handles `methods: { ... }` style contracts; state viewer rendered correctly.
+* **SAYMAN Logo Asset**: 512×512 PNG at `/assets/logo-512.png` — MetaMask uses this for the network icon.
+* **PUKY Wallet APK v22**: New signed build — `addSaymanToMetaMask()` one-click function, tSAYN display, fresh nonce before every broadcast. SHA256: `77fc05fa8eaf910e30ceedb99ed5e42e198db8eb2af4e2d33ac76dab7e1de44f`.
+

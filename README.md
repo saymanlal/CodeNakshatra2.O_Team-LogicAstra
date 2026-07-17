@@ -1,29 +1,35 @@
-# ⛓️ SAYMAN BLOCKCHAIN — PHASE 21: EVM WALLET INTEGRATION & PARALLEL ARCHIVE SYNCHRONIZATION
+# ⛓️ SAYMAN BLOCKCHAIN — PHASE 22: FULL EVM/METAMASK COMPAT · tSAYN · NONCE MANAGER · EXPLORER 2.0
 
 **JavaScript-native Smart Contracts · Proof-of-Stake · Multi-Layer Chains · Custom Tokens · NFTs · DEX · Memecoins · Staking Pools**
 
-[![Phase](https://img.shields.io/badge/Phase-21-brightgreen)](https://github.com/saymanlal/SAYMAN)
+[![Phase](https://img.shields.io/badge/Phase-22-brightgreen)](https://github.com/saymanlal/SAYMAN)
 [![Network](https://img.shields.io/badge/Network-Public%20Testnet-blue)](https://sayman.onrender.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
 
-## 🎯 What's New in Phase 21
+## 🎯 What's New in Phase 22
 
-Phase 21 introduces **native EVM JSON-RPC integration** for global wallet support (MetaMask, Trust Wallet, etc.), **parallelized block archive synchronization** (concurrency limit = 15) to catch up to 25K+ blocks in seconds on startup or crash recovery, and critical **LevelDB memory optimization** to eliminate continuous OOM crashes on Render.
+Phase 22 delivers **full MetaMask & EVM wallet compatibility**, the **tSAYN testnet symbol** (following Ethereum convention), an **atomic NonceManager** that eliminates nonce race conditions, **Explorer 2.0** with dedicated Token/NFT/Memecoin/Address pages, and a unified search bar across all entity types.
 
 | Feature | Status |
 |---|---|
-| **EVM JSON-RPC Support** | ✅ Mounts standard Ethereum JSON-RPC endpoints at `/`, `/api`, and `/rpc` (supporting `eth_chainId`, `net_version`, `eth_blockNumber`, `eth_getBlockByNumber`, `eth_getBalance`, `eth_getTransactionCount`, `eth_sendRawTransaction`, etc.) to work out-of-the-box with MetaMask and other wallets globally |
-| **Parallel Archive Sync** | ✅ Implements a concurrency-safe promise pool (limit = 15) to fetch block chunks from the GitHub archive in parallel, reducing sync times from hours to seconds |
-| **LevelDB Storage Fix** | ✅ Removes full-chain serialization to the LevelDB `'chain'` key on every block, eliminating the $O(N^2)$ memory bottleneck and preventing OOM crashes on Render |
-| **Direct State Snapshots** | ✅ Downloads and writes state snapshots directly to the local snapshot directory (`snapshot-${targetHeight}.json`) to accelerate node initialization |
+| **Full MetaMask Compatibility** | ✅ `eth_getLogs`, `eth_newBlockFilter`, `eth_getFilterChanges`, `wallet_addEthereumChain`, 0x address stripping, correct balance scale (×10¹⁰), nonce pending-state tracking |
+| **tSAYN Testnet Symbol** | ✅ Testnet API returns `tSAYN`; mainnet returns `SAYN` — follows Ethereum convention (SepoliaETH, Mumbai MATIC) |
+| **Atomic Nonce Manager** | ✅ `core/nonce.js` — per-address in-memory nonce tracking with `getNonce/commitNonce/rollbackNonce`; `/api/nonce/:addr` endpoint; wallet fetches fresh nonce before every broadcast |
+| **Explorer 2.0 Pages** | ✅ Dedicated explorer pages: Tokens · NFTs · Memecoins · unified Address (balance + txs + tokens + NFTs + reputation in one view) |
+| **Unified Search** | ✅ Search bar resolves block index, tx hash, address, token name/symbol from a single input |
+| **Live L2 Layer Status** | ✅ `/layers` page shows real-time chain status for each registered L2/sidechain |
+| **Gas Fee Accuracy** | ✅ Explorer now shows "Fee Paid" in tSAYN (not raw gas units) |
+| **Contract State & ABI Fix** | ✅ `_extractABI` correctly handles `methods:{...}` style contracts; state viewer rendered properly |
+| **SAYMAN Logo Asset** | ✅ 512×512 PNG served at `/assets/logo-512.png` for MetaMask network icon recognition |
+| **PUKY Wallet APK v22** | ✅ New signed APK — tSAYN display, fresh nonce on every broadcast, `addSaymanToMetaMask()` one-click function |
 
 ---
 
 ## 🔌 MetaMask & Global Wallet Integration
 
-SAYMAN supports standard Ethereum JSON-RPC 2.0. You can connect MetaMask, Trust Wallet, Coinbase Wallet, or any other Web3 wallet globally to SAYMAN using the following custom network parameters:
+SAYMAN supports standard **Ethereum JSON-RPC 2.0**. Connect MetaMask, Trust Wallet, Coinbase Wallet, or any EVM-compatible wallet using:
 
 ### 🌐 Network Connection Settings
 
@@ -31,21 +37,35 @@ SAYMAN supports standard Ethereum JSON-RPC 2.0. You can connect MetaMask, Trust 
 | :--- | :--- | :--- |
 | **Network Name** | Sayman Public Testnet | Sayman Local Testnet |
 | **New RPC URL** | `https://sayman.onrender.com` | `http://localhost:10000` |
-| **Chain ID** | `82922` (or hex `0x143ea`) | `82923` (or hex `0x143eb`) |
-| **Currency Symbol** | `SAYN` | `SAYN` |
-| **Block Explorer** | `https://sayman.onrender.com` | `http://localhost:10000` |
+| **Chain ID** | `82922` (hex `0x143ea`) | `82923` (hex `0x143eb`) |
+| **Currency Symbol** | `tSAYN` | `tSAYN` |
+| **Block Explorer** | `https://sayman.up.railway.app` | `http://localhost:10000` |
+| **Logo** | `https://sayman.onrender.com/assets/logo-512.png` | — |
 
-### 🛠️ Supported JSON-RPC API Methods
+> **One-click setup:** Visit [https://sayman.up.railway.app](https://sayman.up.railway.app) → Network page → **"Add to MetaMask"** button.
 
-The node exposes an EVM-compatible RPC layer at `/`, `/api`, and `/rpc` supporting:
-- `eth_chainId` / `net_version` - returns the network numeric identifier (`82922` for public testnet)
-- `eth_blockNumber` - returns the latest block index
-- `eth_getBlockByNumber` / `eth_getBlockByHash` - returns block data in EVM format
-- `eth_getBalance` - retrieves address balance mapped to Wei (multiplied by $10^{10}$)
-- `eth_getTransactionCount` - retrieves account nonces for sequential anti-replay transactions
-- `eth_sendRawTransaction` - accepts EIP-155, EIP-2930, and EIP-1559 signed Ethereum transactions, recovers the sender public key using ECDSA (secp256k1), and broadcasts it to SAYMAN mempool
-- `eth_getTransactionByHash` / `eth_getTransactionReceipt` - returns transaction details and receipts
-- `eth_estimateGas` - returns estimated gas (`21000` gas base limit for standard transactions)
+### 🛠️ Supported JSON-RPC Methods (Phase 22)
+
+| Method | Description |
+|---|---|
+| `eth_chainId` / `net_version` | Returns `82922` (testnet) |
+| `eth_blockNumber` | Latest block height in hex |
+| `eth_getBlockByNumber` / `eth_getBlockByHash` | Block data in EVM format |
+| `eth_getBalance` | Balance in Wei-equivalent (base units × 10¹⁰) |
+| `eth_getTransactionCount` | Account nonce (confirmed + pending) |
+| `eth_sendRawTransaction` | EIP-155 / EIP-2930 / EIP-1559 tx, ECDSA recovery → SAYMAN mempool |
+| `eth_getTransactionByHash` / `eth_getTransactionReceipt` | Tx details + receipt with `effectiveGasPrice` |
+| `eth_estimateGas` | Returns `0x5208` (21000) |
+| `eth_gasPrice` | Gas price in Wei-equivalent |
+| `eth_getLogs` | Returns `[]` (SAYMAN events not ABI-encoded) |
+| `eth_newBlockFilter` / `eth_getFilterChanges` | Block filter poll — returns latest block hash |
+| `eth_newPendingTransactionFilter` / `eth_uninstallFilter` | Filter lifecycle |
+| `wallet_addEthereumChain` / `wallet_switchEthereumChain` | EIP-3085 handled — `null` = success |
+| `eth_accounts` / `eth_requestAccounts` | Returns `[]` (non-custodial) |
+| `eth_syncing` | `false` |
+| `net_listening` | `true` |
+| `net_peerCount` | Live peer count |
+| `web3_clientVersion` | `SAYMAN/v22.0.0/javascript` |
 
 ---
 
@@ -54,11 +74,12 @@ The node exposes an EVM-compatible RPC layer at `/`, `/api`, and `/rpc` supporti
 ```
 sayman/
 ├── core/
-│   ├── blockchain.js       # PoS engine (TPS, gasLimits/gasCosts in getStats)
-│   ├── chain-factory.js    # 🆕 ChainFactory: L2/Sidechain/Permissioned config builder
-│   ├── rollup.js           # 🆕 L2 state root commitment to L1
+│   ├── blockchain.js       # PoS engine, NonceManager integration
+│   ├── nonce.js            # 🆕 Phase 22: Atomic per-address NonceManager
+│   ├── chain-factory.js    # ChainFactory: L2/Sidechain/Permissioned config builder
+│   ├── rollup.js           # L2 state root commitment to L1
 │   ├── state.js            # StateEngine: balances, stakes, reputation, contracts
-│   ├── contracts.js        # Sandboxed JS VM
+│   ├── contracts.js        # Sandboxed JS VM contract execution
 │   ├── gas.js              # Gas calculator
 │   └── ...
 ├── contracts/
@@ -66,44 +87,41 @@ sayman/
 │   ├── nft.js              # ERC-721 style NFT
 │   ├── token-factory.js    # Token factory
 │   ├── nft-factory.js      # NFT collection factory
-│   ├── memecoin-factory.js # 🆕 Memecoin launcher (burn/tax/anti-whale)
-│   ├── dex.js              # 🆕 AMM DEX (Uniswap V2 style)
-│   ├── staking-pool.js     # 🆕 Delegated staking pool
-│   └── layer2Bridge.js     # 🆕 L1 bridge for L2 deposits/withdrawals
+│   ├── memecoin-factory.js # Memecoin launcher (burn/tax/anti-whale)
+│   ├── dex.js              # AMM DEX (Uniswap V2 style)
+│   ├── staking-pool.js     # Delegated staking pool
+│   └── layer2Bridge.js     # L1 bridge for L2 deposits/withdrawals
 ├── p2p/server.js           # P2P sync + peer reputation points
-├── api/routes.js           # REST API (12+ endpoints added in Phase 14)
-├── frontend/               # Explorer UI (Layers page, TPS card, denomination card)
+├── api/routes.js           # REST API — tokens, NFTs, memecoins, address, nonce endpoints
+├── assets/                 # 🆕 Phase 22: logo-512.png served for MetaMask
+├── frontend/               # Explorer 2.0 — Tokens/NFTs/Memecoins/Address pages, unified search
 ├── config/                 # Network configs (testnet, public-testnet, mainnet)
-└── server.js               # Server (validator + sequencer modes)
+└── server.js               # Entry point — EVM RPC handler + static asset serving
 ```
 
 ---
 
 ## 🪙 Tokenomics & Denomination
 
-| Property | Value |
-|---|---|
-| Ticker | `SAYN` |
-| Base Unit | sprinkle (1 SAYN = 100,000,000 sprinkles) |
-| Decimals | 8 |
-| Block Time | 5 seconds |
-| Block Reward (Testnet) | 0.5 SAYN = 50,000,000 sprinkles |
-| Block Reward (Mainnet) | 0.2 SAYN = 20,000,000 sprinkles |
-| Min Stake (Testnet) | 10 SAYN = 1,000,000,000 sprinkles |
-| Min Stake (Mainnet) | 500 SAYN = 50,000,000,000 sprinkles |
+| Property | Testnet | Mainnet |
+|---|---|---|
+| **Ticker** | `tSAYN` | `SAYN` |
+| **Base Unit** | sprinkle (1 SAYN = 100,000,000 sprinkles) | same |
+| **Decimals** | 8 | 8 |
+| **Block Time** | 5 seconds | 5 seconds |
+| **Block Reward** | 0.5 SAYN = 50,000,000 sprinkles | 0.2 SAYN |
+| **Min Stake** | 10 SAYN = 1,000,000,000 sprinkles | 500 SAYN |
+| **Max Supply** | Unlimited (testnet) | 100,000,000 SAYN |
 
 > **API Clarity**: All on-chain amounts are integers in base units (sprinkles).
-> Call `GET /api/denomination` for the conversion table, or check `/api/tps` which always returns `decimals` and `ticker`.
+> Call `GET /api/denomination` for the conversion table.
 
 ---
 
 ## 🔗 Multi-Layer Chains
 
-Anyone can spin up their own chain using the `ChainFactory`:
-
 ```javascript
 import { ChainFactory } from './core/chain-factory.js';
-import Blockchain from './core/blockchain.js';
 
 // Layer 2 Rollup (anchored to SAYMAN L1)
 const config = ChainFactory.createL2Config({
@@ -133,7 +151,6 @@ const permConfig = ChainFactory.createPermissionedConfig({
 
 ## 💻 Running Locally
 
-### Quick Start
 ```bash
 git clone https://github.com/saymanlal/SAYMAN
 cd SAYMAN
@@ -142,10 +159,7 @@ npm install
 # Start validator node
 node server.js --network testnet --mode validator
 
-# Start L2 sequencer (commits to L1 every 5 blocks)
-node server.js --network testnet --mode sequencer
-
-# Sync-only node
+# Sync-only observer
 node server.js --network testnet --mode observer
 ```
 
@@ -154,50 +168,44 @@ node server.js --network testnet --mode observer
 PORT=10000
 NETWORK=public-testnet
 MODE=validator
-BOOTSTRAP_PEERS=wss://peer1.example.com/p2p,wss://peer2.example.com/p2p
+BOOTSTRAP_PEERS=wss://peer1.example.com/p2p
 DB_PATH=./data/node-10000
-
-# For L2 sequencer mode:
-L1_RPC_URL=https://sayman.onrender.com
-L1_BRIDGE_CONTRACT=<contract_address>
-L1_SEQUENCER_PRIVATE_KEY=<hex_private_key>
 ```
 
 ### Explorer
-Open `http://localhost:10000` after starting the node. The built-in explorer includes:
-- 📊 Dashboard with TPS, denomination guide, APR, mempool
-- 🔍 Block Explorer with search + pagination
-- 👥 Validators with stake (SAYN + base units), reputation, missed blocks
-- 📄 Smart Contracts registry
-- 🧩 Layers page — how to create your own chain
-- 🌐 Network — peers, node info, uptime
+Open `http://localhost:10000`. Explorer 2.0 includes:
+- 📊 Dashboard — TPS, denomination, APR, mempool
+- 🔍 Block & transaction explorer with unified search
+- 👥 Validators — stake (tSAYN), reputation, missed blocks
+- 🪙 Tokens / NFTs / Memecoins — factory-deployed assets
+- 🏠 Address — balance + tx history + tokens + NFTs + reputation
+- 🧩 Layers — L2/sidechain live status
+- 🌐 Network — peers, node info, MetaMask one-click add
 
 ---
 
 ## 🌐 REST API
 
-Full reference is in `AI.md`. Key endpoints:
-
 ```bash
-# Network info (layer, decimals, denomination)
+# Network info (layer, decimals, denomination, ticker)
 curl https://sayman.onrender.com/api/network
 
-# SAYN/base-unit conversion guide
+# SAYN conversion guide
 curl https://sayman.onrender.com/api/denomination
 
-# Live TPS
-curl https://sayman.onrender.com/api/tps
+# Fresh nonce for address (use before broadcast)
+curl https://sayman.onrender.com/api/nonce/<address>
 
-# Custom tokens
+# Custom tokens list
 curl https://sayman.onrender.com/api/tokens
 
 # NFT collections
 curl https://sayman.onrender.com/api/nfts
 
-# Staking pools
-curl https://sayman.onrender.com/api/staking-pools
+# Memecoins
+curl https://sayman.onrender.com/api/memecoins
 
-# Account (balance in base units + reputation)
+# Unified address view (balance + txs + tokens + NFTs + reputation)
 curl https://sayman.onrender.com/api/address/<address>
 
 # Submit transaction
@@ -210,17 +218,15 @@ curl -X POST https://sayman.onrender.com/api/broadcast \
 
 ## 📝 Smart Contracts
 
-Write contracts in plain JavaScript. See `contracts/` for full examples.
-
 ```javascript
-// Deploy token factory, then create your own token:
+// Deploy a custom token:
 client.callContract({
   contractAddress: TOKEN_FACTORY_ADDR,
   method: 'createToken',
   args: { name: 'DOGE ON SAYMAN', symbol: 'SDOGE', totalSupply: 1_000_000_000 }
 });
 
-// Launch a memecoin with tax + anti-whale:
+// Launch a memecoin:
 client.callContract({
   contractAddress: MEMECOIN_FACTORY_ADDR,
   method: 'launch',
@@ -240,23 +246,27 @@ client.callContract({
 
 ---
 
-## 📱 PUKY Mobile Wallet
+## 📱 PUKY Mobile Wallet (v22)
 
-Available as an Android APK at `/apk/puky.apk`. Features:
+Android APK at `/apk/puky.apk` (also mirrored at `github.com/saymanlal/puky`). Features:
+- MetaMask-compatible: `addSaymanToMetaMask()` one-click network setup
+- Fresh nonce fetched before every broadcast (no nonce race conditions)
+- Balance displayed in **tSAYN** (testnet) / **SAYN** (mainnet)
 - Multi-RPC failover (Railway + Render + local)
-- Real-time GitHub APK update checker
-- Send/receive SAYN, stake, unstake
+- Send / receive / stake / unstake
 
 ---
 
 ## 🤝 Contributing
 
-See `ABOUT.md` for full project vision. PRs welcome on `main` or `phase20` branch.
+See `ABOUT.md` for full project vision. PRs welcome on `main` branch.
 
-### Phase 20 Updates
-- **Integrated Transaction Explorer**: Added dedicated transactions page, statistics bar, and rewards filter (toggles REWARD/REWARD_FEE txs).
-- **Archive System Concurrency and Stability**: Introduced single-writer lock, exponential retry backoff, and sync-state pause protections.
-- **Repository Cleanups**: Purged legacy CLI, SDK, and Faucet code to complete separation of concerns.
+### Phase 22 Updates
+- **Full MetaMask EVM Compat**: `eth_getLogs`, `eth_newBlockFilter`, `eth_getFilterChanges`, `wallet_addEthereumChain`, 0x address auto-stripping, balance scale fix, pending nonce tracking.
+- **tSAYN Testnet Symbol**: API, explorer, wallet all show `tSAYN` on testnet; `SAYN` on mainnet.
+- **Atomic NonceManager**: `core/nonce.js` — eliminates nonce race conditions; `/api/nonce/:addr` endpoint; wallet uses fresh nonce before every broadcast.
+- **Explorer 2.0**: Tokens, NFTs, Memecoins, unified Address pages; unified search; live L2 layer status; accurate gas fee in tSAYN; contract state & ABI viewer fix.
+- **PUKY APK v22**: New signed build with all Phase 22 features.
 
 ---
 
@@ -268,7 +278,11 @@ MIT — see `LICENSE` file.
 
 ## 🔗 Links
 
-- **Explorer**: https://sayman.onrender.com
-- **Wallet**: https://sayman-wallet-manager.vercel.app
+- **Explorer**: https://sayman.up.railway.app
+- **RPC**: https://sayman.onrender.com
+- **Wallet (web)**: https://sayman-wallet-manager.vercel.app
 - **Faucet**: https://sayman-faucet-site.vercel.app
+- **Docs**: https://sayman-docs.vercel.app
 - **GitHub**: https://github.com/saymanlal/SAYMAN
+- **Telegram (bulk tokens)**: https://t.me/SaymanLal
+- **IP Owner**: [Vizkus Groups](https://vizkusgroups.me) (Cybokrafts Universal Innovations Pvt. Ltd.)
