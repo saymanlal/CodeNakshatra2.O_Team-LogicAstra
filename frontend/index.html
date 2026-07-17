@@ -302,10 +302,10 @@ await client.callContract({
         <div class="section-header"><h2>Active L2 / Sidechains</h2></div>
         <table>
           <thead>
-            <tr><th>Chain Name</th><th>Chain ID</th><th>Sequencer Address</th><th>Block Height</th><th>Last Commitment</th><th>Status</th></tr>
+            <tr><th>Chain Name</th><th>Chain ID</th><th>Type</th><th>Sequencer Address</th><th>Block Height</th><th>Last Commitment</th><th>Status</th></tr>
           </thead>
           <tbody id="active-layers-list">
-            <tr><td colspan="6" style="padding:calc(var(--grid)*2);color:var(--mono-400);font-size:12px;text-align:center;">Loading active chains…</td></tr>
+            <tr><td colspan="7" style="padding:calc(var(--grid)*2);color:var(--mono-400);font-size:12px;text-align:center;">Loading active chains…</td></tr>
           </tbody>
         </table>
       </div>
@@ -400,6 +400,53 @@ await client.callContract({
         </div>
       </div>
       <div id="peer-list"><p style="color:var(--mono-400);padding:calc(var(--grid)*2);font-size:12px;">No peers connected</p></div>
+    </div>
+
+    <!-- MetaMask / Wallet Add Network Card -->
+    <div class="section">
+      <div class="section-header">
+        <h2><i class="fas fa-wallet" style="margin-right:6px;"></i>Add SAYMAN to Your Wallet</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--grid)*2);">
+        <!-- Network Details Card -->
+        <div style="border:var(--border);padding:calc(var(--grid)*2.5);background:var(--mono-950);">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mono-400);margin-bottom:calc(var(--grid)*1.5);">Network Details</div>
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <tr><td style="color:var(--mono-400);padding:4px 0;width:130px;">Network Name</td><td class="mono" style="padding:4px 0;">Sayman Public Testnet <button class="copy-data-btn" onclick="copyToClipboard(this,'Sayman Public Testnet')"><i class="fas fa-copy"></i></button></td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">Chain ID</td><td class="mono" style="padding:4px 0;">82922 <button class="copy-data-btn" onclick="copyToClipboard(this,'82922')"><i class="fas fa-copy"></i></button></td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">Currency Symbol</td><td class="mono" style="padding:4px 0;">tSAYN <button class="copy-data-btn" onclick="copyToClipboard(this,'tSAYN')"><i class="fas fa-copy"></i></button></td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">RPC URL</td><td class="mono" style="padding:4px 0;font-size:10px;word-break:break-all;">https://sayman.onrender.com/rpc <button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman.onrender.com/rpc')"><i class="fas fa-copy"></i></button></td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">Block Explorer</td><td class="mono" style="padding:4px 0;font-size:10px;word-break:break-all;">https://sayman.onrender.com <button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman.onrender.com')"><i class="fas fa-copy"></i></button></td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">Decimals (internal)</td><td class="mono" style="padding:4px 0;">8</td></tr>
+          </table>
+        </div>
+        <!-- MetaMask One-Click Add -->
+        <div style="border:var(--border);padding:calc(var(--grid)*2.5);background:var(--mono-950);display:flex;flex-direction:column;gap:calc(var(--grid)*2);">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mono-400);">One-Click Add</div>
+          <div style="display:flex;align-items:center;gap:calc(var(--grid)*1.5);">
+            <img src="/assets/logo-512.png" alt="SAYMAN Logo" style="width:48px;height:48px;border-radius:50%;border:1px solid var(--mono-800);">
+            <div>
+              <div style="font-weight:700;font-size:14px;">SAYMAN Testnet</div>
+              <div style="font-size:11px;color:var(--mono-400);">Chain ID: 82922 · Symbol: tSAYN</div>
+            </div>
+          </div>
+          <button id="metamask-add-btn"
+            onclick="addSaymanToMetaMask()"
+            style="width:100%;padding:10px;background:var(--mono-100);color:var(--mono-1000);border:none;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.04em;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <svg width="20" height="20" viewBox="0 0 212 189" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0"><path d="M201.8 0L114.3 64.7l15.8-37.2L201.8 0z" fill="#E2761B"/><path d="M10.2 0l86.8 65.4-15-37.9L10.2 0z" fill="#E4761B"/><path d="M172.5 136.4l-23.3 35.7 49.9 13.7 14.3-48.7-40.9-.7zM-.5 137.1l14.3 48.7 49.9-13.7-23.3-35.7-40.9.7z" fill="#E4761B"/><path d="M61.4 82.3L48.2 101.6l49.4 2.2-1.7-53.1-34.5 31.6z" fill="#E4761B"/><path d="M150.6 82.3l-34.9-32-1.2 53.5 49.4-2.2-13.3-19.3z" fill="#E4761B"/><path d="M63.8 172.1l29.7-14.5-25.7-20-4 34.5zM118.5 157.6l29.7 14.5-4-34.5-25.7 20z" fill="#E4761B"/></svg>
+            Add to MetaMask
+          </button>
+          <div style="font-size:10px;color:var(--mono-500);line-height:1.5;">
+            <i class="fas fa-info-circle" style="margin-right:4px;"></i>
+            MetaMask will show the network logo once your chain is listed on Chainlist.org. 
+            Until then, the "S" placeholder appears — this is MetaMask's default, not a SAYMAN bug.
+          </div>
+          <a href="https://chainlist.org/chain/82922" target="_blank" rel="noopener noreferrer"
+             style="font-size:12px;color:#60b4ff;text-decoration:none;display:flex;align-items:center;gap:6px;">
+            <i class="fas fa-external-link-alt"></i> View on Chainlist
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 

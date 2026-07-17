@@ -401,14 +401,89 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
   });
 
   router.get('/contracts/:address', (req, res) => {
-    const contract = blockchain.state.getContract(req.params.address);
-    
-    if (!contract) {
+    const addr = req.params.address;
+
+    // ContractEngine is source of truth for live state (setState writes there)
+    // StateEngine has code + metadata; both are kept in sync by setState
+    const liveContract  = blockchain.contracts?.getContract(addr);
+    const stateContract = blockchain.state.getContract(addr);
+
+    if (!liveContract && !stateContract) {
       return res.status(404).json({ error: 'Contract not found' });
     }
 
-    res.json(contract);
+    const base = liveContract || stateContract;
+
+    // Merge all state sources (in priority order: liveContract > stateEngine.state > stateEngine.contractStorage)
+    const liveState      = liveContract?.state      || {};
+    const stateEngineObj = stateContract?.state      || {};
+    const persistedState = blockchain.state.getContractFullState(addr) || {};
+    // getContractFullState already returns contract.state from stateEngine;
+    // liveContract.state is the ContractEngine cache. Merge all three:
+    const mergedState = Object.assign({}, stateEngineObj, persistedState, liveState);
+
+    // Build ABI: stored abi first; if empty, extract from code using all styles
+    let abi = (base.abi && base.abi.length) ? base.abi : _extractContractABI(base.code || '');
+
+    res.json({
+      ...base,
+      state: mergedState,
+      abi,
+      // Surface useful display metadata
+      hasState:    Object.keys(mergedState).length > 0,
+      methodCount: abi.length,
+    });
   });
+
+  // ─── Live contract state endpoint (for SAYFORGE & external tools) ─────────
+  // Returns only the current state map, no code. Polled every 2s by SAYFORGE.
+  router.get('/contracts/:address/state', (req, res) => {
+    const addr = req.params.address;
+    const liveContract  = blockchain.contracts?.getContract(addr);
+    const stateContract = blockchain.state.getContract(addr);
+    if (!liveContract && !stateContract) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    const liveState      = liveContract?.state      || {};
+    const stateEngineObj = stateContract?.state      || {};
+    const persistedState = blockchain.state.getContractFullState(addr) || {};
+    const mergedState    = Object.assign({}, stateEngineObj, persistedState, liveState);
+    res.json({ address: addr, state: mergedState, hasState: Object.keys(mergedState).length > 0 });
+  });
+
+  // Helper: extract ABI from all contract styles (class, object-methods, flat fn, arrow fn)
+  function _extractContractABI(code) {
+    const methods  = new Set();
+    const reserved = new Set(['if','for','while','switch','catch','return','async','await','function','class','const','let','var','new','this','try','throw','import','export','default']);
+    let m;
+
+    // Style C: flat function declarations  →  function myMethod(
+    const flatFn = /\bfunction\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
+    while ((m = flatFn.exec(code)) !== null) {
+      if (!reserved.has(m[1])) methods.add(m[1]);
+    }
+    // Style B1: methods object literal  →  methodName: function(
+    const objMethod = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*(?:async\s+)?function\s*\(/g;
+    while ((m = objMethod.exec(code)) !== null) {
+      if (!reserved.has(m[1])) methods.add(m[1]);
+    }
+    // Style B2: arrow functions in object  →  methodName: (args) =>
+    const arrowMethod = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*(?:async\s+)?(?:\([^)]*\)|[a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/g;
+    while ((m = arrowMethod.exec(code)) !== null) {
+      if (!reserved.has(m[1]) && m[1] !== 'constructor') methods.add(m[1]);
+    }
+    // Style B3/A: shorthand methods  →  methodName(args) {
+    const shorthand = /(?:^|[\n,{;])\s*(?:async\s+)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{/gm;
+    while ((m = shorthand.exec(code)) !== null) {
+      if (!reserved.has(m[1]) && m[1] !== 'constructor') methods.add(m[1]);
+    }
+    // Style: const methodName = (args) => or const methodName = async (args) =>
+    const constArrow = /const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/g;
+    while ((m = constArrow.exec(code)) !== null) {
+      if (!reserved.has(m[1])) methods.add(m[1]);
+    }
+    return [...methods];
+  }
 
   // Broadcast signed transaction (with gas)
   router.post('/broadcast', (req, res) => {
@@ -1182,88 +1257,100 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     }
   });
 
-  // GET /api/layers — live status of L2 chains
+  // GET /api/layers — live status of real L2/sidechain commitments
+  // Only shows chains registered via Layer2Bridge-style contracts (no fake hardcoded data).
   router.get('/layers', async (req, res) => {
     try {
       const layers = [];
-      
-      const defaultLayers = [
-        {
-          chainId: 'sayman-nexus-l2',
-          name: 'Sayman Nexus Rollup',
-          sequencer: '0x7580777ca52a6ad5dc8cf864f1b90de3c21a4210',
-          height: 104520,
-          lastCommitTime: Date.now() - 3200,
-          type: 'L2 Rollup',
-          status: 'active'
-        },
-        {
-          chainId: 'sayman-solaris-sidechain',
-          name: 'Solaris Sidechain',
-          sequencer: '0xbc8cf864f1b90de3c21a42107580777ca52a6ad5',
-          height: 482190,
-          lastCommitTime: Date.now() - 12000,
-          type: 'Sidechain',
-          status: 'active'
-        }
-      ];
+      const allContracts = blockchain.contracts?.getAllContracts?.() || blockchain.state.getAllContracts();
 
-      for (const contract of blockchain.state.getAllContracts()) {
-        const keys = Object.keys(contract.state || {});
-        const registeredKeys = keys.filter(k => k.startsWith('registered_'));
-        
-        if (registeredKeys.length > 0) {
-          for (const key of registeredKeys) {
-            const chainId = key.substring('registered_'.length);
-            const name = contract.state['name_' + chainId] || chainId;
-            const sequencer = contract.state['sequencer_' + chainId] || '—';
-            const height = contract.state['height_' + chainId] || 0;
-            
-            let lastCommitTime = Date.now() - 5000;
-            const prefix = `addr:${contract.address.toLowerCase()}:`;
-            try {
-              for await (const [dbKey, txId] of blockchain.db.iterator({ gte: prefix, lte: prefix + '\xff', reverse: true, limit: 10 })) {
-                const parts = dbKey.split(':');
-                const blockIndex = parseInt(parts[2], 10);
-                const txIndex = parseInt(parts[3], 10);
-                const block = await blockchain.getBlock(blockIndex);
-                if (block && block.transactions[txIndex]) {
-                  const tx = block.transactions[txIndex];
-                  if (tx.data?.method === 'commitState' && tx.data?.args?.chainId === chainId) {
-                    lastCommitTime = tx.timestamp || block.timestamp;
-                    break;
-                  }
+      for (const contract of allContracts) {
+        // Merge state from both engines so we see keys regardless of which wrote them
+        const liveState  = contract.state || {};
+        const stateEngineContract = blockchain.state.getContract(contract.address);
+        const stateObj   = Object.assign({}, stateEngineContract?.state || {}, liveState);
+
+        const registeredKeys = Object.keys(stateObj).filter(k => k.startsWith('registered_'));
+        if (registeredKeys.length === 0) continue;
+
+        for (const key of registeredKeys) {
+          const chainId   = key.substring('registered_'.length);
+          const name      = stateObj['name_'      + chainId] || chainId;
+          const sequencer = stateObj['sequencer_' + chainId] || null;
+          const height    = stateObj['height_'    + chainId] || 0;
+          const type      = stateObj['type_'      + chainId] || 'L2 Rollup';
+          const rpcUrl    = stateObj['rpc_'       + chainId] || null;
+          const explorerUrl = stateObj['explorer_' + chainId] || null;
+
+          // Scan contract tx history for most recent commitState call
+          let lastCommitTime = null;
+          const prefix = `addr:${contract.address.toLowerCase()}:`;
+          try {
+            for await (const [dbKey] of blockchain.db.iterator({
+              gte: prefix, lte: prefix + '\xff', reverse: true, limit: 50
+            })) {
+              const parts = dbKey.split(':');
+              const blockIndex = parseInt(parts[2], 10);
+              const txIndex    = parseInt(parts[3], 10);
+              if (isNaN(blockIndex) || isNaN(txIndex)) continue;
+              const block = await blockchain.getBlock(blockIndex);
+              if (block && block.transactions[txIndex]) {
+                const tx = block.transactions[txIndex];
+                if (tx.data?.method === 'commitState' && tx.data?.args?.chainId === chainId) {
+                  lastCommitTime = tx.timestamp || block.timestamp;
+                  break;
                 }
               }
-            } catch (err) {
-              console.error('Error scanning layers commit timestamps:', err);
             }
+          } catch (_e) {/* ignore scan errors */}
 
-            layers.push({
-              chainId,
-              name,
-              sequencer,
-              height,
-              lastCommitTime,
-              type: 'L2 Rollup',
-              status: 'active'
-            });
-          }
+          const ageMs  = lastCommitTime ? Date.now() - lastCommitTime : Infinity;
+          const status = ageMs < 60_000 ? 'active' : ageMs < 600_000 ? 'slow' : 'stale';
+
+          layers.push({ chainId, name, sequencer, height, lastCommitTime, type, rpcUrl, explorerUrl, status, bridgeContract: contract.address });
         }
       }
 
-      const finalLayers = [...layers];
-      for (const d of defaultLayers) {
-        if (!finalLayers.some(l => l.chainId === d.chainId)) {
-          finalLayers.push(d);
-        }
-      }
-
-      res.json({ layers: finalLayers, total: finalLayers.length });
+      res.json({ layers, total: layers.length });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // ── MetaMask / EIP-3085  wallet_addEthereumChain compatible endpoint ────────
+  // Also serves as a standard EVM network info endpoint for any wallet.
+  // This is what wallets poll to get the chain logo URL + RPC + chainId.
+  router.get('/wallet/chain', (req, res) => {
+    const symbol  = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
+    const chainId = config.chainId;
+    const chainIdHex = '0x' + Number(chainId).toString(16);
+    const host   = req.get('host') || 'sayman.onrender.com';
+    const proto  = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+    const base   = `${proto}://${host}`;
+
+    res.json({
+      chainId:            chainIdHex,
+      chainName:          config.networkName || 'Sayman Public Testnet',
+      nativeCurrency: {
+        name:     config.nativeCurrency?.name    || symbol,
+        symbol:   symbol,
+        decimals: 18   // MetaMask always expects 18 for display math; we handle base-unit conversion internally
+      },
+      rpcUrls:            [ `${base}/rpc`, `${base}/api` ],
+      blockExplorerUrls:  [ base ],
+      iconUrls:           [ `${base}/assets/logo-512.png` ],
+      // Standard EIP-3085 fields
+      _metadata: {
+        internalDecimals: config.decimals || 100_000_000,
+        internalSymbol:   symbol,
+        note: 'SAYMAN uses 8 internal decimals. The 18-decimal nativeCurrency is for MetaMask UI compatibility only.'
+      }
+    });
+  });
+
+  // Redirect /wallet-chain (legacy) to /wallet/chain
+  router.get('/wallet-chain', (req, res) => res.redirect('/api/wallet/chain'));
+
 
   // GET /api/search — unified search detecting tx/address/block/token
   router.get('/search', async (req, res) => {
@@ -1312,11 +1399,17 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
         }
       }
 
-      // 4. Address check
+      // 4. Contract address check
+      const contractByAddr = blockchain.contracts?.getContract(q) || blockchain.state.getContract(q);
+      if (contractByAddr) {
+        return res.json({ type: 'contract', result: q, name: contractByAddr.name || 'Contract' });
+      }
+
+      // 5. Address check (any address with known state)
       const balance = blockchain.state.getBalance(q);
-      const stake = blockchain.state.getStake(q);
-      const nonce = blockchain.state.getNonce(q);
-      if (q.startsWith('0x') && q.length === 42 || balance > 0 || stake > 0 || nonce > 0) {
+      const stake   = blockchain.state.getStake(q);
+      const nonce   = blockchain.state.getNonce(q);
+      if ((q.length === 40 && /^[0-9a-f]+$/i.test(q)) || balance > 0 || stake > 0 || nonce > 0) {
         return res.json({ type: 'address', result: q });
       }
 

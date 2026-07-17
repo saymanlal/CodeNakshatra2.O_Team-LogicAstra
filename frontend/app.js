@@ -338,6 +338,13 @@ async function searchExplorer() {
       showAddressDetail(result.result || q);
       return;
     }
+    if (result.type === 'contract') {
+      renderExplorerRows([]);
+      setEl('explorer-page-info', `Contract found: ${result.name || ''}`);
+      showPage('contracts');
+      showContractDetail(result.result || q);
+      return;
+    }
     if (result.type === 'token' || result.type === 'nft') {
       renderExplorerRows([]);
       setEl('explorer-page-info', `${result.type === 'nft' ? 'NFT Collection' : 'Token'} found`);
@@ -670,25 +677,73 @@ async function loadLayers() {
     if (!tbody) return;
     const layers = layersData.layers || [];
     if (!layers.length) {
-      tbody.innerHTML = `<tr><td colspan="6" style="padding:calc(var(--grid)*2);color:var(--mono-400);font-size:12px;text-align:center;">No active L2 / sidechain commitments found.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">
+        <i class="fas fa-layer-group" style="font-size:24px;display:block;margin-bottom:8px;opacity:.3;"></i>
+        No Layer 2 or sidechain commitments found on this network.<br>
+        <span style="font-size:11px;opacity:.6;">Deploy a Layer2Bridge contract to register a chain.</span>
+      </td></tr>`;
       return;
     }
     tbody.innerHTML = layers.map(l => {
-      const ago = l.lastCommitTime ? fmtTimeAgo(l.lastCommitTime) : '—';
-      const statusColor = l.status === 'active' ? '#2a7a2a' : 'var(--mono-600)';
+      const ago = l.lastCommitTime ? fmtTimeAgo(l.lastCommitTime) : 'Never';
+      const statusColors = {
+        active: { border: '#2a7a2a', color: '#4ecb4e' },
+        slow:   { border: '#7a5a00', color: '#f5c542' },
+        stale:  { border: '#7a2a2a', color: '#f56262' },
+      };
+      const sc = statusColors[l.status] || { border: 'var(--mono-600)', color: 'var(--mono-400)' };
+      const lJson = JSON.stringify(l).replace(/"/g, '&quot;');
       return `
-        <tr>
-          <td>${l.name || l.chainId}</td>
+        <tr onclick="showLayerDetail(${lJson})" style="cursor:pointer;" onmouseover="this.style.background='var(--mono-900)'" onmouseout="this.style.background=''">
+          <td style="font-weight:600;">${l.name || l.chainId}</td>
           <td class="mono" style="font-size:11px;">${l.chainId || '—'}</td>
+          <td style="font-size:11px;opacity:.7;">${l.type || 'L2 Rollup'}</td>
           <td class="mono" style="font-size:10px;">${l.sequencer ? l.sequencer.slice(0,16)+'…' : '—'}</td>
           <td>${(l.height || 0).toLocaleString()}</td>
           <td>${ago}</td>
-          <td><span style="font-size:11px;padding:2px 8px;border:1px solid ${statusColor};color:${statusColor};">${(l.status || 'unknown').toUpperCase()}</span></td>
+          <td><span style="font-size:11px;padding:2px 8px;border:1px solid ${sc.border};color:${sc.color};">${(l.status || 'unknown').toUpperCase()}</span></td>
         </tr>
       `;
     }).join('');
   } catch (e) { console.error('Layers:', e); }
 }
+
+function showLayerDetail(l) {
+  if (typeof l === 'string') { try { l = JSON.parse(l); } catch { return; } }
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  const ago = l.lastCommitTime ? fmtTimeAgo(l.lastCommitTime) : 'Never';
+  const ts  = l.lastCommitTime ? fmtTime(l.lastCommitTime) : '—';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:680px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-layer-group"></i> ${l.name || l.chainId}</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i> CLOSE</button>
+      </div>
+      <div class="modal-body">
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          <tr class="detail-row"><td class="detail-label">Chain ID</td><td class="mono">${l.chainId || '—'} <button class="copy-data-btn" onclick="copyToClipboard(this,'${l.chainId}')"><i class="fas fa-copy"></i></button></td></tr>
+          <tr class="detail-row"><td class="detail-label">Type</td><td>${l.type || 'L2 Rollup'}</td></tr>
+          <tr class="detail-row"><td class="detail-label">Status</td><td><span style="font-size:11px;padding:2px 8px;border:1px solid ${l.status==='active'?'#2a7a2a':l.status==='slow'?'#7a5a00':'#7a2a2a'};color:${l.status==='active'?'#4ecb4e':l.status==='slow'?'#f5c542':'#f56262'};">${(l.status||'unknown').toUpperCase()}</span></td></tr>
+          <tr class="detail-row"><td class="detail-label">Block Height</td><td>${(l.height||0).toLocaleString()}</td></tr>
+          <tr class="detail-row"><td class="detail-label">Last Commit</td><td>${ts} (${ago})</td></tr>
+          <tr class="detail-row"><td class="detail-label">Sequencer</td><td class="mono" style="word-break:break-all;font-size:11px;">${l.sequencer||'—'}${l.sequencer?` <button class="copy-data-btn" onclick="copyToClipboard(this,'${l.sequencer}')"><i class="fas fa-copy"></i></button>`:''}</td></tr>
+          ${l.bridgeContract ? `<tr class="detail-row"><td class="detail-label">Bridge Contract</td><td class="mono" style="font-size:10px;word-break:break-all;">${l.bridgeContract} <button class="copy-data-btn" onclick="copyToClipboard(this,'${l.bridgeContract}')"><i class="fas fa-copy"></i></button></td></tr>` : ''}
+          ${l.rpcUrl ? `<tr class="detail-row"><td class="detail-label">RPC URL</td><td style="font-size:11px;word-break:break-all;"><a href="${l.rpcUrl}" target="_blank" style="color:var(--mono-200);">${l.rpcUrl}</a> <button class="copy-data-btn" onclick="copyToClipboard(this,'${l.rpcUrl}')"><i class="fas fa-copy"></i></button></td></tr>` : ''}
+          ${l.explorerUrl ? `<tr class="detail-row"><td class="detail-label">Explorer</td><td><a href="${l.explorerUrl}" target="_blank" rel="noopener noreferrer" style="color:#60b4ff;font-size:12px;"><i class="fas fa-external-link-alt" style="margin-right:4px;"></i>${l.explorerUrl}</a></td></tr>` : ''}
+        </table>
+        <div style="margin-top:calc(var(--grid)*2);padding:calc(var(--grid)*2);background:var(--mono-950);border:var(--border);font-size:11px;color:var(--mono-400);">
+          <i class="fas fa-info-circle"></i>
+          This chain anchors state roots to SAYMAN L1 via a Layer2Bridge contract.
+          Block height and last commit time update every time the sequencer calls <code>commitState</code>.
+        </div>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
 
 // ── Transactions ──────────────────────────────────────────────────────────────
 let allTransactions     = [];   // all txs loaded from blocks
@@ -1256,6 +1311,50 @@ function sayn(baseUnits, withUnit = true) {
   const ticker = (typeof networkConfig !== 'undefined' && networkConfig &&
     (networkConfig.nativeCurrency?.symbol || networkConfig.ticker)) || 'SAYN';
   return Number.isFinite(v) ? v.toFixed(fixed) + (withUnit ? ' ' + ticker : '') : '—';
+}
+
+// ── MetaMask / EIP-3085 one-click add ─────────────────────────────────────────
+async function addSaymanToMetaMask() {
+  const btn = document.getElementById('metamask-add-btn');
+  if (!window.ethereum) {
+    showNotification('No wallet detected. Please install MetaMask.');
+    return;
+  }
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+    // Fetch live chain params from our EIP-3085 endpoint (includes logo URL)
+    const chainParams = await apiFetch('/wallet/chain').catch(() => null);
+    const params = chainParams || {
+      chainId:           '0x143CA',   // 82922 in hex
+      chainName:         'Sayman Public Testnet',
+      nativeCurrency:    { name: 'Test SAYN', symbol: 'tSAYN', decimals: 18 },
+      rpcUrls:           ['https://sayman.onrender.com/rpc'],
+      blockExplorerUrls: ['https://sayman.onrender.com'],
+      iconUrls:          ['https://sayman.onrender.com/assets/logo-512.png'],
+    };
+    // Remove internal metadata before sending to wallet
+    delete params._metadata;
+
+    await window.ethereum.request({
+      method: 'wallet_addEthereumChain',
+      params: [params],
+    });
+    showNotification('✅ SAYMAN Testnet added to your wallet!');
+  } catch (err) {
+    if (err.code === 4001) {
+      showNotification('Request cancelled by user.');
+    } else {
+      showNotification('Error adding network: ' + (err.message || err));
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-check" style="margin-right:6px;color:#4ecb4e;"></i>Network Added!';
+      setTimeout(() => {
+        btn.innerHTML = 'Add to MetaMask';
+      }, 3000);
+    }
+  }
 }
 
 function showNotification(msg) {

@@ -77,6 +77,8 @@ app.get('/docs/*', (req, res) => {
   }
 });
 
+// Serve frontend/assets AND root assets/ (for logo-512.png accessible to MetaMask)
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/assets', express.static(path.join(__dirname, 'frontend', 'assets')));
 
 let blockchain;
