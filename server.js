@@ -231,6 +231,12 @@ async function startServer() {
         startBootstrapPinger(config.bootstrapPeers);
       }
 
+      if (config.archive && config.archive.enabled) {
+        blockchain.syncFromArchive().catch(err => {
+          console.error('⚠️ [Sync] Archive sync failed:', err.message);
+        });
+      }
+
       if (mode === 'validator' || mode === 'sequencer') {
         console.log(`\n⛏️ Starting block production in ${mode.toUpperCase()} mode...`);
         startMining(mode);
@@ -253,8 +259,8 @@ function startMining(mode) {
   miningInterval = setInterval(async () => {
     try {
       if (p2pServer) {
-        // Skip block production while syncing from peers to prevent forks
-        if (p2pServer.isSyncing) {
+        // Skip block production while syncing from peers or archive to prevent forks
+        if (p2pServer.isSyncing || (blockchain && blockchain.isSyncing)) {
           return;
         }
 

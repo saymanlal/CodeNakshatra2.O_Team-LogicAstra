@@ -412,12 +412,12 @@ await client.callContract({
         <div style="border:var(--border);padding:calc(var(--grid)*2.5);background:var(--mono-950);">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mono-400);margin-bottom:calc(var(--grid)*1.5);">Network Details</div>
           <table style="width:100%;font-size:12px;border-collapse:collapse;">
-            <tr><td style="color:var(--mono-400);padding:4px 0;width:130px;">Network Name</td><td class="mono" style="padding:4px 0;">Sayman Public Testnet <button class="copy-data-btn" onclick="copyToClipboard(this,'Sayman Public Testnet')"><i class="fas fa-copy"></i></button></td></tr>
-            <tr><td style="color:var(--mono-400);padding:4px 0;">Chain ID</td><td class="mono" style="padding:4px 0;">82922 <button class="copy-data-btn" onclick="copyToClipboard(this,'82922')"><i class="fas fa-copy"></i></button></td></tr>
-            <tr><td style="color:var(--mono-400);padding:4px 0;">Currency Symbol</td><td class="mono" style="padding:4px 0;">tSAYN <button class="copy-data-btn" onclick="copyToClipboard(this,'tSAYN')"><i class="fas fa-copy"></i></button></td></tr>
-            <tr><td style="color:var(--mono-400);padding:4px 0;">RPC URL</td><td class="mono" style="padding:4px 0;font-size:10px;word-break:break-all;">https://sayman.onrender.com/rpc <button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman.onrender.com/rpc')"><i class="fas fa-copy"></i></button></td></tr>
-            <tr><td style="color:var(--mono-400);padding:4px 0;">Block Explorer</td><td class="mono" style="padding:4px 0;font-size:10px;word-break:break-all;">https://sayman.onrender.com <button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman.onrender.com')"><i class="fas fa-copy"></i></button></td></tr>
-            <tr><td style="color:var(--mono-400);padding:4px 0;">Decimals (internal)</td><td class="mono" style="padding:4px 0;">8</td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;width:130px;">Network Name</td><td class="mono" id="wallet-net-name" style="padding:4px 0;">Sayman Public Testnet <button class="copy-data-btn" onclick="copyToClipboard(this,'Sayman Public Testnet')"><i class="fas fa-copy"></i></button></td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">Chain ID</td><td class="mono" id="wallet-chain-id" style="padding:4px 0;">82922 <button class="copy-data-btn" onclick="copyToClipboard(this,'82922')"><i class="fas fa-copy"></i></button></td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">Currency Symbol</td><td class="mono" id="wallet-symbol" style="padding:4px 0;">tSAYN <button class="copy-data-btn" onclick="copyToClipboard(this,'tSAYN')"><i class="fas fa-copy"></i></button></td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">RPC URL</td><td class="mono" id="wallet-rpc-url" style="padding:4px 0;font-size:10px;word-break:break-all;">https://sayman.onrender.com/rpc <button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman.onrender.com/rpc')"><i class="fas fa-copy"></i></button></td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">Block Explorer</td><td class="mono" id="wallet-explorer-url" style="padding:4px 0;font-size:10px;word-break:break-all;">https://sayman.onrender.com <button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman.onrender.com')"><i class="fas fa-copy"></i></button></td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">Decimals (internal)</td><td class="mono" id="wallet-decimals" style="padding:4px 0;">8</td></tr>
           </table>
         </div>
         <!-- MetaMask One-Click Add -->
@@ -426,8 +426,8 @@ await client.callContract({
           <div style="display:flex;align-items:center;gap:calc(var(--grid)*1.5);">
             <img src="/assets/logo-512.png" alt="SAYMAN Logo" style="width:48px;height:48px;border-radius:50%;border:1px solid var(--mono-800);">
             <div>
-              <div style="font-weight:700;font-size:14px;">SAYMAN Testnet</div>
-              <div style="font-size:11px;color:var(--mono-400);">Chain ID: 82922 · Symbol: tSAYN</div>
+              <div style="font-weight:700;font-size:14px;" id="wallet-card-title">SAYMAN Testnet</div>
+              <div style="font-size:11px;color:var(--mono-400);" id="wallet-oneclick-info">Chain ID: 82922 · Symbol: tSAYN</div>
             </div>
           </div>
           <button id="metamask-add-btn"
@@ -441,7 +441,7 @@ await client.callContract({
             MetaMask will show the network logo once your chain is listed on Chainlist.org. 
             Until then, the "S" placeholder appears — this is MetaMask's default, not a SAYMAN bug.
           </div>
-          <a href="https://chainlist.org/chain/82922" target="_blank" rel="noopener noreferrer"
+          <a href="https://chainlist.org/chain/82922" id="wallet-chainlist-link" target="_blank" rel="noopener noreferrer"
              style="font-size:12px;color:#60b4ff;text-decoration:none;display:flex;align-items:center;gap:6px;">
             <i class="fas fa-external-link-alt"></i> View on Chainlist
           </a>
