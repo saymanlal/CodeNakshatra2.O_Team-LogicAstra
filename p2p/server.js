@@ -783,9 +783,20 @@ export class P2PServer {
     const now = Date.now();
     const localHeight = this.blockchain.chain.length;
 
-    // Skip P2P sync if archive sync is currently running in the background
+    // Skip P2P sync only if an archive sync is explicitly in progress
+    // (indicated by blockchain.isSyncing=true AND no syncingFromPeerId set)
+    // This prevents P2P and archive from racing each other.
     if (this.blockchain.isSyncing && !this.syncingFromPeerId) {
-      return;
+      // Safety net: if isSyncing has been set for > 120s with no peer activity,
+      // force reset to prevent mining from being blocked forever.
+      const stalledMs = now - this.lastSyncRequestTime;
+      if (this.lastSyncRequestTime > 0 && stalledMs > 120_000) {
+        console.warn(`⚠️ Sync stall detected (${Math.round(stalledMs/1000)}s). Force-resetting isSyncing flag.`);
+        this.blockchain.isSyncing = false;
+        this.syncingFromPeerId = null;
+      } else {
+        return;
+      }
     }
 
     // Check if we are currently syncing from a valid peer and the timeout hasn't elapsed
@@ -854,8 +865,15 @@ export class P2PServer {
     if (!Array.isArray(blocks) || !blocks.length) return;
 
     if (this.blockchain.isSyncing && !this.syncingFromPeerId) {
-      // Archive sync is active, ignore incoming peer blocks to avoid race conditions/corruption
-      return;
+      // Archive sync is active — but check if it's stalled (>120s)
+      const stalledMs = Date.now() - this.lastSyncRequestTime;
+      if (this.lastSyncRequestTime === 0 || stalledMs < 120_000) {
+        // Archive sync is genuinely running, skip to avoid race conditions
+        return;
+      }
+      // Stalled archive sync — force-reset and let blocks through
+      console.warn(`\u26a0\ufe0f Archive sync stalled (${Math.round(stalledMs/1000)}s). Allowing incoming blocks through.`);
+      this.blockchain.isSyncing = false;
     }
 
     this.syncQueue.push({ blocks, peerId });
@@ -884,18 +902,19 @@ export class P2PServer {
         const ourHeight = this.blockchain.chain.length;
 
         if (blockData.index < ourHeight) {
+          // Block is behind our tip — check for fork
           const localBlock = await this.blockchain.getBlock(blockData.index);
           if (localBlock && localBlock.hash !== blockData.hash) {
             console.warn(`⚠️ Fork detected at block #${blockData.index}`);
-            if (peer && peer.chainHeight > ourHeight + 5) {
-              const rollbackHeight = Math.max(0, blockData.index - 5);
-              console.log(`🔄 Peer has longer chain (${peer.chainHeight} > ${ourHeight}). Rolling back local chain to #${rollbackHeight} and syncing...`);
+            // Only rollback if peer has a significantly longer chain (>5 blocks ahead)
+            // and we haven't exceeded max rollback attempts
+            if (peer && peer.chainHeight > ourHeight + 5 && !peer._rollbackDone) {
+              const rollbackHeight = Math.max(0, blockData.index - 1);
+              console.log(`🔄 Peer has longer chain (${peer.chainHeight} > ${ourHeight}). Rolling back to #${rollbackHeight}...`);
+              peer._rollbackDone = true; // Prevent repeated rollbacks from same peer
               await this.blockchain._rollbackToHeight(rollbackHeight);
-              this._send(peer.ws, {
-                type: 'get_blocks',
-                fromIndex: rollbackHeight,
-              });
-              this.syncQueue = []; // Clear queue since we're starting a new sync request
+              this._send(peer.ws, { type: 'get_blocks', fromIndex: rollbackHeight });
+              this.syncQueue = [];
               return;
             }
           }
@@ -907,18 +926,18 @@ export class P2PServer {
           const added = await this.blockchain.addBlock(block);
           if (added) {
             imported++;
+            // Reset rollback guard on success — peer is giving us valid blocks again
+            if (peer) peer._rollbackDone = false;
           } else {
             console.warn(`⚠️ addBlock rejected #${blockData.index}`);
-            if (peer && peer.chainHeight > ourHeight + 5) {
-              const rollbackHeight = Math.max(0, ourHeight - 5);
-              console.log(`🔄 Peer is ahead (${peer.chainHeight} > ${ourHeight}) but block #${blockData.index} was rejected. We might be on a fork. Rolling back local chain to #${rollbackHeight} and requesting sync...`);
-              await this.blockchain._rollbackToHeight(rollbackHeight);
-              this._send(peer.ws, {
-                type: 'get_blocks',
-                fromIndex: rollbackHeight,
-              });
+            // Don't rollback on rejection — it causes infinite loops.
+            // Instead, just request a fresh sync batch from current height.
+            // This handles stateRoot mismatches gracefully without getting stuck.
+            if (peer && peer.ws.readyState === 1) {
+              console.log(`🔄 Requesting fresh sync from height ${ourHeight} without rollback...`);
+              this._send(peer.ws, { type: 'get_blocks', fromIndex: ourHeight });
             }
-            this.syncQueue = []; // Clear queue on rejection
+            this.syncQueue = [];
             return;
           }
           continue;
@@ -926,7 +945,7 @@ export class P2PServer {
 
         console.log(`⚠️ Gap: have ${ourHeight}, next is ${blockData.index}`);
         if (peer) this._requestBlocks(peer.ws);
-        this.syncQueue = []; // Clear queue on gap, since we requested a fresh start
+        this.syncQueue = [];
         return;
       }
 
