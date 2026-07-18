@@ -98,7 +98,19 @@ export class ArchiveReader {
     }
 
     if (!chunk) {
-      throw new Error(`[ArchiveReader] Failed to retrieve chunk ${chunkKey}. Fallback logs:\n- ${errors.join('\n- ')}`);
+      const is404 = errors.some(e => 
+        e.includes('404') || 
+        e.includes('status 404') || 
+        e.includes('Not Found') || 
+        e.includes('not found') || 
+        e.includes('409') ||
+        e.includes('empty')
+      );
+      const err = new Error(`[ArchiveReader] Failed to retrieve chunk ${chunkKey}. Fallback logs:\n- ${errors.join('\n- ')}`);
+      if (is404) {
+        err.notFound = true;
+      }
+      throw err;
     }
 
     // 5. Verify the chunk cryptographically

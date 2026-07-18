@@ -14,7 +14,21 @@ export class RepoManager {
   }
 
   async initialize() {
-    // 1. Try local disk
+    // 1. Try GitHub (base repo) first to get the latest mappings from the network
+    try {
+      const gitData = await this.githubClient.readFile('registry/index.json', this.baseRepo, true); // bypassCDN
+      if (this.verifyRegistry(gitData)) {
+        this.registry = gitData;
+        this.currentRepo = this.getCurrentRepoFromRegistry();
+        this.saveLocalRegistry();
+        console.log(`[RepoManager] Registry loaded from GitHub. Current Repo: ${this.currentRepo}`);
+        return;
+      }
+    } catch (err) {
+      console.log('[RepoManager] Registry file not found or failed to load from GitHub. Trying local...');
+    }
+
+    // 2. Try local disk
     if (fs.existsSync(this.registryPath)) {
       try {
         const localData = JSON.parse(fs.readFileSync(this.registryPath, 'utf8'));
@@ -28,20 +42,6 @@ export class RepoManager {
       } catch (err) {
         console.warn('[RepoManager] Failed to read local registry:', err.message);
       }
-    }
-
-    // 2. Try GitHub (base repo)
-    try {
-      const gitData = await this.githubClient.readFile('registry/index.json', this.baseRepo);
-      if (this.verifyRegistry(gitData)) {
-        this.registry = gitData;
-        this.currentRepo = this.getCurrentRepoFromRegistry();
-        this.saveLocalRegistry();
-        console.log(`[RepoManager] Registry loaded from GitHub. Current Repo: ${this.currentRepo}`);
-        return;
-      }
-    } catch (err) {
-      console.log('[RepoManager] Registry file not found on GitHub. Initializing new registry...');
     }
 
     // 3. Fallback: Initialize new registry
