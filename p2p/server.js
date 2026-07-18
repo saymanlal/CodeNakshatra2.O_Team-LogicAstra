@@ -783,6 +783,11 @@ export class P2PServer {
     const now = Date.now();
     const localHeight = this.blockchain.chain.length;
 
+    // Skip P2P sync if archive sync is currently running in the background
+    if (this.blockchain.isSyncing && !this.syncingFromPeerId) {
+      return;
+    }
+
     // Check if we are currently syncing from a valid peer and the timeout hasn't elapsed
     if (this.syncingFromPeerId) {
       const activeSyncPeer = this.peers.get(this.syncingFromPeerId);
@@ -847,6 +852,11 @@ export class P2PServer {
   async _handleBlocks(msg, peerId) {
     const blocks = msg.blocks;
     if (!Array.isArray(blocks) || !blocks.length) return;
+
+    if (this.blockchain.isSyncing && !this.syncingFromPeerId) {
+      // Archive sync is active, ignore incoming peer blocks to avoid race conditions/corruption
+      return;
+    }
 
     this.syncQueue.push({ blocks, peerId });
     if (this.isSyncing) return;

@@ -134,7 +134,31 @@ export class GithubClient {
     }
   }
 
-  async readFile(path, repoName = this.repo) {
+  async readFile(path, repoName = this.repo, bypassCDN = false) {
+    if (bypassCDN) {
+      try {
+        await this._preRequestCheck();
+        const res = await this.octokit.repos.getContent({
+          owner: this.owner,
+          repo: repoName,
+          path,
+          ref: this.branch
+        });
+
+        if (res.data && res.data.content) {
+          const content = Buffer.from(res.data.content, 'base64').toString('utf8');
+          try {
+            return JSON.parse(content);
+          } catch {
+            return content;
+          }
+        }
+        throw new Error(`No content found at ${path}`);
+      } catch (err) {
+        console.warn(`[GitHub Client] Real-time read failed for ${path}: ${err.message}. Falling back to CDN...`);
+      }
+    }
+
     if (this.useCDN) {
       const cdnUrl = `https://cdn.jsdelivr.net/gh/${this.owner}/${repoName}@${this.branch}/${path}`;
       try {
