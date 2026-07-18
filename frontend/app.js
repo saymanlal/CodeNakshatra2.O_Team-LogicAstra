@@ -545,7 +545,7 @@ async function showBlockDetail(index) {
             </div>
             ${(block.transactions?.length
               ? block.transactions.map(tx => `
-                  <div class="tx-item">
+                  <div class="tx-item" style="cursor:pointer;" onclick="this.closest('.modal-overlay').remove();showTxDetail('${tx.id}')">
                     <div><strong>Type:</strong> ${tx.type}</div>
                     <div><strong>ID:</strong> <span class="mono">${tx.id}</span></div>
                     ${tx.data?.from   ? `<div><strong>From:</strong> <span class="mono">${tx.data.from}</span></div>`   : ''}
@@ -942,10 +942,10 @@ function renderTransactions() {
 
   tbody.innerHTML = page.map(tx => {
     const fee = tx.gasUsed && tx.gasPrice ? sayn(tx.gasUsed * tx.gasPrice) : '—';
-    const from = tx.from ? `<span class="mono" style="font-size:10px;">${tx.from.slice(0, 14)}…</span> <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.from}')"><i class="fas fa-copy"></i></button>` : '—';
-    const to   = tx.to   ? `<span class="mono" style="font-size:10px;">${tx.to.slice(0,   14)}…</span> <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.to}')"><i class="fas fa-copy"></i></button>`   : '—';
+    const from = tx.from ? `<span class="mono" style="font-size:10px;">${tx.from.slice(0, 14)}…</span> <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this,'${tx.from}')"><i class="fas fa-copy"></i></button>` : '—';
+    const to   = tx.to   ? `<span class="mono" style="font-size:10px;">${tx.to.slice(0,   14)}…</span> <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this,'${tx.to}')"><i class="fas fa-copy"></i></button>`   : '—';
     return `
-      <tr onclick="showTxDetail(${JSON.stringify(tx).replace(/"/g,'&quot;')})" style="cursor:pointer;">
+      <tr onclick="showTxDetail('${tx.id}')" style="cursor:pointer;">
         <td class="mono" style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tx.id.slice(0, 18)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this,'${tx.id}')"><i class="fas fa-copy"></i></button></td>
         <td>${txTypeBadge(tx.type)}</td>
         <td style="font-size:11px;">#${tx.blockIndex}</td>
@@ -984,8 +984,31 @@ function txGoPage(p) {
 }
 
 // ── Transaction Detail Modal ────────────────────────────────────────────────
-function showTxDetail(tx) {
-  if (typeof tx === 'string') { try { tx = JSON.parse(tx); } catch { return; } }
+// ── Transaction Detail Modal ────────────────────────────────────────────────
+async function showTxDetail(tx) {
+  if (typeof tx === 'string') {
+    if (tx.trim().startsWith('{')) {
+      try { tx = JSON.parse(tx); } catch { return; }
+    } else {
+      // It's a transaction ID! Fetch details from API
+      try {
+        const res = await apiFetch(`/transactions/${tx.trim()}`);
+        if (!res || !res.transaction) {
+          showNotification('Transaction not found');
+          return;
+        }
+        tx = {
+          ...res.transaction,
+          blockIndex: res.blockIndex,
+          timestamp: res.timestamp
+        };
+      } catch (e) {
+        console.error('Error fetching transaction detail:', e);
+        showNotification('Error loading transaction details');
+        return;
+      }
+    }
+  }
 
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
@@ -1012,7 +1035,7 @@ function showTxDetail(tx) {
           <tr class="detail-row"><td class="detail-label"><i class="fas fa-clock"></i> Time</td><td>${fmtTime(tx.timestamp)}</td></tr>
           ${tx.from ? `<tr class="detail-row"><td class="detail-label"><i class="fas fa-arrow-right"></i> From</td><td class="mono" style="word-break:break-all;">${tx.from} <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.from}')"><i class="fas fa-copy"></i></button></td></tr>` : ''}
           ${tx.to   ? `<tr class="detail-row"><td class="detail-label"><i class="fas fa-arrow-left"></i> To</td><td class="mono" style="word-break:break-all;">${tx.to} <button class="copy-data-btn" onclick="copyToClipboard(this,'${tx.to}')"><i class="fas fa-copy"></i></button></td></tr>` : ''}
-          ${tx.amount !== null ? `<tr class="detail-row"><td class="detail-label"><i class="fas fa-coins"></i> Amount</td><td>${sayn(tx.amount)} <span style="font-size:10px;color:var(--mono-500);">(${Number(tx.amount).toLocaleString()} base units)</span></td></tr>` : ''}
+          ${tx.amount !== null && tx.amount !== undefined ? `<tr class="detail-row"><td class="detail-label"><i class="fas fa-coins"></i> Amount</td><td>${sayn(tx.amount)} <span style="font-size:10px;color:var(--mono-500);">(${Number(tx.amount).toLocaleString()} base units)</span></td></tr>` : ''}
           <tr class="detail-row"><td class="detail-label"><i class="fas fa-gas-pump"></i> Gas Used</td><td>${tx.gasUsed ? tx.gasUsed.toLocaleString() + ' units' : '—'}</td></tr>
           <tr class="detail-row"><td class="detail-label"><i class="fas fa-receipt"></i> Fee Paid</td><td>${fee}${tx.gasUsed && tx.gasPrice ? ` <span style="color:var(--mono-500);font-size:10px;">(${tx.gasUsed.toLocaleString()} units × ${tx.gasPrice} base unit/gas)</span>` : ''}</td></tr>
           ${extraRows}
@@ -1783,7 +1806,7 @@ async function showAddressDetail(address) {
 
     const ticker = (networkConfig && (networkConfig.nativeCurrency?.symbol || networkConfig.ticker)) || 'SAYN';
     const txRows = (d.transactions || []).slice(0, 20).map(tx => `
-      <tr style="font-size:11px;border-bottom:1px solid var(--mono-900);">
+      <tr style="font-size:11px;border-bottom:1px solid var(--mono-900);cursor:pointer;" onclick="this.closest('.modal-overlay').remove();showTxDetail('${tx.id}')">
         <td style="padding:4px 0;" class="mono">${(tx.id || '').slice(0,14)}…</td>
         <td style="padding:4px 0;">${txTypeBadge(tx.type)}</td>
         <td style="padding:4px 0;">#${tx.blockIndex}</td>
@@ -1792,7 +1815,7 @@ async function showAddressDetail(address) {
       </tr>
     `).join('');
 
-    const tokenRows = (d.tokens || []).map(t => `
+    const tokenRows = (d.tokenBalances || []).map(t => `
       <tr style="font-size:11px;border-bottom:1px solid var(--mono-900);">
         <td style="padding:4px 0;font-weight:600;">${t.name || '—'}</td>
         <td style="padding:4px 0;font-family:monospace;">${t.symbol || '—'}</td>
@@ -1800,9 +1823,9 @@ async function showAddressDetail(address) {
       </tr>
     `).join('');
 
-    const nftRows = (d.nfts || []).map(n => `
+    const nftRows = (d.nftsOwned || []).map(n => `
       <div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--mono-900);">
-        <strong>${n.collection || '—'}</strong> #${n.tokenId || '?'}
+        <strong>${n.name || n.symbol || '—'}</strong> NFT Balance: ${n.balance}
       </div>
     `).join('');
 
@@ -1814,9 +1837,9 @@ async function showAddressDetail(address) {
           <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">${(d.balance ?? 0).toLocaleString()} base units</div>
         </div>
         <div style="border:var(--border);padding:calc(var(--grid)*2);background:var(--mono-950);">
-          <div style="font-size:10px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Active Stakes</div>
-          <div style="font-size:18px;font-weight:700;">${sayn(d.totalStaked ?? 0)}</div>
-          <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">${(d.stakes || []).length} pool(s)</div>
+          <div style="font-size:10px;color:var(--mono-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Validator Stake</div>
+          <div style="font-size:18px;font-weight:700;">${sayn(d.stake ?? 0)}</div>
+          <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">${(d.stake ?? 0) > 0 ? 'Active' : 'No Active Stake'}</div>
         </div>
       </div>
 

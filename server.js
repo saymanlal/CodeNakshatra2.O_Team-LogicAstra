@@ -259,8 +259,21 @@ function startMining(mode) {
   miningInterval = setInterval(async () => {
     try {
       if (p2pServer) {
-        // Skip block production while syncing from peers or archive to prevent forks
-        if (p2pServer.isSyncing || (blockchain && blockchain.isSyncing)) {
+        // Skip block production while P2P sync is in progress
+        // Note: blockchain.isSyncing is set by P2P sync; archive sync bails early if no repo.
+        // We add a safety reset: if stuck syncing > 3 minutes, force unblock mining.
+        if (blockchain && blockchain.isSyncing) {
+          const syncAge = Date.now() - (p2pServer.lastSyncRequestTime || 0);
+          if (syncAge > 180_000) {
+            // Stalled for >3 minutes — force-reset
+            console.warn('[Miner] Blockchain sync stalled >3min. Force-resetting isSyncing to resume mining.');
+            blockchain.isSyncing = false;
+            p2pServer.syncingFromPeerId = null;
+          } else {
+            return;
+          }
+        }
+        if (p2pServer.isSyncing) {
           return;
         }
 
