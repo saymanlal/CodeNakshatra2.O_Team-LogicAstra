@@ -68,11 +68,24 @@ export class P2PServer {
   listen(httpServer = null) {
     try {
       if (httpServer) {
-        this.wss = new WebSocketServer({ server: httpServer, path: '/p2p' });
-        console.log('✅ P2P WebSocket attached to HTTP server at /p2p');
+        this.wss = new WebSocketServer({
+          server: httpServer,
+          path: '/p2p',
+          perMessageDeflate: {
+            zlibDeflateOptions: { level: 6 },  // balanced speed vs. compression
+            threshold: 1024                    // only compress frames > 1KB
+          }
+        });
+        console.log('✅ P2P WebSocket attached to HTTP server at /p2p (compression: on)');
       } else if (this.port) {
-        this.wss = new WebSocketServer({ port: this.port });
-        console.log(`✅ P2P server on port ${this.port}`);
+        this.wss = new WebSocketServer({
+          port: this.port,
+          perMessageDeflate: {
+            zlibDeflateOptions: { level: 6 },
+            threshold: 1024
+          }
+        });
+        console.log(`✅ P2P server on port ${this.port} (compression: on)`);
       } else {
         console.log('⚠️ P2P disabled — API-only mode');
         return;
@@ -290,7 +303,12 @@ export class P2PServer {
       console.log(`🔗 Connecting to peer: ${url}`);
       let ws;
       try {
-        ws = new WebSocket(url, { perMessageDeflate: false });
+        ws = new WebSocket(url, {
+          perMessageDeflate: {
+            zlibDeflateOptions: { level: 6 },
+            threshold: 1024
+          }
+        });
       } catch (err) {
         console.error(`❌ Bad peer URL ${url}:`, err.message);
         this._scheduleReconnect(url);
@@ -955,18 +973,12 @@ export class P2PServer {
 
         // ── Reward peer reputation for contributing blocks to our sync ────────
         // Each peer that sends us valid blocks earns 2 reputation points per block.
-        // This incentivises honest and available peers in the network.
-        if (peer && peer.nodeId) {
-          // Map nodeId to a deterministic address using SHA-256 of nodeId
-          const crypto = await import('crypto');
-          const peerAddr = crypto.default
-            .createHash('sha256')
-            .update('peer:' + peer.nodeId)
-            .digest('hex')
-            .slice(0, 40);
+        // Tracked locally on the P2P peer object to avoid mutating block state.
+        if (peer) {
           const reputationDelta = imported * 2;
-          this.blockchain.state.increaseReputation(peerAddr, reputationDelta);
-          console.log(`⭐ Peer ${peer.nodeId.slice(0, 8)} earned +${reputationDelta} reputation for syncing ${imported} blocks`);
+          peer.reputation = (peer.reputation || 0) + reputationDelta;
+          const pid = peer.nodeId ? peer.nodeId.slice(0, 8) : 'peer';
+          console.log(`⭐ Peer ${pid} earned +${reputationDelta} reputation for syncing ${imported} blocks (total: ${peer.reputation})`);
         }
       }
 

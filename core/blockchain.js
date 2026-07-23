@@ -186,6 +186,10 @@ class Blockchain {
     this.totalParallelBuckets = 0;
     this.totalParallelTransactions = 0;
 
+    // Optional callback — server.js sets this to trigger instant block production
+    // when a transaction enters the mempool (avoids full block-time delay).
+    this.onTransactionAdded = null;
+
     // Initialize archive if enabled
     if (this.config.archive && this.config.archive.enabled) {
       this.githubClient = new GithubClient(this.config.archive);
@@ -465,7 +469,7 @@ class Blockchain {
 
       // Restore state and contract engine cache to pre-dry-run state before formal block application
       this.state.importState(stateSnapshot);
-      this.contracts.contracts = contractCacheBackup;
+      this.contracts.contracts = new Map(Array.from(this.state.contracts.entries()));
       this.contracts.events = contractEventsBackup;
 
       this.mempool = [];
@@ -961,6 +965,11 @@ class Blockchain {
     this.pendingNonces.set(tx.data.from, tx.nonce + 1);
     this.mempool.push(tx);
     this.addressTxCount.set(tx.data.from, addrCount + 1);
+
+    // Notify server to produce a block immediately (instead of waiting for block timer)
+    if (typeof this.onTransactionAdded === 'function') {
+      this.onTransactionAdded(tx);
+    }
   }
 
   cleanupRateLimit() {

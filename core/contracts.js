@@ -89,7 +89,12 @@ class ContractEngine {
     const deployGas = this.gas.costs.contractDeploy + Math.floor(code.length / 10);
     gasTracker.gasUsed += deployGas;
 
-    const contract = {
+    // Save to persistent state store
+    this.state.deployContract(contractAddress, code, from, {
+      name, version, abi, codeHash, feePolicy, blockIndex
+    });
+
+    const contract = this.state.getContract(contractAddress) || {
       address:     contractAddress,
       name,
       version,
@@ -98,19 +103,14 @@ class ContractEngine {
       codeHash,
       creator:     from,
       feePolicy,
-      state:       {},              // persistent state — key/value store
-      sponsorBalance: 0,           // base units available for 'sponsor' policy
+      state:       {},
+      sponsorBalance: 0,
       createdAt:   timestamp,
       blockIndex,
     };
 
-    // Save to in-memory cache
+    // Save to in-memory cache (sharing exact same reference with StateEngine)
     this.contracts.set(contractAddress, contract);
-
-    // Save to persistent state store
-    this.state.deployContract(contractAddress, code, from, {
-      name, version, abi, codeHash, feePolicy, blockIndex
-    });
 
     console.log(
       `📜 Deployed [${name} v${version}] ${contractAddress.slice(0, 8)}...` +
