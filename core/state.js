@@ -243,16 +243,28 @@ class StateEngine {
 
   getContractFullState(address) {
     const contract = this.contracts.get(address);
-    return contract ? contract.state : {};
+    const inMem = contract ? (contract.state || {}) : {};
+    const storage = this.stateTree.getAllContractStorage(address) || {};
+    return Object.assign({}, storage, inMem);
   }
 
   getAllContracts() {
-    return Array.from(this.contracts.values());
+    const list = [];
+    for (const [address, contract] of this.contracts.entries()) {
+      const storage = this.stateTree.getAllContractStorage(address) || {};
+      const mergedState = Object.assign({}, storage, contract.state || {});
+      list.push({
+        ...contract,
+        state: mergedState
+      });
+    }
+    return list;
   }
 
   setContractState(contractAddress, key, value) {
-    const contract = this.contracts.get(contractAddress);
+    let contract = this.contracts.get(contractAddress);
     if (contract) {
+      if (!contract.state) contract.state = {};
       contract.state[key] = value;
     }
 
@@ -263,7 +275,9 @@ class StateEngine {
 
   getContractState(contractAddress, key) {
     const contract = this.contracts.get(contractAddress);
-    return contract?.state?.[key];
+    const inMem = contract?.state?.[key];
+    if (inMem !== undefined) return inMem;
+    return this.stateTree.getContractStorage(contractAddress, key);
   }
 
   // ─── Merkle state tree (Phase 8+) ───────────────────────────────────────────
@@ -319,26 +333,41 @@ class StateEngine {
       stakes:      Array.from(this.stakes.entries()),
       unstaking:   Array.from(this.unstaking.entries()),
       publicKeys:  Array.from(this.publicKeys.entries()),
-      contracts:   Array.from(this.contracts.entries()),
-      contractStorage: Array.from(this.contractStorage.entries()),
-      // ✅ Phase 9: include reputation and events in snapshots
+      contracts:   Array.from(this.contracts.entries()).map(([addr, c]) => [
+        addr,
+        {
+          ...c,
+          state: JSON.parse(JSON.stringify(c.state || {}))
+        }
+      ]),
+      contractStorage: Array.from(this.contractStorage.entries()).map(([k, v]) => [
+        k,
+        typeof v === 'object' && v !== null ? JSON.parse(JSON.stringify(v)) : v
+      ]),
       reputation:  Array.from(this.reputation.entries()),
-      eventLog:    this.eventLog,
+      eventLog:    JSON.parse(JSON.stringify(this.eventLog || [])),
       stateTree:   this.stateTree.exportSnapshot()
     };
   }
 
   importState(state) {
-    this.balances    = new Map(state.balances);
-    this.nonces      = new Map(state.nonces);
-    this.stakes      = new Map(state.stakes);
-    this.unstaking   = new Map(state.unstaking);
-    this.publicKeys  = new Map(state.publicKeys);
-    this.contracts   = new Map(state.contracts);
+    this.balances    = new Map(state.balances || []);
+    this.nonces      = new Map(state.nonces || []);
+    this.stakes      = new Map(state.stakes || []);
+    this.unstaking   = new Map(state.unstaking || []);
+    this.publicKeys  = new Map(state.publicKeys || []);
+    this.contracts   = new Map(
+      (state.contracts || []).map(([addr, c]) => [
+        addr,
+        {
+          ...c,
+          state: JSON.parse(JSON.stringify(c.state || {}))
+        }
+      ])
+    );
     this.contractStorage = new Map(state.contractStorage || []);
-    // ✅ Phase 9: restore reputation and events
     this.reputation  = new Map(state.reputation  || []);
-    this.eventLog    = state.eventLog || [];
+    this.eventLog    = JSON.parse(JSON.stringify(state.eventLog || []));
     if (state.stateTree) {
       this.stateTree.importSnapshot(state.stateTree);
     }

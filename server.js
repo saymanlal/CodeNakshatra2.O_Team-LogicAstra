@@ -1,6 +1,7 @@
 import './core/env.js';
 import express from 'express';
 import cors from 'cors';
+import zlib from 'zlib';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -29,10 +30,28 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-app.use(express.static(path.join(__dirname, 'frontend')));
+// ── Gzip compression for all JSON API responses ───────────────────────────────
+// Reduces bandwidth by ~70-80%, preventing free-tier bandwidth cap suspensions.
+app.use((req, res, next) => {
+  const ae = req.headers['accept-encoding'] || '';
+  if (!ae.includes('gzip')) return next();
+  const _json = res.json.bind(res);
+  res.json = (data) => {
+    const body = JSON.stringify(data);
+    zlib.gzip(Buffer.from(body, 'utf8'), (err, compressed) => {
+      if (err) return _json(data);
+      res.setHeader('Content-Encoding', 'gzip');
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Vary', 'Accept-Encoding');
+      res.end(compressed);
+    });
+  };
+  next();
+});
 
 // Serve the built Android APK from the repo-root apk/ folder.
 // Without this, /apk/base.apk 404s because only frontend/ is mounted above.
+app.use(express.static(path.join(__dirname, 'frontend')));
 app.use('/apk', express.static(path.join(__dirname, 'apk')));
 
 app.get('/docs', (req, res) => {
@@ -135,8 +154,8 @@ async function startServer() {
     }
 
     console.log('\n╔════════════════════════════════════════╗');
-    console.log('║   SAYMAN BLOCKCHAIN - PHASE 21         ║');
-    console.log('║   EVM RPC Wallet & Parallel Sync       ║');
+    console.log('║   SAYMAN BLOCKCHAIN - PHASE 22         ║');
+    console.log('║   Instant Tx + Bandwidth Optimised     ║');
     console.log('╚════════════════════════════════════════╝\n');
     console.log(`🌐 NETWORK: ${networkFlag.toUpperCase()}`);
     console.log(`🔧 MODE: ${mode.toUpperCase()}`);
@@ -240,6 +259,32 @@ async function startServer() {
       if (mode === 'validator' || mode === 'sequencer') {
         console.log(`\n⛏️ Starting block production in ${mode.toUpperCase()} mode...`);
         startMining(mode);
+
+        // ── Instant block production on mempool arrival ───────────────────
+        // Instead of waiting the full blockTime (5 s) after every tx,
+        // fire a block immediately when the first tx lands in an empty mempool.
+        let instantBlockDebounce = null;
+        blockchain.onTransactionAdded = () => {
+          if (instantBlockDebounce) return;  // already scheduled
+          if (blockchain.isSyncing || (p2pServer && p2pServer.isSyncing)) return;
+          if (!p2pServer?.canProduceBlocks()) return;
+          instantBlockDebounce = setTimeout(async () => {
+            instantBlockDebounce = null;
+            try {
+              const block = await blockchain.createBlock();
+              if (block) {
+                if (p2pServer) p2pServer.broadcastBlock(block);
+                if (mode === 'sequencer' && block.index > 0 && block.index % 5 === 0) {
+                  submitRollupToL1(block, config).catch(err =>
+                    console.error('[Rollup] Error submitting to L1:', err.message)
+                  );
+                }
+              }
+            } catch (err) {
+              console.error('[Instant-Block] Error:', err.message);
+            }
+          }, 200); // 200ms debounce — batch rapid-fire txs
+        };
       }
     });
 
