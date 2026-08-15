@@ -63,30 +63,38 @@ const localMeshState = {
   blockTime: 5000,
   blockReward: 1000000000,
   blocks: [
-    { index: 145, hash: '0x8f2c3d4e5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d', timestamp: Date.now() - 3000, transactions: [{ id: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b', type: 'TRANSFER', from: '0x71C836443799895691866382072B285b01859080', to: '0x28aF352482329864223297a82910294726591024', data: { amount: 25000000000 } }], validator: '0x71C836443799895691866382072B285b01859080', gasUsed: 21000, fee: 1000000 },
-    { index: 144, hash: '0x7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f', timestamp: Date.now() - 8000, transactions: [{ id: '0x3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d', type: 'STORAGE_POR', from: '0x3a21908472910394857291039485729103948572', to: '0x0000000000000000000000000000000000000000', data: { amount: 0, shards: 20 } }], validator: '0x3a21908472910394857291039485729103948572', gasUsed: 42000, fee: 2000000 },
-    { index: 143, hash: '0x6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e', timestamp: Date.now() - 13000, transactions: [], validator: '0x9f18273645192837465192837465192837465192', gasUsed: 0, fee: 0 },
-    { index: 142, hash: '0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', timestamp: Date.now() - 18000, transactions: [], validator: '0x71C836443799895691866382072B285b01859080', gasUsed: 0, fee: 0 },
-    { index: 141, hash: '0x4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c', timestamp: Date.now() - 23000, transactions: [], validator: '0x3a21908472910394857291039485729103948572', gasUsed: 0, fee: 0 }
+    { index: 145, chainId: 'sayman-public-testnet-1', hash: '0x8f2c3d4e5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d', previousHash: '0x0000000000000000000000000000000000000000000000000000000000000000', timestamp: Date.now() - 3000, transactions: [], validator: null, gasUsed: 0, fee: 0 },
+    { index: 144, chainId: 'sayman-public-testnet-1', hash: '0x7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f', previousHash: '0x8f2c3d4e5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d', timestamp: Date.now() - 8000, transactions: [], validator: null, gasUsed: 0, fee: 0 },
+    { index: 143, chainId: 'sayman-public-testnet-1', hash: '0x6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e', previousHash: '0x7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f', timestamp: Date.now() - 13000, transactions: [], validator: null, gasUsed: 0, fee: 0 },
+    { index: 142, chainId: 'sayman-public-testnet-1', hash: '0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', previousHash: '0x6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e', timestamp: Date.now() - 18000, transactions: [], validator: null, gasUsed: 0, fee: 0 },
+    { index: 141, chainId: 'sayman-public-testnet-1', hash: '0x4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c', previousHash: '0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', timestamp: Date.now() - 23000, transactions: [], validator: null, gasUsed: 0, fee: 0 }
   ],
-  validators: [
-    { address: '0x71C836443799895691866382072B285b01859080', stake: 500000000000, baseUnits: 500000000000, share: 45.4, reputation: 980, missedBlocks: 0, status: 'Active' },
-    { address: '0x3a21908472910394857291039485729103948572', stake: 350000000000, baseUnits: 350000000000, share: 31.8, reputation: 850, missedBlocks: 1, status: 'Active' },
-    { address: '0x9f18273645192837465192837465192837465192', stake: 250000000000, baseUnits: 250000000000, share: 22.8, reputation: 620, missedBlocks: 0, status: 'Active' }
-  ],
+  // ─ Validators: dynamically returns ONLY the user's own browser contributor node ─
+  get validators() {
+    const nodeId = localStorage.getItem('sayman_browser_node_id');
+    const isContributor = localStorage.getItem('sayman_contributor_onboarded') === 'true';
+    if (!nodeId || !isContributor) return [];
+    const alloc = parseInt(localStorage.getItem('sayman_contributor_alloc') || '250', 10);
+    return [{
+      address: nodeId,
+      stake: alloc * 100000,
+      baseUnits: alloc * 100000,
+      share: 100,
+      reputation: 1000,
+      missedBlocks: 0,
+      status: 'Active',
+      nodeType: 'Browser Contributor Node (This Device)'
+    }];
+  },
+  // ─ Only the native genesis token — no fake tokens ─
   tokens: [
-    { name: 'Sayman Testnet Token', symbol: 'tSAYN', address: '0x0000000000000000000000000000000000000001', totalSupply: 100000000, holderCount: 1420, type: 'Native Layer-1' },
-    { name: 'MyToken', symbol: 'MTK', address: '0xa1b2c3d4e5f67890123456789abcdef012345678', totalSupply: 1000000, holderCount: 84, type: 'Fungible Token' },
-    { name: 'Puky Token', symbol: 'PUKY', address: '0xb2c3d4e5f67890123456789abcdef0123456789a', totalSupply: 500000000, holderCount: 312, type: 'Utility Token' }
+    { name: 'Sayman Testnet Token', symbol: 'tSAYN', address: '0x0000000000000000000000000000000000000001', totalSupply: 21000000, holderCount: 1, type: 'Native Layer-1 (Genesis)' }
   ],
-  nfts: [
-    { name: 'SAYMAN Genesis Shards', symbol: 'SGS', address: '0xc3d4e5f67890123456789abcdef0123456789ab1', mintedCount: 350, maxSupply: 1000, baseUri: 'ipfs://QmSaymanGenesis/' },
-    { name: 'CyberBirds Collective', symbol: 'CBC', address: '0xd4e5f67890123456789abcdef0123456789ab12', mintedCount: 80, maxSupply: 500, baseUri: 'ipfs://QmCyberBirds/' }
-  ],
-  memecoins: [
-    { name: 'Puky Doge', symbol: 'PUKY', address: '0x0987654321fedcba0987654321fedcba09876543', totalSupply: 1000000000, holderCount: 412, burnOnTransfer: true, transferTaxPercent: 2, maxWalletPercent: 5 },
-    { name: 'MoonSayman', symbol: 'MSAYN', address: '0x1234567890abcdef1234567890abcdef12345678', totalSupply: 420000000000, holderCount: 189, burnOnTransfer: false, transferTaxPercent: 0, maxWalletPercent: 10 }
-  ]
+  // ─ Empty until real on-chain activity ─
+  nfts: [],
+  memecoins: [],
+  contracts: [],
+  layers: []
 };
 
 // Automatic local block production ticker for Web4 Edge Mesh mode
@@ -95,14 +103,17 @@ setInterval(() => {
     const lastBlock = localMeshState.blocks[0];
     const newIndex = (lastBlock ? lastBlock.index : 145) + 1;
     const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2,'0')).join('');
+    const nodeId = localStorage.getItem('sayman_browser_node_id') || null;
     const newBlock = {
       index: newIndex,
+      chainId: 'sayman-public-testnet-1',
       hash: '0x' + randomHex,
+      previousHash: lastBlock ? lastBlock.hash : '0x0000000000000000000000000000000000000000000000000000000000000000',
       timestamp: Date.now(),
       transactions: [],
-      validator: localMeshState.validators[Math.floor(Math.random() * localMeshState.validators.length)].address,
-      gasUsed: Math.floor(Math.random() * 30000),
-      fee: Math.floor(Math.random() * 1000000)
+      validator: nodeId,
+      gasUsed: 0,
+      fee: 0
     };
     localMeshState.blocks.unshift(newBlock);
     if (localMeshState.blocks.length > 50) localMeshState.blocks.pop();
@@ -220,6 +231,7 @@ window.promptCustomNode = function() {
 
 // ── Browser Community Node Identity & Tier Detection ─────────────────────────
 function initAutomaticStorageContributor() {
+  // Assign a stable browser node ID on first visit
   let nodeId = localStorage.getItem('sayman_browser_node_id');
   if (!nodeId) {
     const bytes = new Uint8Array(8);
@@ -227,23 +239,21 @@ function initAutomaticStorageContributor() {
     nodeId = 'browser-' + Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
     localStorage.setItem('sayman_browser_node_id', nodeId);
   }
-  
+
+  // Auto-onboard every new user as a 250MB contributor immediately — no modal needed.
+  // They can always pause, change allocation, upgrade to permanent, or drawback later.
+  const onboarded = localStorage.getItem('sayman_contributor_onboarded') === 'true';
+  if (!onboarded) {
+    allocatedStorageMB = 250;
+    localStorage.setItem('sayman_contributor_alloc', '250');
+    localStorage.setItem('sayman_contributor_onboarded', 'true');
+    logStorage(`[System] Auto-joined SAYMAN Web4 Mesh with 250MB allocation. Welcome, contributor!`);
+  }
+
   const alloc = localStorage.getItem('sayman_contributor_alloc');
   if (alloc) allocatedStorageMB = parseInt(alloc, 10);
-  
-  const onboarded = localStorage.getItem('sayman_contributor_onboarded') === 'true';
-  
-  if (!onboarded) {
-    setTimeout(() => {
-      if (localStorage.getItem('sayman_contributor_onboarded') !== 'true') {
-        const modal = document.getElementById('contributor-modal-overlay');
-        if (modal) modal.style.display = 'flex';
-      }
-    }, 2000);
-  } else {
-    startContributorEngine();
-  }
-  
+
+  startContributorEngine();
   updateContributorUI();
 }
 
@@ -1795,31 +1805,36 @@ function setNetState(state) {
 
 function resolveMeshFallback(path) {
   const p = path.split('?')[0];
+  const myNodeId = localStorage.getItem('sayman_browser_node_id') || 'browser-contributor-node';
+  const myAlloc  = parseInt(localStorage.getItem('sayman_contributor_alloc') || '250', 10);
+  const validators = localMeshState.validators; // uses getter — returns [] or [myNode]
+  const totalStake = validators.reduce((s, v) => s + (v.stake || 0), 0);
+
   if (p === '/network/stats') {
     return {
       network: localMeshState.network,
       chainId: localMeshState.chainId,
-      nodeId: localStorage.getItem('sayman_browser_node_id') || 'browser-contributor-node',
+      nodeId: myNodeId,
       mode: 'Web4 Mesh (PoSA)',
-      peersCount: 24,
+      peersCount: 1,
       uptime: uptimeSeconds,
-      totalBlocks: localMeshState.blocks[0].index
+      totalBlocks: localMeshState.blocks[0]?.index ?? 141
     };
   }
   if (p === '/stats') {
     return {
-      blocks: localMeshState.blocks[0].index,
-      totalBlocks: localMeshState.blocks[0].index,
+      blocks: localMeshState.blocks[0]?.index ?? 141,
+      totalBlocks: localMeshState.blocks[0]?.index ?? 141,
       mempool: 0,
-      contracts: 4,
+      contracts: 0,
       blockReward: localMeshState.blockReward,
       blockTime: localMeshState.blockTime,
-      tps: '18.4',
-      parallelEfficiency: 99.987
+      tps: '0',
+      parallelEfficiency: 1.0
     };
   }
   if (p === '/network') {
-    return localMeshState;
+    return { ...localMeshState, validators };
   }
   if (p === '/blocks') {
     return {
@@ -1830,17 +1845,17 @@ function resolveMeshFallback(path) {
   }
   if (p.startsWith('/block/')) {
     const idx = parseInt(p.split('/')[2], 10);
-    const blk = localMeshState.blocks.find(b => b.index === idx) || localMeshState.blocks[0];
-    return blk;
+    return localMeshState.blocks.find(b => b.index === idx) || null;
   }
   if (p === '/validators') {
     return {
-      validators: localMeshState.validators,
-      totalStake: 1100000000000,
-      estimatedAPR: 18.5
+      validators,
+      totalStake,
+      estimatedAPR: validators.length > 0 ? 18.5 : 0
     };
   }
   if (p === '/transactions') {
+    // Collect real txs only — all blocks have empty tx arrays in mesh mode
     const txs = [];
     localMeshState.blocks.forEach(b => {
       (b.transactions || []).forEach(t => {
@@ -1857,34 +1872,26 @@ function resolveMeshFallback(path) {
         if (t.id === txId) found = { ...t, blockIndex: b.index, timestamp: b.timestamp };
       });
     });
-    return found || { id: txId, type: 'TRANSFER', blockIndex: localMeshState.blocks[0].index, timestamp: Date.now(), data: { amount: 1000000000 } };
+    // Return null if not found — caller shows 'Transaction not found'
+    return found;
   }
   if (p === '/contracts') {
-    return {
-      contracts: [
-        { address: '0x1111111111111111111111111111111111111111', creator: '0x71C836443799895691866382072B285b01859080', blockIndex: 1, codeSize: 2048, name: 'TokenFactory' },
-        { address: '0x2222222222222222222222222222222222222222', creator: '0x71C836443799895691866382072B285b01859080', blockIndex: 5, codeSize: 4096, name: 'StakingPool' },
-        { address: '0x3333333333333333333333333333333333333333', creator: '0x3a21908472910394857291039485729103948572', blockIndex: 12, codeSize: 3120, name: 'DEXRouter' },
-        { address: '0x4444444444444444444444444444444444444444', creator: '0x9f18273645192837465192837465192837465192', blockIndex: 20, codeSize: 1820, name: 'NFTCollection' }
-      ]
-    };
+    return { contracts: [] };
   }
   if (p === '/tokens') {
     return { tokens: localMeshState.tokens };
   }
   if (p === '/nfts') {
-    return { collections: localMeshState.nfts };
+    return { collections: [] };
   }
   if (p === '/memecoins') {
-    return { memecoins: localMeshState.memecoins };
+    return { memecoins: [] };
   }
   if (p === '/layers' || p === '/layers/active') {
-    return {
-      layers: [
-        { name: 'SAYMAN Rollup L2', chainId: 'sayman-l2-1', type: 'Rollup', sequencer: '0x71C836443799895691866382072B285b01859080', height: 4820, commitment: '0xabc123...456', status: 'Active' },
-        { name: 'GameChain Subnet', chainId: 'gamechain-1', type: 'Sidechain', sequencer: '0x3a21908472910394857291039485729103948572', height: 1240, commitment: '0xdef456...789', status: 'Active' }
-      ]
-    };
+    return { layers: [] };
+  }
+  if (p.startsWith('/address/')) {
+    return { address: p.split('/')[2], balance: 0, nonce: 0, type: 'EOA' };
   }
   return {};
 }
