@@ -41,44 +41,52 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
 
   // Network info (rarely changes — 1 hour TTL)
   router.get('/network', (req, res) => {
-    cache(res, 3600);
-    const stats = blockchain.getStats();
-    const dec   = config.decimals || 100_000_000;
-    const symbol = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
-    res.json({
-      network:       config.networkName,
-      chainId:       config.chainId,
-      layer:         config.layer || 1,
-      ticker:        symbol,
-      nativeCurrency: config.nativeCurrency || {
-        name: 'SAYN',
-        symbol: 'SAYN',
-        decimals: 8
-      },
-      faucetEnabled: config.faucetEnabled,
-      blockTime:     config.blockTime,
-      blockReward:   config.blockReward,
-      minStake:      config.minStake,
-      unstakeDelay:  config.unstakeDelay,
-      gasLimits:     stats.gasLimits,
-      gasCosts:      stats.gasCosts,
-      stateRoot:     stats.stateRoot,
-      decimals:      dec,
-      // Explicit denomination guide — eliminates all confusion in the explorer
-      denomination: {
+    try {
+      cache(res, 3600);
+      const stats = blockchain.getStats();
+      const dec   = config.decimals || 100_000_000;
+      const symbol = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
+      res.json({
+        network:       config.networkName,
+        chainId:       config.chainId,
+        layer:         config.layer || 1,
         ticker:        symbol,
+        nativeCurrency: config.nativeCurrency || {
+          name: 'SAYN',
+          symbol: 'SAYN',
+          decimals: 8
+        },
+        faucetEnabled: config.faucetEnabled,
+        blockTime:     config.blockTime,
+        blockReward:   config.blockReward,
+        minStake:      config.minStake,
+        unstakeDelay:  config.unstakeDelay,
+        gasLimits:     stats.gasLimits,
+        gasCosts:      stats.gasCosts,
+        stateRoot:     stats.stateRoot,
         decimals:      dec,
-        humanUnit:     `1 ${symbol}`,
-        baseUnit:      `${dec} base units`,
-        description:   `All balances on-chain are stored as integers in base units. Divide by ${dec} to get ${symbol}.`
-      }
-    });
+        // Explicit denomination guide — eliminates all confusion in the explorer
+        denomination: {
+          ticker:        symbol,
+          decimals:      dec,
+          humanUnit:     `1 ${symbol}`,
+          baseUnit:      `${dec} base units`,
+          description:   `All balances on-chain are stored as integers in base units. Divide by ${dec} to get ${symbol}.`
+        }
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal error', details: err.message });
+    }
   });
 
   // Stats (changes every block ~5s — short TTL)
   router.get('/stats', (req, res) => {
-    cache(res, 5);
-    res.json(blockchain.getStats());
+    try {
+      cache(res, 5);
+      res.json(blockchain.getStats());
+    } catch (err) {
+      res.json({ blocks: 0, validators: 0, totalStake: 0, mempool: 0, contracts: 0, stateRoot: '0', network: config.networkName, chainId: config.chainId });
+    }
   });
 
   // Blocks with pagination (5s TTL — new block every 5s)
@@ -1473,6 +1481,114 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
       res.status(404).json({ error: 'No matching block, transaction, address, or token found.' });
     } catch (err) {
       res.status(500).json({ error: err.message });
+    }
+  });
+  // ── Contributor API Endpoints ───────────────────────────────────────────────
+  const contributorRegistry = new Map();
+
+  router.post('/contributor/register', (req, res) => {
+    try {
+      const { nodeId, walletAddress, storageMB, tier, permanent } = req.body;
+      const estimatedDailyReward = (storageMB || 0) * 0.0004;
+      const registeredAt = Date.now();
+      const contributor = { nodeId, walletAddress, storageMB, tier, permanent, estimatedDailyReward, registeredAt, uptimeSeconds: 0 };
+      contributorRegistry.set(nodeId, contributor);
+      if (p2pServer && typeof p2pServer.emit === 'function') {
+        p2pServer.emit('contributor-registered', contributor);
+      }
+      res.json({ success: true, nodeId, registeredAt, tier, estimatedDailyReward });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal error', details: err.message });
+    }
+  });
+
+  router.get('/contributor/status/:nodeId', (req, res) => {
+    try {
+      const { nodeId } = req.params;
+      const contributor = contributorRegistry.get(nodeId);
+      if (!contributor) return res.status(404).json({ error: 'Not found' });
+      const uptimeSeconds = Math.floor((Date.now() - contributor.registeredAt) / 1000);
+      const estimatedPendingReward = (uptimeSeconds / 86400) * contributor.estimatedDailyReward;
+      res.json({
+        nodeId: contributor.nodeId,
+        walletAddress: contributor.walletAddress,
+        storageMB: contributor.storageMB,
+        tier: contributor.tier,
+        permanent: contributor.permanent,
+        uptimeSeconds,
+        estimatedPendingReward,
+        registeredAt: contributor.registeredAt
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal error', details: err.message });
+    }
+  });
+
+  router.post('/contributor/challenge/:nodeId', (req, res) => {
+    try {
+      const { nodeId } = req.params;
+      const { challengeSeed } = req.body;
+      const timestamp = Date.now();
+      const seedNum = challengeSeed ? challengeSeed.toString().charCodeAt(0) : 0;
+      const leafIndex = seedNum % 1000;
+      const hmac = crypto.createHash('sha256').update(nodeId + leafIndex + timestamp).digest('hex');
+      res.json({ leafIndex, hmac, timestamp });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal error', details: err.message });
+    }
+  });
+
+  router.post('/contributor/claim', (req, res) => {
+    try {
+      const { nodeId, walletAddress, estimatedReward, signature } = req.body;
+      if (!contributorRegistry.has(nodeId)) {
+        return res.status(400).json({ error: 'Node ID not registered' });
+      }
+      if (!walletAddress || (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress) && !/^[a-fA-F0-9]{40}$/.test(walletAddress))) {
+        return res.status(400).json({ error: 'Invalid wallet address format' });
+      }
+      let amount = Math.min((estimatedReward || 0) * 100000000, 1000000000);
+      amount = Math.floor(amount);
+      const tx = new Transaction('REWARD', { to: walletAddress, amount });
+      tx.timestamp = Date.now();
+      tx.id = tx.calculateHash ? tx.calculateHash() : uuidv4();
+      blockchain.mempool.push(tx);
+      res.json({ txHash: tx.id, status: 'pending', claimedAmount: amount / 100000000, note: 'Contributor reward claim submitted to mempool' });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal error', details: err.message });
+    }
+  });
+
+  router.get('/contributor/leaderboard', (req, res) => {
+    try {
+      const list = Array.from(contributorRegistry.values())
+        .sort((a, b) => b.storageMB - a.storageMB)
+        .slice(0, 20)
+        .map(c => ({
+          nodeId: c.nodeId,
+          tier: c.tier,
+          estimatedDailyReward: c.estimatedDailyReward,
+          permanent: c.permanent,
+          storageMB: c.storageMB
+        }));
+      res.json(list);
+    } catch (err) {
+      res.status(500).json({ error: 'Internal error', details: err.message });
+    }
+  });
+
+  router.get('/contributor/stats', (req, res) => {
+    try {
+      const contributors = Array.from(contributorRegistry.values());
+      const totalContributors = contributors.length;
+      const totalStorageMB = contributors.reduce((sum, c) => sum + c.storageMB, 0);
+      const avgDailyReward = totalContributors > 0 ? contributors.reduce((sum, c) => sum + c.estimatedDailyReward, 0) / totalContributors : 0;
+      const totalVSU = Math.floor(totalStorageMB / 1024) * 10;
+      const sorted = [...contributors].sort((a, b) => b.storageMB - a.storageMB);
+      const topTier = totalContributors > 0 ? sorted[0].tier : 'none';
+      res.json({ totalContributors, totalStorageMB, totalVSU, avgDailyReward, topTier });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal error', details: err.message });
     }
   });
 

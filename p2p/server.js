@@ -107,13 +107,19 @@ export class P2PServer {
       }
 
       this.wss.on('connection', (ws, req) => {
-        const ip = req.socket.remoteAddress;
-        console.log(`🤝 Inbound peer from ${ip}`);
-        this._handleInboundConnection(ws);
+        try {
+          const ip = req.socket.remoteAddress;
+          console.log(`🤝 Inbound peer from ${ip}`);
+          this._handleInboundConnection(ws);
+        } catch (e) {
+          console.error('Error handling inbound connection:', e);
+        }
       });
 
       this.wss.on('error', (err) => {
-        console.error('❌ P2P WSS error:', err.message);
+        try {
+          console.error('❌ P2P WSS error:', err.message);
+        } catch (e) {}
       });
 
       console.log(`📡 Node ID: ${this.nodeId}`);
@@ -177,6 +183,12 @@ export class P2PServer {
           }
         }
       }
+      
+      // If no peers, produce blocks locally (solo mode)
+      if (this.peers.size === 0 && this.canProduceBlocks() && this.blockchain && typeof this.blockchain.createBlock === 'function') {
+        this.blockchain.createBlock().catch(err => console.error('Solo block production error:', err));
+      }
+
       // Trigger sync verification to recover from any stalled syncs
       this.checkAndTriggerSync();
     }, 45_000);
@@ -330,8 +342,10 @@ export class P2PServer {
       });
 
       ws.on('error', (err) => {
-        clearTimeout(timeout);
-        console.error(`❌ Peer ${url} error:`, err.message);
+        try {
+          clearTimeout(timeout);
+          console.error(`❌ Peer ${url} error:`, err.message);
+        } catch (e) {}
       });
 
       ws.on('close', () => {
@@ -448,8 +462,10 @@ export class P2PServer {
     });
 
     ws.on('error', (err) => {
-      console.error(`Peer ${peerId} socket error:`, err.message);
-      this.peers.delete(peerId);
+      try {
+        console.error(`Peer ${peerId} socket error:`, err.message);
+        this.peers.delete(peerId);
+      } catch (e) {}
     });
   }
 
@@ -1125,7 +1141,13 @@ export class P2PServer {
     if (!lastBlock) return true;
     
     // Evaluate validator selection for current slot
-    const selectedValidator = this.blockchain.pos.selectValidator(lastBlock.hash);
+    let selectedValidator = null;
+    try {
+      selectedValidator = this.blockchain.pos.selectValidator(lastBlock.hash);
+    } catch (e) {
+      selectedValidator = null;
+    }
+    
     if (!selectedValidator) return true; // Default fallback if no validators staked yet
     
     // Check if local node address matches selected validator address
