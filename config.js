@@ -4,6 +4,11 @@ export default {
     p2pPort: parseInt(process.env.P2P_PORT) || 6001,
     peers: process.env.PEERS ? process.env.PEERS.split(',') : [],
     
+    // Token Symbols
+    tokenSymbol: 'SAYN',
+    testnetTokenSymbol: 'tSAYN',
+    symbol: (process.env.NETWORK || 'testnet') === 'mainnet' ? 'SAYN' : 'tSAYN',
+
     // Blockchain
     blockTime: 5000, // 5 seconds
     blockReward: 10,

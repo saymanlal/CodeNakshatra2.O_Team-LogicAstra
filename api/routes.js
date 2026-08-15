@@ -8,6 +8,18 @@ import { getNumericChainId } from '../core/evmHelper.js';
 export function setupRoutes(app, blockchain, p2pServer, config) {
   const router = express.Router();
 
+  // ── Cache-Control helper ─────────────────────────────────────────────
+  // Cloudflare respects s-maxage on edge cache nodes.
+  // max-age tells browsers to cache locally too.
+  // Immutable data (txs by hash, blocks by hash) get long TTLs.
+  function cache(res, seconds, immutable = false) {
+    const directive = immutable
+      ? `public, max-age=${seconds}, s-maxage=${seconds}, immutable`
+      : `public, max-age=${seconds}, s-maxage=${seconds}`;
+    res.setHeader('Cache-Control', directive);
+    res.setHeader('Vary', 'Accept-Encoding');
+  }
+
   function normalizeBlockForApi(block) {
     const json = block.toJSON ? block.toJSON() : block;
     const timestamp =
@@ -27,8 +39,9 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     };
   }
 
-  // Network info
+  // Network info (rarely changes — 1 hour TTL)
   router.get('/network', (req, res) => {
+    cache(res, 3600);
     const stats = blockchain.getStats();
     const dec   = config.decimals || 100_000_000;
     const symbol = config.nativeCurrency?.symbol || config.ticker || 'SAYN';
@@ -62,14 +75,16 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     });
   });
 
-  // Stats
+  // Stats (changes every block ~5s — short TTL)
   router.get('/stats', (req, res) => {
+    cache(res, 5);
     res.json(blockchain.getStats());
   });
 
-  // Blocks with pagination
+  // Blocks with pagination (5s TTL — new block every 5s)
   router.get('/blocks', async (req, res) => {
     try {
+      cache(res, 5);
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 50;
       const totalBlocks = blockchain.chain.length;
@@ -1349,7 +1364,7 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     const chainId = config.chainId;
     const numericId = getNumericChainId(chainId);
     const chainIdHex = '0x' + numericId.toString(16);
-    const host   = req.get('host') || 'sayman.onrender.com';
+    const host   = req.get('host') || req.hostname || 'community.node.sayman.network';
     const proto  = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
     const base   = `${proto}://${host}`;
 
