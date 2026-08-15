@@ -330,7 +330,7 @@ window.submitClaim = function() {
   const nodeId = localStorage.getItem('sayman_browser_node_id');
   const pending = document.getElementById('claim-pending-val').textContent;
   
-  const url = \`https://wallet-manager-flax.vercel.app?claim=true&nodeId=\${encodeURIComponent(nodeId)}&pendingRewards=\${encodeURIComponent(pending)}\`;
+  const url = 'https://wallet-manager-flax.vercel.app?claim=true&nodeId=' + encodeURIComponent(nodeId) + '&pendingRewards=' + encodeURIComponent(pending);
   window.open(url, '_blank');
   
   document.getElementById('claim-panel-overlay').style.display = 'none';
@@ -583,17 +583,18 @@ function showPage(pageId) {
   if (btn) btn.classList.add('active');
 
   switch (pageId) {
-    case 'dashboard':     loadDashboard();        break;
-    case 'explorer':      loadExplorer(1);        break;
-    case 'validators':    loadValidators();       break;
-    case 'transactions':  loadTransactions();     break;
-    case 'contracts':     loadContracts();        break;
-    case 'layers':        loadLayers();           break;
-    case 'network':       loadNetwork();          break;
-    case 'tokens':        loadTokens();           break;
-    case 'nfts':          loadNFTs();             break;
-    case 'memecoins':     loadMemecoins();        break;
-    case 'docs':          break;
+    case 'dashboard':       loadDashboard();               break;
+    case 'explorer':        loadExplorer(1);               break;
+    case 'storage-mining':  initAutomaticStorageContributor(); break;
+    case 'validators':      loadValidators();              break;
+    case 'transactions':    loadTransactions();            break;
+    case 'contracts':       loadContracts();               break;
+    case 'layers':          loadLayers();                  break;
+    case 'network':         loadNetwork();                 break;
+    case 'tokens':          loadTokens();                  break;
+    case 'nfts':            loadNFTs();                    break;
+    case 'memecoins':       loadMemecoins();               break;
+    case 'docs':            break;
   }
 }
 
