@@ -32,6 +32,25 @@ let allContracts   = [];
 let allPeers       = [];
 
 async function loadExplorerEnv() {
+  // 1. Check URL query parameters (e.g. ?rpc=https://node.example.com)
+  const urlParams = new URLSearchParams(window.location.search);
+  const rpcParam = urlParams.get('rpc') || urlParams.get('node');
+  if (rpcParam) {
+    API = rpcParam.replace(/\/$/, '') + '/api';
+    localStorage.setItem('sayman_explorer_node', rpcParam);
+    console.log(`✅ Loaded explorer API from URL param: ${API}`);
+    return;
+  }
+
+  // 2. Check localStorage (persisted community node URL)
+  const savedNode = localStorage.getItem('sayman_explorer_node') || localStorage.getItem('sayman_node_testnet') || localStorage.getItem('sayman_node_mainnet');
+  if (savedNode) {
+    API = savedNode.replace(/\/$/, '') + '/api';
+    console.log(`✅ Loaded explorer API from localStorage: ${API}`);
+    return;
+  }
+
+  // 3. Fallback to local static environment file
   const paths = ['.env', 'explorer.env'];
   for (const p of paths) {
     try {
