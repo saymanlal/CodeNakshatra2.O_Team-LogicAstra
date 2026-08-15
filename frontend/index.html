@@ -186,6 +186,7 @@
       <div style="margin-top:24px; display:flex; gap:12px; flex-wrap:wrap;">
         <button id="toggle-mining-btn" onclick="toggleStorageMining()" style="padding:10px 20px; background:var(--mono-100); color:var(--mono-1000); border:none; border-radius:6px; font-weight:600; cursor:pointer;"><i class="fas fa-play"></i> Start Contributing</button>
         <button onclick="openClaimPanel()" style="padding:10px 20px; background:transparent; border:var(--border); border-radius:6px; font-weight:600; cursor:pointer;"><i class="fas fa-gift"></i> Claim Rewards</button>
+        <button id="drawback-btn" onclick="drawbackContributor()" style="padding:10px 20px; background:transparent; border:1px solid rgba(239,68,68,0.5); color:#ef4444; border-radius:6px; font-weight:600; cursor:pointer;"><i class="fas fa-undo-alt"></i> Drawback & Stop Node</button>
       </div>
     </div>
 
@@ -200,6 +201,7 @@
           <option value="10240">10 GB (Max)</option>
         </select>
         <button onclick="upgradeToPermanent()" style="padding:8px 16px; background:var(--mono-100); color:var(--mono-1000); border:none; border-radius:4px; font-weight:600; cursor:pointer;">Upgrade to Permanent Node</button>
+        <button onclick="withdrawPermanentTier()" style="padding:8px 16px; background:transparent; border:var(--border); border-radius:4px; font-size:13px; cursor:pointer; color:var(--mono-300);">Revert to Standard Tier</button>
       </div>
     </div>
 
