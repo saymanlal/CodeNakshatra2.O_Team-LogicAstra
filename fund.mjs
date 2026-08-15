@@ -33,7 +33,14 @@ const sig = kp.sign(hash);
 tx.signature = { r: sig.r.toString('hex'), s: sig.s.toString('hex') };
 tx.publicKey = pub;
 
-const res = await fetch('https://sayman.up.railway.app/api/broadcast', {
+// Broadcast to a SAYMAN node. Use SAYMAN_API env var to set your node.
+// No hardcoded SAYMAN infrastructure — set SAYMAN_API=https://your-node.example.com/api
+const SAYMAN_API = process.env.SAYMAN_API || '';
+if (!SAYMAN_API) {
+  console.error('Set SAYMAN_API=https://your-node.example.com/api');
+  process.exit(1);
+}
+const res = await fetch(`${SAYMAN_API}/broadcast`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(tx)

@@ -5,6 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
+    "test": "node test_phase2_3.js && node test_phase2_4.js && node test_full_network.js && node test_phase3_compatibility.js",
     "start": "node server.js",
     "build": "echo 'No build step required'",
     "testnet": "node server.js --network testnet",

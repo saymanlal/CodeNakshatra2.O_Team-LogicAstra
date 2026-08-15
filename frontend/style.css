@@ -792,4 +792,41 @@ footer a i {
   background: rgba(218, 165, 32, 0.1);
   color: #daa520;
   border-color: rgba(218, 165, 32, 0.2);
+}.badge-gold {
+  background: rgba(218, 165, 32, 0.1);
+  color: #daa520;
+  border-color: rgba(218, 165, 32, 0.2);
+}
+
+/* ── Contributor Modal & Claim Panel ── */
+.contributor-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: calc(var(--grid)*2);
+}
+.contributor-modal {
+  background: var(--mono-1000); max-width: 560px; width: 100%; border-radius: 16px; padding: 32px; border: var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+.tier-card {
+  border: var(--border); padding: 16px; border-radius: 10px; cursor: pointer; transition: all 0.2s; background: var(--mono-950); margin-bottom: 8px;
+}
+.tier-card:hover {
+  border-color: var(--mono-400);
+}
+.tier-selected {
+  border: 2px solid #10b981; background: rgba(16, 185, 129, 0.05);
+}
+.reward-calculator {
+  width: 100%; cursor: pointer;
+}
+.claim-panel {
+  background: var(--mono-1000); width: 100%; max-width: 500px; padding: 24px; border-radius: 16px 16px 0 0; border: var(--border); border-bottom: none; animation: slideUp 0.3s ease-out; margin: 0 auto;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.permanent-badge {
+  display: inline-block; padding: 4px 8px; background: rgba(16, 185, 129, 0.15); color: #10b981; border-radius: 12px; font-size: 11px; font-weight: 600; vertical-align: middle; margin-left: 8px;
+}
+.offline-banner {
+  background: #f59e0b; color: #fff; padding: 10px; text-align: center; font-size: 13px; font-weight: 600; position: fixed; top: 0; left: 0; right: 0; z-index: 10000; display: none;
 }

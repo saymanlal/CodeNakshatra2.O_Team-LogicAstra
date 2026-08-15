@@ -259,32 +259,8 @@ async function startServer() {
       if (mode === 'validator' || mode === 'sequencer') {
         console.log(`\n⛏️ Starting block production in ${mode.toUpperCase()} mode...`);
         startMining(mode);
-
-        // ── Instant block production on mempool arrival ───────────────────
-        // Instead of waiting the full blockTime (5 s) after every tx,
-        // fire a block immediately when the first tx lands in an empty mempool.
-        let instantBlockDebounce = null;
-        blockchain.onTransactionAdded = () => {
-          if (instantBlockDebounce) return;  // already scheduled
-          if (blockchain.isSyncing || (p2pServer && p2pServer.isSyncing)) return;
-          if (!p2pServer?.canProduceBlocks()) return;
-          instantBlockDebounce = setTimeout(async () => {
-            instantBlockDebounce = null;
-            try {
-              const block = await blockchain.createBlock();
-              if (block) {
-                if (p2pServer) p2pServer.broadcastBlock(block);
-                if (mode === 'sequencer' && block.index > 0 && block.index % 5 === 0) {
-                  submitRollupToL1(block, config).catch(err =>
-                    console.error('[Rollup] Error submitting to L1:', err.message)
-                  );
-                }
-              }
-            } catch (err) {
-              console.error('[Instant-Block] Error:', err.message);
-            }
-          }, 200); // 200ms debounce — batch rapid-fire txs
-        };
+        // Block time is fixed at config.blockTime (5 s) — one block per interval.
+        // Multiple transactions are batched inside each block via the mempool.
       }
     });
 
@@ -322,11 +298,10 @@ function startMining(mode) {
           return;
         }
 
-        // ── Leader election: standby nodes yield to the primary ───────
-        // Primary (sayman.onrender.com) always produces.
-        // Standbys only produce when primary has been silent for > 20s.
+        // ── PoS Consensus Leader Check ──────────────────────────────
+        // Evaluates whether local node is selected validator for current slot.
         if (!p2pServer.canProduceBlocks()) {
-          return; // Primary is alive — yield
+          return; // Yield to selected validator for slot
         }
 
         // Skip block production if we are behind any connected peer

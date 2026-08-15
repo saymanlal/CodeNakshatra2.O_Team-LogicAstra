@@ -7,6 +7,8 @@ class PeerManager {
     this.version = version;
     this.peers = new Map(); // nodeId -> peer info
     this.maxPeers = 50;
+    this.reputationScores = new Map(); // nodeId -> score (0 to 100)
+    this.bannedPeers = new Set(); // banned nodeIds / IPs
     this.peerTimeout = 60000; // 60 seconds
     this.cleanupInterval = null;
   }
@@ -24,10 +26,32 @@ class PeerManager {
     }
   }
 
-  addPeer(socket, nodeId, ip, port, chainId, version) {
+  getReputation(nodeId) {
+    return this.reputationScores.get(nodeId) ?? 50; // default initial score: 50
+  }
+
+  adjustReputation(nodeId, delta) {
+    const current = this.getReputation(nodeId);
+    const updated = Math.max(0, Math.min(100, current + delta));
+    this.reputationScores.set(nodeId, updated);
+    if (updated <= 0) {
+      console.log(`⛔ Peer ${nodeId} reputation dropped to 0. Banning peer...`);
+      this.bannedPeers.add(nodeId);
+      this.removePeer(nodeId);
+    }
+    return updated;
+  }
+
+  addPeer(socket, nodeId, ip, port, chainId, version, pubKey = null, transport = 'websocket') {
+    if (this.bannedPeers.has(nodeId) || this.bannedPeers.has(ip)) {
+      console.log(`❌ Rejected banned peer: ${nodeId} (${ip})`);
+      return false;
+    }
+
     // Validate chain ID
     if (chainId !== this.chainId) {
       console.log(`❌ Rejected peer ${nodeId} - wrong chain ID: ${chainId}`);
+      this.adjustReputation(nodeId, -20);
       return false;
     }
 
@@ -43,13 +67,17 @@ class PeerManager {
       port,
       chainId,
       version,
+      pubKey,
+      transport,
       socket,
       lastSeen: Date.now(),
-      connected: true
+      connected: true,
+      score: this.getReputation(nodeId)
     };
 
     this.peers.set(nodeId, peer);
-    console.log(`✓ Connected to peer: ${nodeId} (${ip}:${port}) - Chain: ${chainId}`);
+    this.adjustReputation(nodeId, 5); // reward successful handshake
+    console.log(`✓ Connected to peer: ${nodeId} (${ip}:${port}) via ${transport} - Chain: ${chainId} | Rep: ${this.getReputation(nodeId)}`);
     
     return true;
   }

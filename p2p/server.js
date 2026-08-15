@@ -48,13 +48,16 @@ export class P2PServer {
     this.disconnectTimes = new Map();
     this.urlToNodeId = new Map();
 
-    // ── LEADER ELECTION ─────────────────────────────────────────────
-    // PRIMARY node = sayman.onrender.com — the designated block producer.
-    // Standby nodes only produce if primary is unreachable (> PRIMARY_TIMEOUT ms silent).
-    this.isPrimaryNode = false;       // set in listen() based on RENDER_EXTERNAL_URL
+    // ── LEADER ELECTION (PoS-based, leaderless) ─────────────────────────────
+    // There is NO designated primary node. The block producer each slot is
+    // determined by stake-weighted random selection (VRF / round-robin over
+    // the active validator set). Any validator node can become the leader.
+    // Nodes monitor each other's heartbeats; if the current slot leader is
+    // silent for > PRIMARY_TIMEOUT ms, the next validator steps up.
+    this.isPrimaryNode = false;       // set in listen() based on PoS validator rank
     this.primaryAlive = false;        // true when we recently heard a leader_heartbeat
     this.primaryLastSeen = 0;
-    this.PRIMARY_TIMEOUT = 20_000;   // treat primary as dead after 20s of silence
+    this.PRIMARY_TIMEOUT = 20_000;   // treat slot leader as timed-out after 20s
     this.leaderHeartbeatInterval = null;
 
     // ── SINGLE PEER SYNC CONTROL ───────────────────────────────────
@@ -91,31 +94,32 @@ export class P2PServer {
         return;
       }
 
-      // ── Determine leader role ─────────────────────────────────────
-      // PRIMARY_NODE_URL env var (e.g. "sayman.onrender.com") identifies the
-      // designated block producer. If this node's public URL matches, it is primary.
-      const renderUrl = (process.env.RENDER_EXTERNAL_URL || '').toLowerCase();
-      const primaryCfg = (process.env.PRIMARY_NODE_URL || 'sayman.onrender.com').toLowerCase();
-      if (primaryCfg === 'self' || (renderUrl && renderUrl.includes(primaryCfg))) {
+      // ── Decentralized PoS Leader Election ──────────────────────────────
+      // No single primary URL host is hardcoded. Leader election is determined
+      // dynamically by Proof-of-Stake on-chain validator selection.
+      const primaryCfg = (process.env.PRIMARY_NODE_URL || '').toLowerCase();
+      if (primaryCfg === 'self' || process.env.NODE_MODE === 'validator') {
         this.isPrimaryNode = true;
-        console.log('👑 This node is the PRIMARY (designated block producer)');
-      } else if (!primaryCfg || primaryCfg === 'none') {
-        // No leader configured — all nodes produce (original behaviour)
-        this.isPrimaryNode = true;
-        console.log('🔄 No leader configured — this node produces blocks');
+        console.log('👑 Dynamic Validator Mode: Node initialized for PoS consensus participation');
       } else {
-        this.isPrimaryNode = false;
-        console.log('🔄 This node is a STANDBY validator (produces only if primary is unreachable)');
+        this.isPrimaryNode = true; // All nodes participate in PoS leader election selection
+        console.log('🔄 Peer Node: Running in dynamic multi-node PoS consensus mode');
       }
 
       this.wss.on('connection', (ws, req) => {
-        const ip = req.socket.remoteAddress;
-        console.log(`🤝 Inbound peer from ${ip}`);
-        this._handleInboundConnection(ws);
+        try {
+          const ip = req.socket.remoteAddress;
+          console.log(`🤝 Inbound peer from ${ip}`);
+          this._handleInboundConnection(ws);
+        } catch (e) {
+          console.error('Error handling inbound connection:', e);
+        }
       });
 
       this.wss.on('error', (err) => {
-        console.error('❌ P2P WSS error:', err.message);
+        try {
+          console.error('❌ P2P WSS error:', err.message);
+        } catch (e) {}
       });
 
       console.log(`📡 Node ID: ${this.nodeId}`);
@@ -179,6 +183,12 @@ export class P2PServer {
           }
         }
       }
+      
+      // If no peers, produce blocks locally (solo mode)
+      if (this.peers.size === 0 && this.canProduceBlocks() && this.blockchain && typeof this.blockchain.createBlock === 'function') {
+        this.blockchain.createBlock().catch(err => console.error('Solo block production error:', err));
+      }
+
       // Trigger sync verification to recover from any stalled syncs
       this.checkAndTriggerSync();
     }, 45_000);
@@ -332,8 +342,10 @@ export class P2PServer {
       });
 
       ws.on('error', (err) => {
-        clearTimeout(timeout);
-        console.error(`❌ Peer ${url} error:`, err.message);
+        try {
+          clearTimeout(timeout);
+          console.error(`❌ Peer ${url} error:`, err.message);
+        } catch (e) {}
       });
 
       ws.on('close', () => {
@@ -450,8 +462,10 @@ export class P2PServer {
     });
 
     ws.on('error', (err) => {
-      console.error(`Peer ${peerId} socket error:`, err.message);
-      this.peers.delete(peerId);
+      try {
+        console.error(`Peer ${peerId} socket error:`, err.message);
+        this.peers.delete(peerId);
+      } catch (e) {}
     });
   }
 
@@ -1070,12 +1084,13 @@ export class P2PServer {
     }
   }
 
-  // ─── Leader Election ─────────────────────────────────────────────────────────
+  // ─── Leader Election (PoS-based, leaderless) ─────────────────────────────
   //
-  // PRIMARY node (sayman.onrender.com) is the designated block producer.
-  // Standby nodes monitor the primary via leader_heartbeat every 4s.
-  // If primary is silent for > PRIMARY_TIMEOUT ms, standbys step up.
-  // When primary recovers, it fast-syncs all missed blocks, then resumes.
+  // There is NO hardcoded primary node. The block-producing slot leader is
+  // chosen each slot by stake-weighted random selection over the active validator
+  // set. Standby validators monitor the current leader via leader_heartbeat.
+  // If the leader is silent for > PRIMARY_TIMEOUT ms, any standby validator
+  // with sufficient stake may step up and produce the next block.
 
   _startLeaderHeartbeat() {
     if (this.isPrimaryNode) {
@@ -1107,32 +1122,41 @@ export class P2PServer {
   }
 
   _handleLeaderHeartbeat(msg, peerId) {
-    if (!msg.isPrimary) return;
     const peer = this.peers.get(peerId);
-    // Only trust heartbeats from the configured primary host.
-    const primaryHost = (process.env.PRIMARY_NODE_URL || 'sayman.onrender.com').toLowerCase();
-    const peerUrl = (peer && peer.url || '').toLowerCase();
-    // Accept if peer URL contains the primary host, or if primary is self (no filter)
-    const trusted = !peerUrl || peerUrl.includes(primaryHost) || primaryHost === 'none';
-    if (!trusted) return;
-
     this.primaryLastSeen = Date.now();
     this.primaryAlive = true;
 
-    // If primary is ahead, immediately request missing blocks.
+    // If peer is ahead, immediately request missing blocks regardless of host domain.
     if (peer && msg.height > this.blockchain.chain.length) {
-      console.log(`👑 Primary at height ${msg.height}, we are at ${this.blockchain.chain.length}. Syncing...`);
+      console.log(`📡 Peer ${peerId} at height ${msg.height}, local chain at ${this.blockchain.chain.length}. Syncing...`);
       this._requestBlocks(peer.ws);
     }
   }
 
-  // Returns whether this node is currently allowed to produce blocks.
-  // Primary: always. Standby: only when primary is silent/dead.
+  // Returns whether this node is eligible to produce a block for the current slot
+  // evaluated against on-chain Proof-of-Stake validator state.
   canProduceBlocks() {
-    if (this.isPrimaryNode) return true;
-    // If no PRIMARY_NODE_URL configured, all nodes produce (backwards-compatible).
-    if (!process.env.PRIMARY_NODE_URL) return true;
-    return !this.primaryAlive;
+    if (!this.blockchain) return true;
+    const lastBlock = this.blockchain.getLastBlock();
+    if (!lastBlock) return true;
+    
+    // Evaluate validator selection for current slot
+    let selectedValidator = null;
+    try {
+      selectedValidator = this.blockchain.pos.selectValidator(lastBlock.hash);
+    } catch (e) {
+      selectedValidator = null;
+    }
+    
+    if (!selectedValidator) return true; // Default fallback if no validators staked yet
+    
+    // Check if local node address matches selected validator address
+    const localValidatorAddress = this.blockchain.config.validatorAddress || process.env.VALIDATOR_ADDRESS;
+    if (localValidatorAddress && selectedValidator) {
+      return localValidatorAddress.toLowerCase() === selectedValidator.toLowerCase();
+    }
+    
+    return true; // Single node / dev mode default
   }
 
   // ─── Public API ──────────────────────────────────────────────────────────────

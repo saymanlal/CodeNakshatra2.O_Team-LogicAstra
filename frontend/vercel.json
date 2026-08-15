@@ -1,0 +1,23 @@
+{
+  "cleanUrls": false,
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "rewrites": [
+    {
+      "source": "/block/:index",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/tx/:hash",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/contract/:addr",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

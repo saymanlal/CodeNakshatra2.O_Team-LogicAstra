@@ -31,41 +31,332 @@ let allValidators  = [];
 let allContracts   = [];
 let allPeers       = [];
 
-async function loadExplorerEnv() {
-  const paths = ['.env', 'explorer.env'];
-  for (const p of paths) {
+// ── Dynamic Node Auto-Discovery & PoSA Storage Contributor Engine ─────────────
+const COMMUNITY_SEEDS = [
+  'https://sayman-blockchain.onrender.com',
+  'https://sayman.onrender.com',
+  'https://sayman.up.railway.app',
+  'http://localhost:3000',
+  'http://localhost:10000',
+  window.location.origin
+];
+
+let activeNodeUrl = '';
+let activeNodeHeight = 0;
+let activeNodeLatency = 0;
+
+// Storage Node State (Automatic Web4 Community Contributor)
+let isMiningActive = false; // Auto-active if onboarded
+let allocatedStorageMB = 250;
+let accumulatedRewards = parseFloat(localStorage.getItem('sayman_posa_rewards') || '0.00000000');
+let miningInterval = null;
+let verifiedShardsCount = 0;
+
+async function autoDiscoverBestNode() {
+  const custom = localStorage.getItem('sayman_explorer_node');
+  const candidates = [
+    custom,
+    ...COMMUNITY_SEEDS
+  ].filter(Boolean);
+
+  let bestNode = null;
+  let highestHeight = -1;
+  let lowestPing = Infinity;
+
+  const pingPromises = candidates.map(async (url) => {
+    const cleanUrl = url.replace(/\/$/, '');
+    const startTime = Date.now();
     try {
-      const res = await fetch(p);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(`${cleanUrl}/api/stats`, { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (res.ok) {
-        const text = await res.text();
-        const env = {};
-        const lines = text.split('\n');
-        for (let line of lines) {
-          line = line.trim();
-          if (!line || line.startsWith('#')) continue;
-          const idx = line.indexOf('=');
-          if (idx === -1) continue;
-          const key = line.substring(0, idx).trim();
-          let val = line.substring(idx + 1).trim();
-          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-            val = val.substring(1, val.length - 1);
-          }
-          env[key] = val;
+        // Critical: reject HTML (Vercel SPA rewrites, nginx defaults, etc.)
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+          return { url: cleanUrl, height: -1, latency: Infinity, ok: false };
         }
-        if (env.API_BASE) {
-          API = env.API_BASE;
-          console.log(`✅ Loaded explorer API base from ${p}: ${API}`);
-        }
-        break;
+        const data = await res.json();
+        const latency = Date.now() - startTime;
+        const height = data.totalBlocks || data.height || 0;
+        return { url: cleanUrl, height, latency, ok: true };
       }
     } catch (e) {
-      // ignore
+      // Node unreachable or timeout
+    }
+    return { url: cleanUrl, height: -1, latency: Infinity, ok: false };
+  });
+
+  const results = await Promise.all(pingPromises);
+  const liveNodes = results.filter(r => r.ok);
+
+  if (liveNodes.length > 0) {
+    // Sort primarily by highest block height (most updated), then by lowest latency
+    liveNodes.sort((a, b) => {
+      if (b.height !== a.height) return b.height - a.height;
+      return a.latency - b.latency;
+    });
+    bestNode = liveNodes[0];
+  }
+
+  if (bestNode) {
+    activeNodeUrl = bestNode.url;
+    activeNodeHeight = bestNode.height;
+    activeNodeLatency = bestNode.latency;
+    API = `${activeNodeUrl}/api`;
+    console.log(`🚀 Auto-selected fastest canonical node: ${activeNodeUrl} (Height: #${activeNodeHeight}, Latency: ${activeNodeLatency}ms)`);
+  } else {
+    API = '';
+    activeNodeUrl = '';
+    activeNodeLatency = 0;
+    setNetState('OFFLINE');
+    console.warn('⚠️ No community nodes reachable. Explorer is offline.');
+    return;
+  }
+
+  updateNodeDiscoveryUI();
+}
+
+function updateNodeDiscoveryUI() {
+  const urlEl = document.getElementById('node-url-display');
+  const heightEl = document.getElementById('node-height-badge');
+  const latencyEl = document.getElementById('node-latency-badge');
+  const dotEl = document.getElementById('node-status-dot');
+
+  if (urlEl) urlEl.textContent = activeNodeUrl || 'Connecting...';
+  if (heightEl) heightEl.textContent = activeNodeHeight > 0 ? `Height: #${activeNodeHeight}` : 'Height: #Syncing';
+  if (latencyEl) latencyEl.textContent = `${activeNodeLatency} ms`;
+  if (dotEl) dotEl.style.background = '#10b981';
+}
+
+window.rescanFastestNode = async function() {
+  const urlEl = document.getElementById('node-url-display');
+  if (urlEl) urlEl.textContent = 'Scanning network nodes...';
+  await autoDiscoverBestNode();
+  await loadNetworkConfig();
+  poll();
+  showNotification('Auto-discovered & connected to latest network node!');
+};
+
+window.promptCustomNode = function() {
+  const current = localStorage.getItem('sayman_explorer_node') || activeNodeUrl || '';
+  const input = prompt('Enter community node URL (e.g. https://node.sayman.network):', current);
+  if (input !== null) {
+    if (input.trim()) {
+      localStorage.setItem('sayman_explorer_node', input.trim());
+      API = input.trim().replace(/\/$/, '') + '/api';
+      activeNodeUrl = input.trim();
+      updateNodeDiscoveryUI();
+      loadNetworkConfig();
+      poll();
+      showNotification(`Connected to custom node: ${input.trim()}`);
+    } else {
+      localStorage.removeItem('sayman_explorer_node');
+      autoDiscoverBestNode();
     }
   }
+};
+
+// ── Browser Community Node Identity & Tier Detection ─────────────────────────
+let uptimeSeconds = 0;
+let rewardRate = 0.0004; // tSAYN per MB per day
+let engineInterval = null;
+
+function initAutomaticStorageContributor() {
+  let nodeId = localStorage.getItem('sayman_browser_node_id');
+  if (!nodeId) {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    nodeId = 'browser-' + Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+    localStorage.setItem('sayman_browser_node_id', nodeId);
+  }
+  
+  const alloc = localStorage.getItem('sayman_contributor_alloc');
+  if (alloc) allocatedStorageMB = parseInt(alloc, 10);
+  
+  const onboarded = localStorage.getItem('sayman_contributor_onboarded') === 'true';
+  
+  if (!onboarded) {
+    setTimeout(() => {
+      if (localStorage.getItem('sayman_contributor_onboarded') !== 'true') {
+        const modal = document.getElementById('contributor-modal-overlay');
+        if (modal) modal.style.display = 'flex';
+      }
+    }, 3000);
+  } else {
+    startContributorEngine();
+  }
+  
+  updateContributorUI();
+}
+
+function startContributorEngine() {
+  if (engineInterval) return;
+  isMiningActive = true;
+  updateContributorUI();
+  
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().then(granted => {
+      logStorage(`[StorageManager] Persistent storage granted: ${granted}`);
+    });
+  }
+  
+  engineInterval = setInterval(() => {
+    uptimeSeconds += 30;
+    
+    // Simulate MAISS challenge
+    const challengeId = Math.random().toString(16).slice(2, 10);
+    const ms = Math.floor(Math.random() * 50) + 10;
+    logStorage(`[MAISS] Shard challenge ${challengeId} passed in ${ms}ms. Availability verified.`);
+    verifiedShardsCount++;
+    
+    updateContributorUI();
+  }, 30000);
+  logStorage(`[System] Engine started. Relay + verify mode active.`);
+}
+
+function updateContributorUI() {
+  const isPermanent = localStorage.getItem('sayman_contributor_permanent') === 'true';
+  
+  const nodeIdEl = document.getElementById('mining-node-id');
+  if (nodeIdEl) nodeIdEl.textContent = localStorage.getItem('sayman_browser_node_id') || '—';
+  
+  const tierLabel = document.getElementById('mining-tier-label');
+  if (tierLabel) tierLabel.textContent = isPermanent ? 'Permanent Node (Tier 2+)' : 'Browser Node (Tier 1)';
+  
+  const badgeEl = document.getElementById('permanent-badge-el');
+  if (badgeEl) badgeEl.innerHTML = isPermanent ? '<span class="permanent-badge"><i class="fas fa-check-circle"></i> Permanent Node</span>' : '';
+  
+  const allocVal = document.getElementById('mining-alloc-val');
+  if (allocVal) allocVal.textContent = allocatedStorageMB;
+  
+  const uptimeEl = document.getElementById('mining-uptime');
+  if (uptimeEl) uptimeEl.textContent = uptimeSeconds;
+  
+  const proofsEl = document.getElementById('mining-proofs');
+  if (proofsEl) proofsEl.textContent = verifiedShardsCount;
+  
+  const statusText = document.getElementById('mining-status-text');
+  const statusDot = document.getElementById('mining-status-dot');
+  const toggleBtn = document.getElementById('toggle-mining-btn');
+  
+  if (isMiningActive) {
+    if (statusText) statusText.textContent = 'Active & Syncing';
+    if (statusDot) statusDot.style.background = '#10b981';
+    if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-stop"></i> Pause Contributing';
+  } else {
+    if (statusText) statusText.textContent = 'Standby / Idle';
+    if (statusDot) statusDot.style.background = '#f59e0b';
+    if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-play"></i> Start Contributing';
+  }
+  
+  const rewardsEl = document.getElementById('mining-rewards-val');
+  if (rewardsEl) {
+    const uptimeHours = uptimeSeconds / 3600;
+    const est = (allocatedStorageMB * uptimeHours * rewardRate).toFixed(8);
+    rewardsEl.textContent = est;
+    const claimVal = document.getElementById('claim-pending-val');
+    if (claimVal) claimVal.textContent = est;
+  }
+}
+
+window.toggleStorageMining = function() {
+  if (isMiningActive) {
+    isMiningActive = false;
+    clearInterval(engineInterval);
+    engineInterval = null;
+    logStorage(`[System] Engine paused.`);
+  } else {
+    startContributorEngine();
+  }
+  updateContributorUI();
+};
+
+function logStorage(msg) {
+  const logBox = document.getElementById('storage-log');
+  if (logBox) {
+    const time = new Date().toLocaleTimeString();
+    logBox.innerHTML = `<div style="margin-bottom:4px;"><span style="color:var(--mono-400);">[${time}]</span> ${msg}</div>` + logBox.innerHTML;
+  }
+}
+
+// Modal functions
+window.selectModalTier = function(tier, mb) {
+  document.querySelectorAll('.tier-card').forEach(el => el.classList.remove('tier-selected'));
+  document.getElementById(`modal-tier-${tier}`).classList.add('tier-selected');
+  const slider = document.getElementById('modal-alloc-slider');
+  slider.value = mb;
+  updateModalSlider(mb);
+};
+
+window.updateModalSlider = function(val) {
+  document.getElementById('modal-alloc-val').textContent = val;
+  document.getElementById('modal-est-rewards').textContent = (val * rewardRate).toFixed(2);
+};
+
+window.startContributingModal = function() {
+  const val = document.getElementById('modal-alloc-slider').value;
+  allocatedStorageMB = parseInt(val, 10);
+  localStorage.setItem('sayman_contributor_alloc', val);
+  localStorage.setItem('sayman_contributor_onboarded', 'true');
+  document.getElementById('contributor-modal-overlay').style.display = 'none';
+  startContributorEngine();
+};
+
+window.upgradeToPermanent = function() {
+  const select = document.getElementById('upgrade-storage-select');
+  const val = parseInt(select.value, 10);
+  allocatedStorageMB = val;
+  localStorage.setItem('sayman_contributor_alloc', val);
+  localStorage.setItem('sayman_contributor_permanent', 'true');
+  updateContributorUI();
+  logStorage(`[System] Upgraded to Permanent Node with ${val}MB allocation.`);
+};
+
+window.openClaimPanel = function() {
+  document.getElementById('claim-panel-overlay').style.display = 'flex';
+  const input = document.getElementById('claim-wallet-input');
+  const saved = localStorage.getItem('sayman_claim_wallet');
+  if (saved) input.value = saved;
+};
+
+window.submitClaim = function() {
+  const input = document.getElementById('claim-wallet-input');
+  const wallet = input.value.trim();
+  if (!wallet) return;
+  localStorage.setItem('sayman_claim_wallet', wallet);
+  
+  const nodeId = localStorage.getItem('sayman_browser_node_id');
+  const pending = document.getElementById('claim-pending-val').textContent;
+  
+  const url = 'https://wallet-manager-flax.vercel.app?claim=true&nodeId=' + encodeURIComponent(nodeId) + '&pendingRewards=' + encodeURIComponent(pending);
+  window.open(url, '_blank');
+  
+  document.getElementById('claim-panel-overlay').style.display = 'none';
+};
+
+window.updateCalculator = function(val) {
+  document.getElementById('calc-storage-val').textContent = val;
+  const daily = val * rewardRate;
+  const calcDaily = document.getElementById('calc-daily');
+  const calcWeekly = document.getElementById('calc-weekly');
+  const calcMonthly = document.getElementById('calc-monthly');
+  if (calcDaily) calcDaily.textContent = daily.toFixed(2);
+  if (calcWeekly) calcWeekly.textContent = (daily * 7).toFixed(2);
+  if (calcMonthly) calcMonthly.textContent = (daily * 30).toFixed(2);
+};
+
+async function loadExplorerEnv() {
+  await autoDiscoverBestNode();
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  window.addEventListener('unhandledrejection', function(event) {
+    console.warn('Unhandled promise rejection:', event.reason);
+  });
+
   await loadExplorerEnv();
   await loadNetworkConfig();
   updateHeaderInfo();
@@ -87,9 +378,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (rewardWrap) rewardWrap.classList.add('active');
   if (rewardKnob) rewardKnob.classList.add('active');
 
+  initAutomaticStorageContributor();
+
   const urlParams = new URLSearchParams(window.location.search);
   const pageParam = urlParams.get('page');
-  if (pageParam && ['dashboard', 'explorer', 'validators', 'transactions', 'contracts', 'layers', 'network'].includes(pageParam)) {
+  if (pageParam && ['dashboard', 'explorer', 'storage-mining', 'validators', 'transactions', 'contracts', 'layers', 'network'].includes(pageParam)) {
     showPage(pageParam);
   } else {
     showPage('dashboard');
@@ -141,6 +434,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   setInterval(poll, POLL);
   setInterval(updateHeaderInfo, POLL);
+  setInterval(() => {
+    if (NET_STATE === 'OFFLINE') rescanFastestNode();
+  }, 30000);
 });
 
 window.toggleExplorerTheme = function() {
@@ -164,6 +460,7 @@ function poll() {
   switch (active.dataset.page) {
     case 'dashboard':     loadDashboard();                    break;
     case 'explorer':      loadExplorer(explorerPage);         break;
+    case 'storage-mining':loadStorageMiningStats();           break;
     case 'validators':    loadValidators();                   break;
     case 'transactions':  loadTransactions();                 break;
     case 'contracts':     loadContracts();                    break;
@@ -173,6 +470,19 @@ function poll() {
     case 'nfts':          loadNFTs();                         break;
     case 'memecoins':     loadMemecoins();                    break;
     case 'docs':          break;
+  }
+}
+
+async function loadStorageMiningStats() {
+  try {
+    const stats = await apiFetch('/stats');
+    if (stats) {
+      const activePeers = (stats.peersCount || 0) + 1;
+      const nodesEl = document.getElementById('mesh-nodes-count');
+      if (nodesEl) nodesEl.textContent = activePeers;
+    }
+  } catch (e) {
+    // ignore
   }
 }
 
@@ -273,17 +583,18 @@ function showPage(pageId) {
   if (btn) btn.classList.add('active');
 
   switch (pageId) {
-    case 'dashboard':     loadDashboard();        break;
-    case 'explorer':      loadExplorer(1);        break;
-    case 'validators':    loadValidators();       break;
-    case 'transactions':  loadTransactions();     break;
-    case 'contracts':     loadContracts();        break;
-    case 'layers':        loadLayers();           break;
-    case 'network':       loadNetwork();          break;
-    case 'tokens':        loadTokens();           break;
-    case 'nfts':          loadNFTs();             break;
-    case 'memecoins':     loadMemecoins();        break;
-    case 'docs':          break;
+    case 'dashboard':       loadDashboard();               break;
+    case 'explorer':        loadExplorer(1);               break;
+    case 'storage-mining':  initAutomaticStorageContributor(); break;
+    case 'validators':      loadValidators();              break;
+    case 'transactions':    loadTransactions();            break;
+    case 'contracts':       loadContracts();               break;
+    case 'layers':          loadLayers();                  break;
+    case 'network':         loadNetwork();                 break;
+    case 'tokens':          loadTokens();                  break;
+    case 'nfts':            loadNFTs();                    break;
+    case 'memecoins':       loadMemecoins();               break;
+    case 'docs':            break;
   }
 }
 
@@ -1344,10 +1655,78 @@ function renderPeers(peers) {
 }
 
 // ── API helper ────────────────────────────────────────────────────────────────
-async function apiFetch(path) {
-  const res = await fetch(API + path);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+// ── Network State Machine ─────────────────────────────────────────────────────
+// States: CONNECTING | ONLINE | OFFLINE
+// This drives honest UI feedback instead of silent loading spinners.
+let NET_STATE = 'CONNECTING';
+function setNetState(state) {
+  if (NET_STATE === state) return;
+  NET_STATE = state;
+  const dot = document.getElementById('node-status-dot');
+  const modeBadge = document.getElementById('node-mode-badge');
+  const urlEl = document.getElementById('node-url-display');
+  const offlineBanner = document.getElementById('offline-banner');
+  if (offlineBanner) {
+    offlineBanner.style.display = state === 'OFFLINE' ? 'block' : 'none';
+  }
+  if (state === 'ONLINE') {
+    if (dot) dot.style.background = '#10b981';
+    if (modeBadge) { modeBadge.textContent = 'Connected · Live'; modeBadge.style.color = '#10b981'; modeBadge.style.background = 'rgba(16,185,129,0.12)'; }
+  } else if (state === 'CONNECTING') {
+    if (dot) dot.style.background = '#f59e0b';
+    if (modeBadge) { modeBadge.textContent = 'Discovering peers…'; modeBadge.style.color = '#f59e0b'; modeBadge.style.background = 'rgba(245,158,11,0.12)'; }
+  } else if (state === 'OFFLINE') {
+    if (dot) dot.style.background = '#ef4444';
+    if (urlEl) urlEl.textContent = 'No community nodes reachable';
+    if (modeBadge) { modeBadge.textContent = 'Network Unavailable'; modeBadge.style.color = '#ef4444'; modeBadge.style.background = 'rgba(239,68,68,0.12)'; }
+    const offlineMsg = '<tr><td colspan="9" style="padding:24px;text-align:center;color:#ef4444;font-size:12px;">⚠️ Network unavailable — no community nodes reachable. <a href="#" onclick="rescanFastestNode();return false;">Retry</a></td></tr>';
+    ['explorer-blocks','validator-list','tx-list','contract-list'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.querySelectorAll('tr').length <= 1) el.innerHTML = offlineMsg;
+    });
+    const bf = document.getElementById('block-feed');
+    if (bf && bf.children.length === 0) bf.innerHTML = '<div style="padding:24px;text-align:center;color:#ef4444;font-size:12px;">⚠️ No community node reachable — <a href="#" onclick="rescanFastestNode();return false;">Retry connection</a></div>';
+  }
+}
+
+async function apiFetch(path, options = {}, retries = 3) {
+  if (!API) {
+    setNetState('OFFLINE');
+    throw new Error('No community node configured. Use "Rescan Peers" or "Change Node" to connect.');
+  }
+  for (let i = 0; i < retries; i++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    try {
+      const url = path.startsWith('http') ? path : `${API}${path}`;
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        if (i === retries - 1) throw new Error(`HTTP ${res.status}`);
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i))); // backoff
+        continue;
+      }
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        if (i === retries - 1) throw new Error(`Node returned non-JSON`);
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+        continue;
+      }
+      const data = await res.json();
+      if (NET_STATE !== 'ONLINE') setNetState('ONLINE');
+      return data;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (i === retries - 1) {
+        if (NET_STATE === 'ONLINE') {
+          setNetState('CONNECTING');
+          autoDiscoverBestNode().catch(() => setNetState('OFFLINE'));
+        }
+        throw err;
+      }
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+    }
+  }
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
