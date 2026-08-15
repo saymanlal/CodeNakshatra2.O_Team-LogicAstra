@@ -17,6 +17,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.5.4/elliptic.min.js"></script>
 </head>
 <body>
+<div id="offline-banner" class="offline-banner">
+  Network Unavailable — Retrying... <button onclick="rescanFastestNode()" style="margin-left:12px; padding:4px 8px; background:rgba(0,0,0,0.2); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:11px;">Retry Now</button>
+</div>
 <div class="container">
 
   <!-- ── Header ── -->
@@ -150,69 +153,136 @@
         <div class="stat-value" id="mesh-nodes-count">24</div>
         <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">Decentralized Mesh Peers</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">MAISS Spot Proofs</div>
-        <div class="stat-value" style="color:var(--success);" id="mesh-proofs-rate">100% Valid</div>
-        <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">Avg latency: 42ms (<200ms)</div>
+    </div>
+
+    <!-- Contributor Status Card -->
+    <div class="section" style="background:var(--mono-950); border:var(--border); padding:24px; border-radius:8px; margin-bottom:24px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+        <div>
+          <h2 style="margin-bottom:8px;"><i class="fas fa-server" style="color:var(--success); margin-right:8px;"></i> Contributor Status <span id="permanent-badge-el"></span></h2>
+          <div style="font-size:13px; color:var(--mono-400); margin-bottom:4px;">Node ID: <span class="mono" id="mining-node-id">—</span></div>
+          <div style="font-size:13px; color:var(--mono-400); margin-bottom:4px;">Tier: <span id="mining-tier-label">—</span></div>
+          <div style="font-size:13px; color:var(--mono-400);">Uptime: <span id="mining-uptime">0</span>s · Proofs Passed: <span id="mining-proofs">0</span></div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px; text-transform:uppercase; color:var(--mono-400); margin-bottom:4px;">Estimated Pending Rewards</div>
+          <div style="font-size:24px; font-weight:700; color:var(--success);"><span id="mining-rewards-val">0.00000000</span> <span style="font-size:14px;">tSAYN</span></div>
+        </div>
+      </div>
+      <div style="margin-top:24px; display:flex; gap:16px; flex-wrap:wrap;">
+        <div style="flex:1; border:var(--border); padding:16px; border-radius:6px; background:var(--mono-1000);">
+          <div style="font-size:11px; text-transform:uppercase; color:var(--mono-400); margin-bottom:8px;">Storage Allocated</div>
+          <div style="font-size:18px; font-weight:600;"><span id="mining-alloc-val">250</span> MB</div>
+        </div>
+        <div style="flex:1; border:var(--border); padding:16px; border-radius:6px; background:var(--mono-1000);">
+          <div style="font-size:11px; text-transform:uppercase; color:var(--mono-400); margin-bottom:8px;">Status</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span id="mining-status-dot" style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#f59e0b;"></span>
+            <span id="mining-status-text" style="font-weight:600; font-size:14px;">Standby / Idle</span>
+          </div>
+        </div>
+      </div>
+      
+      <div style="margin-top:24px; display:flex; gap:12px; flex-wrap:wrap;">
+        <button id="toggle-mining-btn" onclick="toggleStorageMining()" style="padding:10px 20px; background:var(--mono-100); color:var(--mono-1000); border:none; border-radius:6px; font-weight:600; cursor:pointer;"><i class="fas fa-play"></i> Start Contributing</button>
+        <button onclick="openClaimPanel()" style="padding:10px 20px; background:transparent; border:var(--border); border-radius:6px; font-weight:600; cursor:pointer;"><i class="fas fa-gift"></i> Claim Rewards</button>
       </div>
     </div>
 
-    <!-- Contributor Portal -->
-    <div class="section" style="background:var(--mono-1000);border:var(--border);padding:24px;margin-bottom:24px;border-radius:8px;">
-      <div class="section-header" style="margin-bottom:16px;">
-        <h2><i class="fas fa-microchip" style="color:var(--success);margin-right:8px;"></i> Web4 Browser & Device Storage Contributor Portal</h2>
+    <!-- Upgrade Tier Section -->
+    <div class="section" id="tier-upgrade-section" style="background:var(--mono-1000); border:var(--border); padding:24px; border-radius:8px; margin-bottom:24px;">
+      <h3 style="margin-bottom:16px;">Become a Permanent Contributor</h3>
+      <p style="color:var(--mono-400); font-size:13px; margin-bottom:16px;">Upgrade to a permanent node to lock in your storage allocation and boost rewards.</p>
+      <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+        <select id="upgrade-storage-select" style="padding:8px 12px; border:var(--border); background:var(--mono-950); border-radius:4px; font-size:13px;">
+          <option value="1024">1 GB (Standard)</option>
+          <option value="5120">5 GB (Pro)</option>
+          <option value="10240">10 GB (Max)</option>
+        </select>
+        <button onclick="upgradeToPermanent()" style="padding:8px 16px; background:var(--mono-100); color:var(--mono-1000); border:none; border-radius:4px; font-weight:600; cursor:pointer;">Upgrade to Permanent Node</button>
       </div>
-      <p style="color:var(--mono-400);font-size:13px;line-height:1.6;margin-bottom:20px;">
-        Contribute unused storage and availability directly from your browser or community node to the SAYMAN Data Availability Mesh.
-        Earn <strong>tSAYN</strong> mining rewards automatically as your node verifies Reed-Solomon shards and passes MAISS availability challenges.
-      </p>
+    </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:24px;">
-        <div style="border:var(--border);padding:16px;border-radius:6px;background:var(--mono-950);">
-          <div style="font-size:11px;text-transform:uppercase;color:var(--mono-400);margin-bottom:6px;">Allocated Storage</div>
-          <div style="display:flex;align-items:center;gap:12px;">
-            <select id="storage-alloc-select" style="padding:6px 12px;border:var(--border);border-radius:4px;background:var(--mono-1000);font-size:13px;">
-              <option value="50">50 MB (Light Contributor)</option>
-              <option value="250" selected>250 MB (Standard Mesh)</option>
-              <option value="1000">1 GB (Heavy Archival)</option>
-              <option value="5000">5 GB (Full Storage Node)</option>
-            </select>
-          </div>
+    <!-- Rewards Calculator -->
+    <div class="section" style="border:var(--border); padding:24px; border-radius:8px; margin-bottom:24px;">
+      <h3 style="margin-bottom:16px;">Rewards Calculator</h3>
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div>
+          <label style="display:flex; justify-content:space-between; font-size:12px; color:var(--mono-400); margin-bottom:8px;"><span>Storage: <span id="calc-storage-val">1024</span> MB</span></label>
+          <input type="range" id="calc-slider" min="250" max="10240" step="50" value="1024" class="reward-calculator" oninput="updateCalculator(this.value)">
         </div>
-
-        <div style="border:var(--border);padding:16px;border-radius:6px;background:var(--mono-950);">
-          <div style="font-size:11px;text-transform:uppercase;color:var(--mono-400);margin-bottom:6px;">Your Storage Status</div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span id="mining-status-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;"></span>
-            <span id="mining-status-text" style="font-weight:600;font-size:13px;">Standby / Idle</span>
-          </div>
-        </div>
-
-        <div style="border:var(--border);padding:16px;border-radius:6px;background:var(--mono-950);">
-          <div style="font-size:11px;text-transform:uppercase;color:var(--mono-400);margin-bottom:6px;">Your Accumulated PoSA Rewards</div>
-          <div style="display:flex;align-items:baseline;gap:6px;">
-            <span id="mining-rewards-val" style="font-size:20px;font-weight:700;color:var(--success);">0.00000000</span>
-            <span style="font-size:12px;font-weight:600;">tSAYN</span>
-          </div>
+        <div style="display:flex; gap:16px; flex-wrap:wrap;">
+          <div style="flex:1; padding:12px; background:var(--mono-950); border-radius:4px;">Daily: <strong id="calc-daily" style="color:var(--success);">0.41</strong> tSAYN</div>
+          <div style="flex:1; padding:12px; background:var(--mono-950); border-radius:4px;">Weekly: <strong id="calc-weekly" style="color:var(--success);">2.87</strong> tSAYN</div>
+          <div style="flex:1; padding:12px; background:var(--mono-950); border-radius:4px;">Monthly: <strong id="calc-monthly" style="color:var(--success);">12.29</strong> tSAYN</div>
         </div>
       </div>
+    </div>
 
-      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-        <button id="toggle-mining-btn" onclick="toggleStorageMining()" style="padding:10px 20px;font-size:13px;font-weight:600;background:var(--mono-100);color:var(--mono-1000);border:none;border-radius:6px;cursor:pointer;">
-          <i class="fas fa-play"></i> Start Contributing Storage & Availability
-        </button>
-        <button onclick="claimStorageRewards()" style="padding:10px 20px;font-size:13px;font-weight:600;background:transparent;border:var(--border);border-radius:6px;cursor:pointer;">
-          <i class="fas fa-gift"></i> Claim Rewards to Wallet
-        </button>
-        <span id="mining-session-info" style="font-size:12px;color:var(--mono-400);"></span>
+    <!-- Live Log -->
+    <div class="section">
+      <h3 style="margin-bottom:16px;">Live Activity Log</h3>
+      <div id="storage-log" style="font-family:monospace;font-size:11px;background:var(--mono-950);border:var(--border);padding:12px;border-radius:6px;height:150px;overflow-y:auto;line-height:1.5;">
+        <div style="color:var(--mono-400);">[System] Storage & Availability Mesh engine ready. Click 'Start Contributing' to join as a Web4 node.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Claim Panel -->
+  <div id="claim-panel-overlay" class="contributor-modal-overlay" style="display:none; align-items:flex-end;">
+    <div class="claim-panel">
+      <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+        <h3>Claim Rewards</h3>
+        <button class="modal-close" onclick="document.getElementById('claim-panel-overlay').style.display='none'"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px; color:var(--mono-400); text-transform:uppercase; margin-bottom:4px;">Estimated Pending Rewards</div>
+        <div style="font-size:24px; font-weight:700; color:var(--success);"><span id="claim-pending-val">0.00000000</span> tSAYN</div>
+      </div>
+      <div style="margin-bottom:24px;">
+        <label style="display:block; font-size:12px; color:var(--mono-400); margin-bottom:8px;">Your Wallet Address</label>
+        <input type="text" id="claim-wallet-input" placeholder="0x..." style="width:100%; padding:10px; border:var(--border); border-radius:4px; background:var(--mono-950); font-family:monospace;">
+      </div>
+      <button onclick="submitClaim()" style="width:100%; padding:12px; background:var(--success, #10b981); color:#fff; border:none; border-radius:6px; font-weight:600; cursor:pointer; margin-bottom:16px;">Connect Wallet & Claim</button>
+      <p style="font-size:11px; color:var(--mono-400); text-align:center;">Actual claimable rewards are settled on-chain by the protocol. Estimated values shown here are for reference only.</p>
+    </div>
+  </div>
+
+  <!-- Contributor Onboarding Modal -->
+  <div id="contributor-modal-overlay" class="contributor-modal-overlay" style="display: none;">
+    <div class="contributor-modal">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2><i class="fas fa-network-wired" style="color:var(--success); margin-right: 8px;"></i> Become a SAYMAN Network Contributor</h2>
+      </div>
+      <p style="color:var(--mono-400); margin-bottom: 24px;">Contribute your unused storage and bandwidth to the SAYMAN decentralized mesh. Starting at just 250MB, you can earn tSAYN rewards by relaying and verifying Reed-Solomon shards.</p>
+      
+      <div style="display: flex; flex-direction: column; margin-bottom: 24px;">
+        <div class="tier-card tier-selected" onclick="selectModalTier(1, 250)" id="modal-tier-1">
+          <div style="font-weight: 600;">Tier 1 — Browser Node</div>
+          <div style="font-size: 12px; color: var(--mono-400);">250MB · ~0.1 tSAYN/day · Relay + Verify Shards</div>
+        </div>
+        <div class="tier-card" onclick="selectModalTier(2, 1024)" id="modal-tier-2">
+          <div style="font-weight: 600;">Tier 2 — Standard</div>
+          <div style="font-size: 12px; color: var(--mono-400);">1GB · ~0.5 tSAYN/day · Full Storage Node</div>
+        </div>
+        <div class="tier-card" onclick="selectModalTier(3, 5120)" id="modal-tier-3">
+          <div style="font-weight: 600;">Tier 3 — Pro</div>
+          <div style="font-size: 12px; color: var(--mono-400);">5GB+ · ~2.5 tSAYN/day · Archival + Priority Rewards</div>
+        </div>
+      </div>
+      
+      <div style="margin-bottom: 24px;">
+        <label style="display: block; font-size: 12px; text-transform: uppercase; color: var(--mono-400); margin-bottom: 8px;">Storage Allocation (MB): <span id="modal-alloc-val">250</span> MB</label>
+        <input type="range" id="modal-alloc-slider" min="250" max="5120" step="50" value="250" class="reward-calculator" oninput="updateModalSlider(this.value)">
+        <div style="margin-top: 8px; font-size: 13px;">Estimated Rewards: <span id="modal-est-rewards" style="color:var(--success); font-weight: 600;">0.10</span> tSAYN / day</div>
       </div>
 
-      <!-- Live Shard Activity Log -->
-      <div style="margin-top:24px;">
-        <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Live Reed-Solomon Shard Challenges & Availability Proofs</div>
-        <div id="storage-log" style="font-family:monospace;font-size:11px;background:var(--mono-950);border:var(--border);padding:12px;border-radius:6px;height:120px;overflow-y:auto;line-height:1.5;">
-          <div style="color:var(--mono-400);">[System] Storage & Availability Mesh engine ready. Click 'Start Contributing Storage' to join as a Web4 node.</div>
-        </div>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+        <button onclick="startContributingModal()" style="flex: 1; padding: 12px; background: var(--mono-100); color: var(--mono-1000); border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">Start Contributing</button>
+        <button onclick="window.open('https://wallet-manager-flax.vercel.app', '_blank')" style="flex: 1; padding: 12px; background: transparent; border: var(--border); color: var(--mono-100); border-radius: 6px; font-weight: 600; cursor: pointer;">Connect Wallet to Claim Rewards</button>
+      </div>
+      <div style="text-align: center;">
+        <a href="#" onclick="event.preventDefault(); document.getElementById('contributor-modal-overlay').style.display='none'" style="font-size: 12px; color: var(--mono-400);">Skip for now</a>
       </div>
     </div>
   </div>
