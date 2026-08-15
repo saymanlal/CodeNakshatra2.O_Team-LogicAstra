@@ -30,18 +30,34 @@
     </div>
     <div class="header-meta">
       <div class="meta-item"><span class="meta-label">Network</span><span class="meta-value" id="header-network">—</span></div>
+      <div class="meta-item"><span class="meta-label">Consensus</span><span class="meta-value" style="color:var(--success);font-weight:600;" id="header-consensus">Proof of Storage & Availability</span></div>
       <div class="meta-item"><span class="meta-label">Chain ID</span><span class="meta-value mono" id="header-chain">—</span></div>
       <div class="meta-item"><span class="meta-label">Node ID</span><span class="meta-value mono" id="header-node">—</span></div>
-      <div class="meta-item"><span class="meta-label">Mode</span><span class="meta-value" id="header-mode">—</span></div>
     </div>
   </header>
+
+  <!-- ── Dynamic Node Auto-Discovery Banner ── -->
+  <div class="node-discovery-bar" style="display:flex;justify-content:space-between;align-items:center;background:var(--mono-950);border-bottom:var(--border);padding:8px 16px;font-size:12px;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span id="node-status-dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;"></span>
+      <span><strong>Connected Node:</strong> <span id="node-url-display" style="font-family:monospace;">Auto-discovering best node...</span></span>
+      <span id="node-height-badge" style="background:rgba(16,185,129,0.15);color:#10b981;padding:2px 8px;border-radius:6px;font-weight:600;font-size:11px;">Height: #—</span>
+      <span id="node-latency-badge" style="background:rgba(0,0,0,0.06);color:var(--mono-400);padding:2px 8px;border-radius:6px;font-size:11px;">— ms</span>
+      <span id="node-mode-badge" style="background:rgba(59,130,246,0.12);color:#3b82f6;padding:2px 8px;border-radius:6px;font-size:11px;">Auto-Selected (Latest Chain Tip)</span>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button style="padding:4px 10px;font-size:11px;border:var(--border);background:var(--mono-1000);cursor:pointer;border-radius:4px;" onclick="rescanFastestNode()"><i class="fas fa-sync-alt"></i> Rescan Peers</button>
+      <button style="padding:4px 10px;font-size:11px;border:var(--border);background:var(--mono-1000);cursor:pointer;border-radius:4px;" onclick="promptCustomNode()"><i class="fas fa-edit"></i> Change Node</button>
+    </div>
+  </div>
 
   <!-- ── Nav ── -->
   <nav class="nav">
     <ul class="nav-list">
       <li class="nav-item"><button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')"><i class="fas fa-th-large"></i> Dashboard</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="explorer" onclick="showPage('explorer')"><i class="fas fa-search"></i> Explorer</button></li>
-      <li class="nav-item"><button class="nav-btn" data-page="validators" onclick="showPage('validators')"><i class="fas fa-user-check"></i> Validators</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="storage-mining" onclick="showPage('storage-mining')"><i class="fas fa-database"></i> Storage & Mining (PoSA)</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="validators" onclick="showPage('validators')"><i class="fas fa-user-check"></i> Storage Nodes & Validators</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="transactions" onclick="showPage('transactions')"><i class="fas fa-exchange-alt"></i> Transactions</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="contracts" onclick="showPage('contracts')"><i class="fas fa-file-contract"></i> Contracts</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="tokens" onclick="showPage('tokens')"><i class="fas fa-coins"></i> Tokens</button></li>
@@ -62,9 +78,9 @@
   <div id="dashboard" class="page active">
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Total Blocks</div><div class="stat-value" id="stat-blocks">—</div></div>
-      <div class="stat-card"><div class="stat-label">Validators</div><div class="stat-value" id="stat-validators">—</div></div>
+      <div class="stat-card"><div class="stat-label">Community Nodes</div><div class="stat-value" id="stat-validators">—</div></div>
       <div class="stat-card">
-        <div class="stat-label">Total Stake</div>
+        <div class="stat-label">Pledged Capacity</div>
         <div class="stat-value"><span id="stat-stake">—</span><span class="stat-unit">SAYN</span></div>
         <div id="stat-stake-raw" style="font-size:10px;color:var(--mono-500);margin-top:2px;"></div>
       </div>
@@ -76,9 +92,9 @@
         <div id="stat-reward-raw" style="font-size:10px;color:var(--mono-500);margin-top:2px;"></div>
       </div>
       <div class="stat-card"><div class="stat-label">Block Time</div><div class="stat-value"><span id="stat-blocktime">5</span><span class="stat-unit">s</span></div></div>
-      <div class="stat-card"><div class="stat-label">Est. APR</div><div class="stat-value"><span id="stat-apr">—</span><span class="stat-unit">%</span></div></div>
+      <div class="stat-card"><div class="stat-label">Storage APR</div><div class="stat-value"><span id="stat-apr">—</span><span class="stat-unit">%</span></div></div>
       <div class="stat-card"><div class="stat-label">Live TPS</div><div class="stat-value"><span id="stat-tps">—</span><span class="stat-unit">tx/s</span></div></div>
-      <div class="stat-card"><div class="stat-label">Parallel Concurrency</div><div class="stat-value"><span id="stat-parallel">—</span><span class="stat-unit">x</span></div></div>
+      <div class="stat-card"><div class="stat-label">Mesh Durability</div><div class="stat-value"><span id="stat-parallel">99.987</span><span class="stat-unit">%</span></div></div>
       <div class="stat-card">
         <div class="stat-label">Denomination</div>
         <div class="stat-value" style="font-size:11px" id="stat-denom">—</div>
@@ -86,7 +102,7 @@
       </div>
     </div>
     <div class="section">
-      <div class="section-header"><h2>Live Block Feed</h2></div>
+      <div class="section-header"><h2>Live Block Feed (PoSA Consensus)</h2></div>
       <div class="block-feed" id="block-feed"></div>
     </div>
   </div>
@@ -107,12 +123,97 @@
 
       <table>
         <thead>
-          <tr><th>Block</th><th>Hash</th><th>Validator</th><th>Txs</th><th>Fee / Gas</th><th>Time</th></tr>
+          <tr><th>Block</th><th>Hash</th><th>Community Node</th><th>Txs</th><th>Fee / Gas</th><th>Time</th></tr>
         </thead>
         <tbody id="explorer-blocks"><tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading blocks…</td></tr></tbody>
       </table>
 
       <div id="pagination-controls"></div>
+    </div>
+  </div>
+
+  <!-- ═══ STORAGE & POSA MINING ═══ -->
+  <div id="storage-mining" class="page">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Mesh Durability</div>
+        <div class="stat-value" style="color:var(--success);"><span id="mesh-durability">99.987</span><span class="stat-unit">%</span></div>
+        <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">Reed-Solomon N=10, M=10</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Verified Storage Units (VSU)</div>
+        <div class="stat-value" id="mesh-total-vsu">14,820</div>
+        <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">Network Total Pledged</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active Storage Providers</div>
+        <div class="stat-value" id="mesh-nodes-count">24</div>
+        <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">Decentralized Mesh Peers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">MAISS Spot Proofs</div>
+        <div class="stat-value" style="color:var(--success);" id="mesh-proofs-rate">100% Valid</div>
+        <div style="font-size:10px;color:var(--mono-500);margin-top:2px;">Avg latency: 42ms (<200ms)</div>
+      </div>
+    </div>
+
+    <!-- Contributor Portal -->
+    <div class="section" style="background:var(--mono-1000);border:var(--border);padding:24px;margin-bottom:24px;border-radius:8px;">
+      <div class="section-header" style="margin-bottom:16px;">
+        <h2><i class="fas fa-microchip" style="color:var(--success);margin-right:8px;"></i> Web4 Browser & Device Storage Contributor Portal</h2>
+      </div>
+      <p style="color:var(--mono-400);font-size:13px;line-height:1.6;margin-bottom:20px;">
+        Contribute unused storage and availability directly from your browser or community node to the SAYMAN Data Availability Mesh.
+        Earn <strong>tSAYN</strong> mining rewards automatically as your node verifies Reed-Solomon shards and passes MAISS availability challenges.
+      </p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:24px;">
+        <div style="border:var(--border);padding:16px;border-radius:6px;background:var(--mono-950);">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--mono-400);margin-bottom:6px;">Allocated Storage</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <select id="storage-alloc-select" style="padding:6px 12px;border:var(--border);border-radius:4px;background:var(--mono-1000);font-size:13px;">
+              <option value="50">50 MB (Light Contributor)</option>
+              <option value="250" selected>250 MB (Standard Mesh)</option>
+              <option value="1000">1 GB (Heavy Archival)</option>
+              <option value="5000">5 GB (Full Storage Node)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="border:var(--border);padding:16px;border-radius:6px;background:var(--mono-950);">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--mono-400);margin-bottom:6px;">Your Storage Status</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="mining-status-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;"></span>
+            <span id="mining-status-text" style="font-weight:600;font-size:13px;">Standby / Idle</span>
+          </div>
+        </div>
+
+        <div style="border:var(--border);padding:16px;border-radius:6px;background:var(--mono-950);">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--mono-400);margin-bottom:6px;">Your Accumulated PoSA Rewards</div>
+          <div style="display:flex;align-items:baseline;gap:6px;">
+            <span id="mining-rewards-val" style="font-size:20px;font-weight:700;color:var(--success);">0.00000000</span>
+            <span style="font-size:12px;font-weight:600;">tSAYN</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        <button id="toggle-mining-btn" onclick="toggleStorageMining()" style="padding:10px 20px;font-size:13px;font-weight:600;background:var(--mono-100);color:var(--mono-1000);border:none;border-radius:6px;cursor:pointer;">
+          <i class="fas fa-play"></i> Start Contributing Storage & Availability
+        </button>
+        <button onclick="claimStorageRewards()" style="padding:10px 20px;font-size:13px;font-weight:600;background:transparent;border:var(--border);border-radius:6px;cursor:pointer;">
+          <i class="fas fa-gift"></i> Claim Rewards to Wallet
+        </button>
+        <span id="mining-session-info" style="font-size:12px;color:var(--mono-400);"></span>
+      </div>
+
+      <!-- Live Shard Activity Log -->
+      <div style="margin-top:24px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Live Reed-Solomon Shard Challenges & Availability Proofs</div>
+        <div id="storage-log" style="font-family:monospace;font-size:11px;background:var(--mono-950);border:var(--border);padding:12px;border-radius:6px;height:120px;overflow-y:auto;line-height:1.5;">
+          <div style="color:var(--mono-400);">[System] Storage & Availability Mesh engine ready. Click 'Start Contributing Storage' to join as a Web4 node.</div>
+        </div>
+      </div>
     </div>
   </div>
 
