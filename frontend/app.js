@@ -72,6 +72,11 @@ async function autoDiscoverBestNode() {
       const res = await fetch(`${cleanUrl}/api/stats`, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
+        // Critical: reject HTML (Vercel SPA rewrites, nginx defaults, etc.)
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+          return { url: cleanUrl, height: -1, latency: Infinity, ok: false };
+        }
         const data = await res.json();
         const latency = Date.now() - startTime;
         const height = data.totalBlocks || data.height || 0;
@@ -102,10 +107,13 @@ async function autoDiscoverBestNode() {
     API = `${activeNodeUrl}/api`;
     console.log(`🚀 Auto-selected fastest canonical node: ${activeNodeUrl} (Height: #${activeNodeHeight}, Latency: ${activeNodeLatency}ms)`);
   } else {
-    // Fallback to relative /api
-    API = '/api';
-    activeNodeUrl = window.location.origin;
-    activeNodeLatency = 12;
+    // No live community nodes found — honest offline state
+    API = '';
+    activeNodeUrl = '';
+    activeNodeLatency = 0;
+    setNetState('OFFLINE');
+    console.warn('⚠️ No community nodes reachable. Explorer is offline. Use "Rescan Peers" or "Change Node" to connect.');
+    return;
   }
 
   updateNodeDiscoveryUI();
@@ -151,77 +159,76 @@ window.promptCustomNode = function() {
   }
 };
 
-// ── Automatic Web4 Community Storage & PoSA Mining Engine ─────────────────────
+// ── Browser Community Node Identity & Tier Detection ─────────────────────────
+// IMPORTANT: Browser nodes are NOT permanent archival nodes.
+// Browser storage can be evicted. Tabs can be killed.
+// Tier 0 = Observer (read-only), Tier 1 = Ephemeral (relay + temp cache).
+// Tier 2+ requires a persistent community node (desktop/server).
 function initAutomaticStorageContributor() {
-  const logEl = document.getElementById('storage-log');
+  // Generate or load persistent browser node identity
+  let nodeId = localStorage.getItem('sayman_browser_node_id');
+  if (!nodeId) {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    nodeId = 'browser-' + Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+    localStorage.setItem('sayman_browser_node_id', nodeId);
+  }
+
+  // Detect actual browser capabilities
+  const hasIndexedDB = typeof indexedDB !== 'undefined';
+  const hasWebCrypto = typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined';
+  const hasWebSocket = typeof WebSocket !== 'undefined';
+  const hasServiceWorker = 'serviceWorker' in navigator;
+
+  let tier, tierLabel, tierColor;
+  if (hasIndexedDB && hasWebCrypto && hasWebSocket) {
+    tier = 1;
+    tierLabel = 'Tier 1 — Ephemeral Community Node (Relay + Verify)';
+    tierColor = '#10b981';
+  } else {
+    tier = 0;
+    tierLabel = 'Tier 0 — Observer (Read-only)';
+    tierColor = '#f59e0b';
+  }
+
   const statusText = document.getElementById('mining-status-text');
   const statusDot = document.getElementById('mining-status-dot');
   const toggleBtn = document.getElementById('toggle-mining-btn');
   const rewardsEl = document.getElementById('mining-rewards-val');
+  const logBox = document.getElementById('storage-log');
 
-  if (statusText) statusText.textContent = 'Active (Contributing Storage & Availability)';
-  if (statusDot) statusDot.style.background = '#10b981';
-  if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-pause"></i> Pause Contribution';
-  if (rewardsEl) rewardsEl.textContent = accumulatedRewards.toFixed(8);
+  if (statusText) statusText.textContent = tier >= 1 ? 'Active — Ephemeral Community Node' : 'Observer Mode';
+  if (statusDot) statusDot.style.background = tierColor;
+  if (toggleBtn) {
+    toggleBtn.innerHTML = tier >= 1
+      ? '<i class="fas fa-info-circle"></i> Tier 1 Participant'
+      : '<i class="fas fa-eye"></i> Observer';
+    toggleBtn.onclick = window.toggleStorageMining;
+  }
 
-  if (miningInterval) clearInterval(miningInterval);
+  // Rewards come ONLY from real protocol events — never incremented locally
+  if (rewardsEl) rewardsEl.textContent = '0.00000000 tSAYN (connect wallet to view on-chain rewards)';
 
-  miningInterval = setInterval(() => {
-    if (!isMiningActive) return;
-
-    // Simulate Reed-Solomon shard verification and MAISS availability challenge
-    verifiedShardsCount++;
-    const rewardIncrement = 0.000025; // Continuous micro-reward per proof
-    accumulatedRewards += rewardIncrement;
-    localStorage.setItem('sayman_posa_rewards', accumulatedRewards.toFixed(8));
-
-    if (rewardsEl) rewardsEl.textContent = accumulatedRewards.toFixed(8);
-
-    const logBox = document.getElementById('storage-log');
-    if (logBox && verifiedShardsCount % 2 === 0) {
-      const shardId = Math.floor(Math.random() * 20);
-      const latency = 25 + Math.floor(Math.random() * 35);
-      const blobHash = '0x' + Array.from({length: 8}, () => Math.floor(Math.random()*16).toString(16)).join('');
-      const timeStr = new Date().toLocaleTimeString();
-      const logLine = document.createElement('div');
-      logLine.style.color = '#10b981';
-      logLine.innerHTML = `[${timeStr}] <i class="fas fa-check-circle"></i> MAISS Proof verified for Blob ${blobHash} (Shard #${shardId}/20) · Response: ${latency}ms (<200ms) · +${rewardIncrement.toFixed(6)} tSAYN`;
-      logBox.insertBefore(logLine, logBox.firstChild);
-      if (logBox.children.length > 30) logBox.removeChild(logBox.lastChild);
-    }
-  }, 2500);
+  if (logBox) {
+    logBox.innerHTML = [
+      `<div style="color:var(--mono-400);font-size:11px;">[${new Date().toLocaleTimeString()}] Browser node initialized · ID: ${nodeId}</div>`,
+      `<div style="color:${tierColor};font-size:11px;">[${new Date().toLocaleTimeString()}] Contribution tier: ${tierLabel}</div>`,
+      `<div style="color:var(--mono-400);font-size:11px;">[${new Date().toLocaleTimeString()}] Capabilities: IndexedDB=${hasIndexedDB} WebCrypto=${hasWebCrypto} WebSocket=${hasWebSocket} ServiceWorker=${hasServiceWorker}</div>`,
+      `<div style="color:var(--mono-500);font-size:10px;margin-top:8px;line-height:1.5;">Note: Browser storage is ephemeral and may be evicted by the OS. Storage rewards require a Tier 2+ persistent community node. See documentation for community node setup.</div>`,
+    ].join('');
+  }
 }
 
 window.toggleStorageMining = function() {
-  isMiningActive = !isMiningActive;
-  const statusText = document.getElementById('mining-status-text');
-  const statusDot = document.getElementById('mining-status-dot');
-  const toggleBtn = document.getElementById('toggle-mining-btn');
-
-  if (isMiningActive) {
-    if (statusText) statusText.textContent = 'Active (Contributing Storage & Availability)';
-    if (statusDot) statusDot.style.background = '#10b981';
-    if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-pause"></i> Pause Contribution';
-    showNotification('Storage & Availability contribution resumed!');
-  } else {
-    if (statusText) statusText.textContent = 'Paused / Standby';
-    if (statusDot) statusDot.style.background = '#f59e0b';
-    if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-play"></i> Start Contributing Storage';
-    showNotification('Storage contribution paused.');
-  }
+  // Browser nodes are Tier 0 or Tier 1 — they do not produce fake storage rewards
+  // Real storage rewards require a Tier 2+ persistent community node
+  alert('Browser nodes participate as Tier 0 (Observer) or Tier 1 (Ephemeral relay).\n\nTo earn storage rewards, run a persistent SAYMAN community node (Tier 2+).\nSee the documentation for community node setup: https://docs-plum-six.vercel.app');
 };
 
 window.claimStorageRewards = function() {
-  if (accumulatedRewards <= 0) {
-    showNotification('No rewards accumulated yet.');
-    return;
-  }
-  const amt = accumulatedRewards.toFixed(8);
-  accumulatedRewards = 0;
-  localStorage.setItem('sayman_posa_rewards', '0.00000000');
-  const rewardsEl = document.getElementById('mining-rewards-val');
-  if (rewardsEl) rewardsEl.textContent = '0.00000000';
-  showNotification(`✓ Successfully claimed ${amt} tSAYN storage rewards!`);
+  // Rewards can only be claimed via a real on-chain transaction signed by your wallet.
+  // The claim submits a reward settlement transaction to the network.
+  alert('To claim storage rewards:\n\n1. Open the SAYMAN Wallet\n2. Connect to a community node\n3. Submit a reward claim transaction\n\nRewards are settled on-chain and are NOT incremented by the browser UI.');
 };
 
 async function loadExplorerEnv() {
@@ -1524,10 +1531,66 @@ function renderPeers(peers) {
 }
 
 // ── API helper ────────────────────────────────────────────────────────────────
+// ── Network State Machine ─────────────────────────────────────────────────────
+// States: CONNECTING | CONNECTED | OFFLINE
+// This drives honest UI feedback instead of silent loading spinners.
+let NET_STATE = 'CONNECTING';
+function setNetState(state) {
+  if (NET_STATE === state) return;
+  NET_STATE = state;
+  const dot = document.getElementById('node-status-dot');
+  const modeBadge = document.getElementById('node-mode-badge');
+  const urlEl = document.getElementById('node-url-display');
+  if (state === 'CONNECTED') {
+    if (dot) dot.style.background = '#10b981';
+    if (modeBadge) { modeBadge.textContent = 'Connected · Live'; modeBadge.style.color = '#10b981'; modeBadge.style.background = 'rgba(16,185,129,0.12)'; }
+  } else if (state === 'CONNECTING') {
+    if (dot) dot.style.background = '#f59e0b';
+    if (modeBadge) { modeBadge.textContent = 'Discovering peers…'; modeBadge.style.color = '#f59e0b'; modeBadge.style.background = 'rgba(245,158,11,0.12)'; }
+  } else if (state === 'OFFLINE') {
+    if (dot) dot.style.background = '#ef4444';
+    if (urlEl) urlEl.textContent = 'No community nodes reachable';
+    if (modeBadge) { modeBadge.textContent = 'Network Unavailable'; modeBadge.style.color = '#ef4444'; modeBadge.style.background = 'rgba(239,68,68,0.12)'; }
+    // Propagate offline state to all loading indicators
+    const offlineMsg = '<tr><td colspan="9" style="padding:24px;text-align:center;color:#ef4444;font-size:12px;">⚠️ Network unavailable — no community nodes reachable. <a href="#" onclick="rescanFastestNode();return false;">Retry</a></td></tr>';
+    ['explorer-blocks','validator-list','tx-list','contract-list'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.querySelectorAll('tr').length <= 1) el.innerHTML = offlineMsg;
+    });
+    const bf = document.getElementById('block-feed');
+    if (bf && bf.children.length === 0) bf.innerHTML = '<div style="padding:24px;text-align:center;color:#ef4444;font-size:12px;">⚠️ No community node reachable — <a href="#" onclick="rescanFastestNode();return false;">Retry connection</a></div>';
+  }
+}
+
 async function apiFetch(path) {
-  const res = await fetch(API + path);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  if (!API) {
+    setNetState('OFFLINE');
+    throw new Error('No community node configured. Use "Rescan Peers" or "Change Node" to connect.');
+  }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(API + path, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // Critical: reject HTML responses (e.g. Vercel SPA rewrites returning index.html)
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      throw new Error(`Node returned ${ct.split(';')[0].trim()} instead of JSON — this URL is not a SAYMAN community node`);
+    }
+    const data = await res.json();
+    if (NET_STATE !== 'CONNECTED') setNetState('CONNECTED');
+    return data;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') throw new Error('Request timed out — community node may be unreachable');
+    // If we were connected and now get errors, trigger re-discovery
+    if (NET_STATE === 'CONNECTED') {
+      setNetState('CONNECTING');
+      autoDiscoverBestNode().catch(() => setNetState('OFFLINE'));
+    }
+    throw err;
+  }
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
