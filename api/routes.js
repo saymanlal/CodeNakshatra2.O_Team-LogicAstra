@@ -120,6 +120,87 @@ export function setupRoutes(app, blockchain, p2pServer, config) {
     }
   });
 
+  // ─── Batch Range query for Explorer Range Synchronization ──────────────────
+  router.get(['/block-range', '/blocks/range'], async (req, res) => {
+    try {
+      cache(res, 5);
+      const start = parseInt(req.query.start || req.query.from || 0);
+      const end = parseInt(req.query.end || req.query.to || (start + 49));
+      const blocks = await blockchain.getBlockRange(start, end);
+      res.json({
+        start,
+        end,
+        total: blocks.length,
+        blocks: blocks.map(normalizeBlockForApi)
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/blocks/range/:start/:end', async (req, res) => {
+    try {
+      cache(res, 5);
+      const start = parseInt(req.params.start);
+      const end = parseInt(req.params.end);
+      const blocks = await blockchain.getBlockRange(start, end);
+      res.json({
+        start,
+        end,
+        total: blocks.length,
+        blocks: blocks.map(normalizeBlockForApi)
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── Community Nodes: Live decentralized network participants ──────────────
+  router.get('/community-nodes', (req, res) => {
+    try {
+      const nodes = [];
+      const localNodeId = p2pServer ? p2pServer.nodeId : 'local-node';
+      
+      // Local node
+      nodes.push({
+        nodeId: localNodeId,
+        role: process.env.NODE_MODE === 'validator' ? 'Validator' : 'Community Node',
+        status: 'ONLINE',
+        isLocal: true,
+        height: blockchain.chain.length,
+        storageMB: 250,
+        reputation: 1000,
+        latency: 0,
+        blocksProduced: blockchain.chain.length
+      });
+
+      // P2P connected peers
+      if (p2pServer && p2pServer.peers) {
+        for (const [id, peer] of p2pServer.peers.entries()) {
+          nodes.push({
+            nodeId: peer.nodeId || `peer-${id.slice(0, 8)}`,
+            role: 'Relay & Storage Contributor',
+            status: peer.ws?.readyState === 1 ? 'ACTIVE' : 'WARNING',
+            isLocal: false,
+            height: peer.chainHeight || 0,
+            storageMB: 250,
+            reputation: peer.reputation || 500,
+            latency: peer.lastSeen ? Math.max(1, Date.now() - peer.lastSeen) : 25,
+            url: peer.url || 'inbound'
+          });
+        }
+      }
+
+      res.json({
+        total: nodes.length,
+        active: nodes.filter(n => n.status === 'ONLINE' || n.status === 'ACTIVE').length,
+        nodes
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Single block by index (legacy)
   router.get('/blocks/:index', async (req, res) => {
     try {

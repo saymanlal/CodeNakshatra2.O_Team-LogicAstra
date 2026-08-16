@@ -115,10 +115,12 @@ export default {
     githubRepo: 'sayman-archive',
     githubBranch: 'main',
     githubToken: process.env.GITHUB_TOKEN,  // MUST be env variable
-    batchSize: 1000,
+    batchSize: 100,          // Push every 100 blocks (testnet-friendly)
+    archiveMinBatch: 10,     // Partial flush if ≥10 blocks ready
     compressionEnabled: true,
-    useCDN: true,
-    ipfsGateway: null,  // optional: 'https://ipfs.io/ipfs/',
-    migrationCheckpoint: './data/migration-checkpoint.json'
+    useCDN: false,           // Use direct GitHub API (private repo, no CDN)
+    ipfsGateway: null,
+    migrationCheckpoint: './data/migration-checkpoint.json',
+    archiveCacheDir: './data/archive-cache'
   }
 };

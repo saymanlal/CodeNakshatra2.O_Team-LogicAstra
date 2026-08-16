@@ -134,68 +134,62 @@ export class GithubClient {
     }
   }
 
-  async readFile(path, repoName = this.repo, bypassCDN = false) {
-    if (bypassCDN) {
+  async readFile(filePath, repoName = this.repo, bypassCDN = false) {
+    // For private repos (token present + CDN disabled), always use GitHub API directly
+    const forceApi = !this.useCDN || bypassCDN;
+
+    if (forceApi) {
       try {
         await this._preRequestCheck();
         const res = await this.octokit.repos.getContent({
           owner: this.owner,
           repo: repoName,
-          path,
+          path: filePath,
           ref: this.branch
         });
-
         if (res.data && res.data.content) {
           const content = Buffer.from(res.data.content, 'base64').toString('utf8');
-          try {
-            return JSON.parse(content);
-          } catch {
-            return content;
-          }
+          try { return JSON.parse(content); } catch { return content; }
         }
-        throw new Error(`No content found at ${path}`);
+        throw new Error(`No content found at ${filePath}`);
       } catch (err) {
-        console.warn(`[GitHub Client] Real-time read failed for ${path}: ${err.message}. Falling back to CDN...`);
+        if (bypassCDN) {
+          // bypassCDN means: caller wants real-time, no CDN. If API also fails, rethrow.
+          throw new Error(`[GitHub Client] API read failed for ${filePath}: ${err.message}`);
+        }
+        console.warn(`[GitHub Client] API read failed for ${filePath}: ${err.message}`);
+        // fall through to CDN attempt
       }
     }
 
     if (this.useCDN) {
-      const cdnUrl = `https://cdn.jsdelivr.net/gh/${this.owner}/${repoName}@${this.branch}/${path}`;
+      const cdnUrl = `https://cdn.jsdelivr.net/gh/${this.owner}/${repoName}@${this.branch}/${filePath}`;
       try {
         const res = await fetch(cdnUrl);
         if (res.ok) {
           const text = await res.text();
-          try {
-            return JSON.parse(text);
-          } catch {
-            return text;
-          }
+          try { return JSON.parse(text); } catch { return text; }
         }
-        console.warn(`[GitHub Client] CDN read failed for ${path} (${res.status}). Falling back to raw GitHub API...`);
+        console.warn(`[GitHub Client] CDN read failed for ${filePath} (${res.status}). Falling back to GitHub API...`);
       } catch (err) {
-        console.warn(`[GitHub Client] CDN read error for ${path}: ${err.message}. Falling back to raw GitHub API...`);
+        console.warn(`[GitHub Client] CDN error for ${filePath}: ${err.message}. Falling back to GitHub API...`);
       }
     }
 
-    // Fallback: GitHub API
+    // Final fallback: GitHub API
     try {
       await this._preRequestCheck();
       const res = await this.octokit.repos.getContent({
         owner: this.owner,
         repo: repoName,
-        path,
+        path: filePath,
         ref: this.branch
       });
-
       if (res.data && res.data.content) {
         const content = Buffer.from(res.data.content, 'base64').toString('utf8');
-        try {
-          return JSON.parse(content);
-        } catch {
-          return content;
-        }
+        try { return JSON.parse(content); } catch { return content; }
       }
-      throw new Error(`No content found at ${path}`);
+      throw new Error(`No content found at ${filePath}`);
     } catch (err) {
       throw new Error(`Failed to read file from GitHub: ${err.message}`);
     }

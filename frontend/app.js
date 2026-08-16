@@ -33,98 +33,87 @@ let allPeers       = [];
 
 // ── Dynamic Node Auto-Discovery & PoSA Storage Contributor Engine ─────────────
 const COMMUNITY_SEEDS = [
-  'https://sayman-blockchain.onrender.com',
-  'https://sayman.onrender.com',
-  'https://sayman.up.railway.app',
+  (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '',
   'http://localhost:3000',
-  'http://localhost:10000'
-];
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://localhost:10000',
+  'https://sayman-blockchain.onrender.com',
+  'https://sayman.up.railway.app'
+].filter((url, i, arr) => url && typeof url === 'string' && url.startsWith('http') && arr.indexOf(url) === i);
 
 let activeNodeUrl = '';
-let activeNodeHeight = 145;
-let activeNodeLatency = 35;
+let activeNodeHeight = 0;
+let activeNodeLatency = 0;
 
-// Storage Node State (Automatic Web4 Community Contributor)
+// Storage Node State (Genuine Community Contributor)
 let isMiningActive = false;
 let allocatedStorageMB = 250;
 let miningInterval = null;
 let miningTickerInterval = null;
 let verifiedShardsCount = 0;
 let uptimeSeconds = 0;
-let rewardRate = 0.0004; // tSAYN per MB per day
+let engineInterval = null;
 
-// ── Web4 Local P2P Mesh State (Fallback & Edge Ledger) ────────────────────────
-const localMeshState = {
-  network: 'Sayman Public Testnet (Web4 Mesh)',
-  chainId: 'sayman-public-testnet-1',
-  decimals: 100000000,
-  ticker: 'tSAYN',
-  nativeCurrency: { name: 'Sayman Testnet Token', symbol: 'tSAYN', decimals: 18 },
-  blockTime: 5000,
-  blockReward: 1000000000,
-  blocks: [
-    { index: 145, chainId: 'sayman-public-testnet-1', hash: '0x8f2c3d4e5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d', previousHash: '0x0000000000000000000000000000000000000000000000000000000000000000', timestamp: Date.now() - 3000, transactions: [], validator: null, gasUsed: 0, fee: 0 },
-    { index: 144, chainId: 'sayman-public-testnet-1', hash: '0x7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f', previousHash: '0x8f2c3d4e5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d', timestamp: Date.now() - 8000, transactions: [], validator: null, gasUsed: 0, fee: 0 },
-    { index: 143, chainId: 'sayman-public-testnet-1', hash: '0x6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e', previousHash: '0x7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f', timestamp: Date.now() - 13000, transactions: [], validator: null, gasUsed: 0, fee: 0 },
-    { index: 142, chainId: 'sayman-public-testnet-1', hash: '0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', previousHash: '0x6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e', timestamp: Date.now() - 18000, transactions: [], validator: null, gasUsed: 0, fee: 0 },
-    { index: 141, chainId: 'sayman-public-testnet-1', hash: '0x4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c', previousHash: '0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', timestamp: Date.now() - 23000, transactions: [], validator: null, gasUsed: 0, fee: 0 }
-  ],
-  // ─ Validators: dynamically returns ONLY the user's own browser contributor node ─
-  get validators() {
-    const nodeId = localStorage.getItem('sayman_browser_node_id');
-    const isContributor = localStorage.getItem('sayman_contributor_onboarded') === 'true';
-    if (!nodeId || !isContributor) return [];
-    const alloc = parseInt(localStorage.getItem('sayman_contributor_alloc') || '250', 10);
-    return [{
-      address: nodeId,
-      stake: alloc * 100000,
-      baseUnits: alloc * 100000,
-      share: 100,
-      reputation: 1000,
-      missedBlocks: 0,
-      status: 'Active',
-      nodeType: 'Browser Contributor Node (This Device)'
-    }];
-  },
-  // ─ Only the native genesis token — no fake tokens ─
-  tokens: [
-    { name: 'Sayman Testnet Token', symbol: 'tSAYN', address: '0x0000000000000000000000000000000000000001', totalSupply: 21000000, holderCount: 1, type: 'Native Layer-1 (Genesis)' }
-  ],
-  // ─ Empty until real on-chain activity ─
-  nfts: [],
-  memecoins: [],
-  contracts: [],
-  layers: []
-};
+// ── Explorer Sync Manager (Gap Detection & Range Sync) ─────────────────────────
+class ExplorerSyncManager {
+  constructor() {
+    this.blocksCache = new Map();
+    this.latestHeight = 0;
+    this.isSyncing = false;
+    this.gapQueue = new Set();
+  }
 
-// Automatic local block production ticker for Web4 Edge Mesh mode
-setInterval(() => {
-  if (!activeNodeUrl || activeNodeUrl.includes('Web4 P2P Mesh')) {
-    const lastBlock = localMeshState.blocks[0];
-    const newIndex = (lastBlock ? lastBlock.index : 145) + 1;
-    const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2,'0')).join('');
-    const nodeId = localStorage.getItem('sayman_browser_node_id') || null;
-    const newBlock = {
-      index: newIndex,
-      chainId: 'sayman-public-testnet-1',
-      hash: '0x' + randomHex,
-      previousHash: lastBlock ? lastBlock.hash : '0x0000000000000000000000000000000000000000000000000000000000000000',
-      timestamp: Date.now(),
-      transactions: [],
-      validator: nodeId,
-      gasUsed: 0,
-      fee: 0
-    };
-    localMeshState.blocks.unshift(newBlock);
-    if (localMeshState.blocks.length > 50) localMeshState.blocks.pop();
-    activeNodeHeight = newIndex;
-    updateNodeDiscoveryUI();
-    const curPage = document.querySelector('.page.active');
-    if (curPage && curPage.id === 'dashboard') {
-      loadDashboard();
+  async syncRange(start, end) {
+    if (!API) return [];
+    try {
+      const res = await fetch(`${API}/blocks/range/${start}/${end}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      const blocks = data.blocks || [];
+      blocks.forEach(b => this.blocksCache.set(b.index, b));
+      return blocks;
+    } catch (e) {
+      return [];
     }
   }
-}, 5000);
+
+  detectGaps(blocks) {
+    if (!blocks || blocks.length < 2) return [];
+    const sorted = [...blocks].sort((a, b) => a.index - b.index);
+    const missing = [];
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const cur = sorted[i].index;
+      const next = sorted[i + 1].index;
+      if (next > cur + 1) {
+        for (let g = cur + 1; g < next; g++) {
+          missing.push(g);
+        }
+      }
+    }
+    return missing;
+  }
+
+  async recoverGaps(missingIndices) {
+    if (!missingIndices.length || !API) return [];
+    const recovered = [];
+    for (const idx of missingIndices) {
+      try {
+        const res = await fetch(`${API}/block/${idx}`);
+        if (res.ok) {
+          const b = await res.json();
+          if (b && b.index === idx) {
+            this.blocksCache.set(idx, b);
+            recovered.push(b);
+          }
+        }
+      } catch (e) {}
+    }
+    return recovered;
+  }
+}
+
+const syncManager = new ExplorerSyncManager();
 
 async function autoDiscoverBestNode() {
   const custom = localStorage.getItem('sayman_explorer_node');
@@ -142,7 +131,7 @@ async function autoDiscoverBestNode() {
     const startTime = Date.now();
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
       const res = await fetch(`${cleanUrl}/api/stats`, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
@@ -152,11 +141,11 @@ async function autoDiscoverBestNode() {
         }
         const data = await res.json();
         const latency = Date.now() - startTime;
-        const height = data.totalBlocks || data.height || 0;
+        const height = data.totalBlocks || data.blocks || data.height || 0;
         return { url: cleanUrl, height, latency, ok: true };
       }
     } catch (e) {
-      // Node unreachable or timeout
+      // Node unreachable
     }
     return { url: cleanUrl, height: -1, latency: Infinity, ok: false };
   });
@@ -180,10 +169,10 @@ async function autoDiscoverBestNode() {
     setNetState('ONLINE');
   } else {
     API = '';
-    activeNodeUrl = 'Web4 P2P Mesh (Local Edge Node)';
-    activeNodeHeight = localMeshState.blocks[0].index;
-    activeNodeLatency = 12;
-    setNetState('MESH_EDGE');
+    activeNodeUrl = 'No community node reachable';
+    activeNodeHeight = 0;
+    activeNodeLatency = 0;
+    setNetState('OFFLINE');
   }
 
   updateNodeDiscoveryUI();
@@ -195,10 +184,12 @@ function updateNodeDiscoveryUI() {
   const latencyEl = document.getElementById('node-latency-badge');
   const dotEl = document.getElementById('node-status-dot');
 
-  if (urlEl) urlEl.textContent = activeNodeUrl || 'Web4 P2P Mesh Node';
-  if (heightEl) heightEl.textContent = activeNodeHeight > 0 ? `Height: #${activeNodeHeight}` : 'Height: #Syncing';
-  if (latencyEl) latencyEl.textContent = `${activeNodeLatency} ms`;
-  if (dotEl) dotEl.style.background = '#10b981';
+  if (urlEl) urlEl.textContent = activeNodeUrl || 'Scanning community peers...';
+  if (heightEl) heightEl.textContent = activeNodeHeight > 0 ? `Height: #${activeNodeHeight}` : (API ? 'Height: #Syncing' : 'Height: —');
+  if (latencyEl) latencyEl.textContent = activeNodeLatency > 0 ? `${activeNodeLatency} ms` : '— ms';
+  if (dotEl) {
+    dotEl.style.background = API ? '#10b981' : '#ef4444';
+  }
 }
 
 window.rescanFastestNode = async function() {
@@ -207,12 +198,12 @@ window.rescanFastestNode = async function() {
   await autoDiscoverBestNode();
   await loadNetworkConfig();
   poll();
-  showNotification('Auto-discovered & synced with network mesh!');
+  showNotification(API ? 'Connected to community node!' : 'No community nodes reachable');
 };
 
 window.promptCustomNode = function() {
   const current = localStorage.getItem('sayman_explorer_node') || (activeNodeUrl.startsWith('http') ? activeNodeUrl : '');
-  const input = prompt('Enter community node URL (e.g. https://node.sayman.network):', current);
+  const input = prompt('Enter community node URL (e.g. http://localhost:3000 or https://node.sayman.network):', current);
   if (input !== null) {
     if (input.trim()) {
       localStorage.setItem('sayman_explorer_node', input.trim());
@@ -261,38 +252,67 @@ function startContributorEngine() {
   if (engineInterval || miningTickerInterval) return;
   isMiningActive = true;
   updateContributorUI();
-  
+
+  const nodeId = localStorage.getItem('sayman_browser_node_id');
+  const isPermanent = localStorage.getItem('sayman_contributor_permanent') === 'true';
+  const alloc = parseInt(localStorage.getItem('sayman_contributor_alloc') || '250', 10);
+
   if (navigator.storage && navigator.storage.persist) {
     navigator.storage.persist().then(granted => {
-      logStorage(`[StorageManager] Persistent storage granted: ${granted}`);
+      logStorage(`[StorageManager] Browser persistent storage granted: ${granted}`);
     });
   }
+
+  // Register contributor with connected node if online
+  if (API && nodeId) {
+    fetch(`${API}/contributor/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nodeId,
+        storageMB: alloc,
+        tier: isPermanent ? 'Permanent (Tier 2+)' : 'Standard (Tier 1)',
+        permanent: isPermanent
+      })
+    }).then(res => res.json()).then(data => {
+      logStorage(`[System] Contributor node registered with network (Node ID: ${nodeId.slice(0, 12)}...)`);
+    }).catch(() => {});
+  }
   
-  // Real-time 1-second ticker for smooth uptime and live rewards
+  // Real-time 1-second ticker for uptime
   miningTickerInterval = setInterval(() => {
     if (!isMiningActive) return;
     uptimeSeconds += 1;
     updateContributorUI();
   }, 1000);
 
-  // Periodic MAISS challenge verifications every 10 seconds
-  engineInterval = setInterval(() => {
-    if (!isMiningActive) return;
-    const challengeId = Math.random().toString(16).slice(2, 10);
-    const ms = Math.floor(Math.random() * 40) + 12;
-    logStorage(`[MAISS] Shard challenge ${challengeId} passed in ${ms}ms. Availability verified.`);
-    verifiedShardsCount++;
-    updateContributorUI();
-  }, 10000);
+  // Periodic cryptographic challenge against connected node every 30 seconds
+  engineInterval = setInterval(async () => {
+    if (!isMiningActive || !API || !nodeId) return;
+    try {
+      const res = await fetch(`${API}/contributor/challenge/${nodeId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeSeed: Date.now() })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        verifiedShardsCount++;
+        logStorage(`[StorageMesh] Integrity challenge passed. Proof leaf #${data.leafIndex} verified.`);
+        updateContributorUI();
+      }
+    } catch (e) {}
+  }, 30000);
 
-  logStorage(`[System] Engine started. Relay + verify mode active.`);
+  logStorage(`[System] Community storage contributor active.`);
 }
 
 function updateContributorUI() {
   const isPermanent = localStorage.getItem('sayman_contributor_permanent') === 'true';
+  const nodeId = localStorage.getItem('sayman_browser_node_id');
   
   const nodeIdEl = document.getElementById('mining-node-id');
-  if (nodeIdEl) nodeIdEl.textContent = localStorage.getItem('sayman_browser_node_id') || '—';
+  if (nodeIdEl) nodeIdEl.textContent = nodeId || '—';
   
   const tierLabel = document.getElementById('mining-tier-label');
   if (tierLabel) tierLabel.textContent = isPermanent ? 'Permanent Node (Tier 2+)' : 'Browser Node (Tier 1)';
@@ -326,7 +346,7 @@ function updateContributorUI() {
   const rewardsEl = document.getElementById('mining-rewards-val');
   if (rewardsEl) {
     const uptimeFraction = uptimeSeconds / 86400; // fraction of day
-    const est = (allocatedStorageMB * rewardRate * Math.max(uptimeFraction, 0.00001)).toFixed(8);
+    const est = (allocatedStorageMB * 0.0004 * Math.max(uptimeFraction, 0.00001)).toFixed(8);
     rewardsEl.textContent = est;
     const claimVal = document.getElementById('claim-pending-val');
     if (claimVal) claimVal.textContent = est;
@@ -720,16 +740,17 @@ function showPage(pageId) {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 async function loadDashboard() {
   try {
-    const [stats, blocksData, valData] = await Promise.all([
+    const [stats, blocksData, valData, communityData] = await Promise.all([
       apiFetch('/stats'),
       apiFetch('/blocks?page=1&limit=10'),
       apiFetch('/validators'),
+      apiFetch('/community-nodes').catch(() => ({ total: 1, nodes: [] })),
     ]);
 
     const dec = (networkConfig && networkConfig.decimals) || 100_000_000;
 
     setEl('stat-blocks',    stats.blocks     ?? 0);
-    setEl('stat-validators', valData.validators?.length ?? 0);
+    setEl('stat-validators', communityData.total || (valData.validators?.length || 1));
     setEl('stat-stake',     sayn(valData.totalStake ?? 0, false));
     setEl('stat-mempool',   stats.mempool    ?? 0);
     setEl('stat-contracts', stats.contracts  ?? 0);
@@ -737,8 +758,9 @@ async function loadDashboard() {
     setEl('stat-blocktime', Math.round((stats.blockTime ?? 5000) / 1000));
     setEl('stat-apr',       valData.estimatedAPR ?? 0);
 
-    // ── TPS & Concurrency ─────────────────────────────────────────────
-    setEl('stat-tps', stats.tps ?? '0');
+    // ── Measured Empirical TPS ─────────────────────────────────────────
+    const tpsVal = stats.tpsMetrics?.live || stats.tps || '0.00';
+    setEl('stat-tps', tpsVal);
     setEl('stat-parallel', (stats.parallelEfficiency ?? 1.0).toFixed(2));
 
     // ── Denomination card — eliminate all confusion about tSAYN/SAYN vs base units ──
@@ -775,7 +797,19 @@ async function loadExplorer(page = 1) {
     const data = await apiFetch(`/blocks?page=${page}&limit=${PG_SZ}`);
     explorerTotal = data.total || 0;
     const totalPages = data.totalPages || Math.max(1, Math.ceil(explorerTotal / PG_SZ));
-    const blocks = (data.blocks || []).sort((a, b) => b.index - a.index);
+    let blocks = (data.blocks || []).sort((a, b) => b.index - a.index);
+
+    // Gap detection & automatic recovery
+    const gaps = syncManager.detectGaps(blocks);
+    if (gaps.length > 0) {
+      setNetState('DATA_GAP');
+      console.warn(`[SyncManager] Detected missing blocks in explorer page: ${gaps.join(', ')}. Triggering auto-recovery...`);
+      const recovered = await syncManager.recoverGaps(gaps);
+      if (recovered.length > 0) {
+        blocks = [...blocks, ...recovered].sort((a, b) => b.index - a.index);
+        setNetState('ONLINE');
+      }
+    }
 
     renderExplorerRows(blocks);
     renderPagination(page, totalPages, explorerTotal);
@@ -1773,9 +1807,8 @@ function renderPeers(peers) {
   `).join('');
 }
 
-// ── API helper ────────────────────────────────────────────────────────────────
 // ── Network State Machine ─────────────────────────────────────────────────────
-// States: CONNECTING | ONLINE | MESH_EDGE | OFFLINE
+// States: CONNECTING | ONLINE | SYNCING | DATA_GAP | DEGRADED | OFFLINE
 let NET_STATE = 'CONNECTING';
 function setNetState(state) {
   NET_STATE = state;
@@ -1783,123 +1816,62 @@ function setNetState(state) {
   const modeBadge = document.getElementById('node-mode-badge');
   const urlEl = document.getElementById('node-url-display');
   const offlineBanner = document.getElementById('offline-banner');
+
   if (offlineBanner) {
-    offlineBanner.style.display = state === 'OFFLINE' ? 'block' : 'none';
+    offlineBanner.style.display = (state === 'OFFLINE' || state === 'DEGRADED') ? 'block' : 'none';
   }
-  if (state === 'ONLINE') {
+
+  if (state === 'ONLINE' || state === 'LIVE') {
     if (dot) dot.style.background = '#10b981';
-    if (modeBadge) { modeBadge.textContent = 'Connected · Live'; modeBadge.style.color = '#10b981'; modeBadge.style.background = 'rgba(16,185,129,0.12)'; }
-  } else if (state === 'MESH_EDGE') {
-    if (dot) dot.style.background = '#10b981';
-    if (urlEl) urlEl.textContent = 'Web4 P2P Mesh (Local Contributor Node)';
-    if (modeBadge) { modeBadge.textContent = 'Web4 Mesh Active'; modeBadge.style.color = '#10b981'; modeBadge.style.background = 'rgba(16,185,129,0.12)'; }
-  } else if (state === 'CONNECTING') {
+    if (modeBadge) {
+      modeBadge.textContent = 'Live · P2P Synced';
+      modeBadge.style.color = '#10b981';
+      modeBadge.style.background = 'rgba(16,185,129,0.12)';
+    }
+  } else if (state === 'SYNCING') {
+    if (dot) dot.style.background = '#3b82f6';
+    if (modeBadge) {
+      modeBadge.textContent = 'Syncing Blocks...';
+      modeBadge.style.color = '#3b82f6';
+      modeBadge.style.background = 'rgba(59,130,246,0.12)';
+    }
+  } else if (state === 'DATA_GAP') {
     if (dot) dot.style.background = '#f59e0b';
-    if (modeBadge) { modeBadge.textContent = 'Discovering peers…'; modeBadge.style.color = '#f59e0b'; modeBadge.style.background = 'rgba(245,158,11,0.12)'; }
+    if (modeBadge) {
+      modeBadge.textContent = 'Data Gap · Repairing...';
+      modeBadge.style.color = '#f59e0b';
+      modeBadge.style.background = 'rgba(245,158,11,0.12)';
+    }
+  } else if (state === 'CONNECTING' || state === 'DISCOVERING') {
+    if (dot) dot.style.background = '#f59e0b';
+    if (modeBadge) {
+      modeBadge.textContent = 'Discovering Community Peers…';
+      modeBadge.style.color = '#f59e0b';
+      modeBadge.style.background = 'rgba(245,158,11,0.12)';
+    }
+  } else if (state === 'DEGRADED') {
+    if (dot) dot.style.background = '#f59e0b';
+    if (modeBadge) {
+      modeBadge.textContent = 'Degraded · Limited Connectivity';
+      modeBadge.style.color = '#f59e0b';
+      modeBadge.style.background = 'rgba(245,158,11,0.12)';
+    }
   } else if (state === 'OFFLINE') {
-    if (dot) dot.style.background = '#f59e0b';
-    if (urlEl) urlEl.textContent = 'Web4 P2P Mesh (Local Contributor Node)';
-    if (modeBadge) { modeBadge.textContent = 'Web4 Mesh Active'; modeBadge.style.color = '#10b981'; modeBadge.style.background = 'rgba(16,185,129,0.12)'; }
+    if (dot) dot.style.background = '#ef4444';
+    if (urlEl) urlEl.textContent = 'No community nodes reachable';
+    if (modeBadge) {
+      modeBadge.textContent = 'Network Offline';
+      modeBadge.style.color = '#ef4444';
+      modeBadge.style.background = 'rgba(239,68,68,0.12)';
+    }
   }
-}
-
-function resolveMeshFallback(path) {
-  const p = path.split('?')[0];
-  const myNodeId = localStorage.getItem('sayman_browser_node_id') || 'browser-contributor-node';
-  const myAlloc  = parseInt(localStorage.getItem('sayman_contributor_alloc') || '250', 10);
-  const validators = localMeshState.validators; // uses getter — returns [] or [myNode]
-  const totalStake = validators.reduce((s, v) => s + (v.stake || 0), 0);
-
-  if (p === '/network/stats') {
-    return {
-      network: localMeshState.network,
-      chainId: localMeshState.chainId,
-      nodeId: myNodeId,
-      mode: 'Web4 Mesh (PoSA)',
-      peersCount: 1,
-      uptime: uptimeSeconds,
-      totalBlocks: localMeshState.blocks[0]?.index ?? 141
-    };
-  }
-  if (p === '/stats') {
-    return {
-      blocks: localMeshState.blocks[0]?.index ?? 141,
-      totalBlocks: localMeshState.blocks[0]?.index ?? 141,
-      mempool: 0,
-      contracts: 0,
-      blockReward: localMeshState.blockReward,
-      blockTime: localMeshState.blockTime,
-      tps: '0',
-      parallelEfficiency: 1.0
-    };
-  }
-  if (p === '/network') {
-    return { ...localMeshState, validators };
-  }
-  if (p === '/blocks') {
-    return {
-      total: localMeshState.blocks.length,
-      totalPages: 1,
-      blocks: localMeshState.blocks
-    };
-  }
-  if (p.startsWith('/block/')) {
-    const idx = parseInt(p.split('/')[2], 10);
-    return localMeshState.blocks.find(b => b.index === idx) || null;
-  }
-  if (p === '/validators') {
-    return {
-      validators,
-      totalStake,
-      estimatedAPR: validators.length > 0 ? 18.5 : 0
-    };
-  }
-  if (p === '/transactions') {
-    // Collect real txs only — all blocks have empty tx arrays in mesh mode
-    const txs = [];
-    localMeshState.blocks.forEach(b => {
-      (b.transactions || []).forEach(t => {
-        txs.push({ ...t, blockIndex: b.index, timestamp: b.timestamp });
-      });
-    });
-    return { transactions: txs, total: txs.length };
-  }
-  if (p.startsWith('/tx/')) {
-    const txId = p.split('/')[2];
-    let found = null;
-    localMeshState.blocks.forEach(b => {
-      (b.transactions || []).forEach(t => {
-        if (t.id === txId) found = { ...t, blockIndex: b.index, timestamp: b.timestamp };
-      });
-    });
-    // Return null if not found — caller shows 'Transaction not found'
-    return found;
-  }
-  if (p === '/contracts') {
-    return { contracts: [] };
-  }
-  if (p === '/tokens') {
-    return { tokens: localMeshState.tokens };
-  }
-  if (p === '/nfts') {
-    return { collections: [] };
-  }
-  if (p === '/memecoins') {
-    return { memecoins: [] };
-  }
-  if (p === '/layers' || p === '/layers/active') {
-    return { layers: [] };
-  }
-  if (p.startsWith('/address/')) {
-    return { address: p.split('/')[2], balance: 0, nonce: 0, type: 'EOA' };
-  }
-  return {};
 }
 
 async function apiFetch(path, options = {}, retries = 2) {
   if (!API) {
-    return resolveMeshFallback(path);
+    return handleEmptyData(path);
   }
+
   for (let i = 0; i < retries; i++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -1908,13 +1880,13 @@ async function apiFetch(path, options = {}, retries = 2) {
       const res = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);
       if (!res.ok) {
-        if (i === retries - 1) return resolveMeshFallback(path);
+        if (i === retries - 1) return handleEmptyData(path);
         await new Promise(r => setTimeout(r, 400));
         continue;
       }
       const ct = res.headers.get('content-type') || '';
       if (!ct.includes('application/json')) {
-        if (i === retries - 1) return resolveMeshFallback(path);
+        if (i === retries - 1) return handleEmptyData(path);
         await new Promise(r => setTimeout(r, 400));
         continue;
       }
@@ -1924,12 +1896,29 @@ async function apiFetch(path, options = {}, retries = 2) {
     } catch (err) {
       clearTimeout(timeoutId);
       if (i === retries - 1) {
-        return resolveMeshFallback(path);
+        setNetState('OFFLINE');
+        return handleEmptyData(path);
       }
       await new Promise(r => setTimeout(r, 400));
     }
   }
-  return resolveMeshFallback(path);
+  return handleEmptyData(path);
+}
+
+function handleEmptyData(path) {
+  const p = path.split('?')[0];
+  if (p === '/blocks') return { blocks: [], total: 0, totalPages: 1 };
+  if (p === '/validators') return { validators: [], totalStake: 0, estimatedAPR: 0 };
+  if (p === '/transactions') return { transactions: [], total: 0 };
+  if (p === '/contracts') return { contracts: [] };
+  if (p === '/tokens') return { tokens: [] };
+  if (p === '/nfts') return { collections: [] };
+  if (p === '/memecoins') return { memecoins: [] };
+  if (p === '/layers') return { layers: [] };
+  if (p === '/community-nodes') return { nodes: [], total: 0, active: 0 };
+  if (p === '/stats') return { blocks: 0, totalBlocks: 0, mempool: 0, contracts: 0, blockReward: 0, blockTime: 5000, tps: '0.00' };
+  if (p === '/network') return { network: 'Sayman Public Testnet', chainId: 'sayman-public-testnet-1', decimals: 100000000, ticker: 'tSAYN' };
+  return {};
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
