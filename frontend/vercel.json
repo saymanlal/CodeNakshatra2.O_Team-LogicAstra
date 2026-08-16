@@ -1,17 +1,15 @@
 {
-  "cleanUrls": false,
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/block/:index",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/tx/:hash",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/contract/:addr",
-      "destination": "/index.html"
+      "src": "**/*",
+      "use": "@vercel/static"
     }
+  ],
+  "routes": [
+    { "src": "/block/(.+)", "dest": "/index.html" },
+    { "src": "/tx/(.+)", "dest": "/index.html" },
+    { "src": "/contract/(.+)", "dest": "/index.html" },
+    { "src": "/(.*)", "dest": "/$1" }
   ]
 }
