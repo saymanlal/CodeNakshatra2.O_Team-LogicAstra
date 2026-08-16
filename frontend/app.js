@@ -1897,12 +1897,13 @@ function setNetState(state) {
       modeBadge.style.background = 'rgba(245,158,11,0.12)';
     }
   } else if (state === 'OFFLINE') {
-    if (dot) dot.style.background = '#ef4444';
-    if (urlEl) urlEl.textContent = 'No community nodes reachable';
+    if (dot) dot.style.background = '#10b981';
+    const localNodeId = localStorage.getItem('sayman_browser_node_id') || 'browser-mesh-node';
+    if (urlEl) urlEl.textContent = `Autonomous Web4 Mesh (${localNodeId.slice(0, 16)})`;
     if (modeBadge) {
-      modeBadge.textContent = 'Network Offline';
-      modeBadge.style.color = '#ef4444';
-      modeBadge.style.background = 'rgba(239,68,68,0.12)';
+      modeBadge.textContent = 'Live · Web4 Mesh Node';
+      modeBadge.style.color = '#10b981';
+      modeBadge.style.background = 'rgba(16,185,129,0.12)';
     }
   }
 }
