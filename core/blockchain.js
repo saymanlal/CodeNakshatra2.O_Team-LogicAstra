@@ -40,56 +40,54 @@ function createChainProxy(blockchain) {
   let chainLength = 0;
 
   const target = {
-    push: async (block) => {
-      const index = block.index;
-      const json = block.toJSON ? block.toJSON() : block;
-      
-      const ops = [
-        { type: 'put', key: `block:${index}`, value: json },
-        { type: 'put', key: 'latest_height', value: index }
-      ];
-      
-      if (block.hash) {
-        ops.push({ type: 'put', key: `hash:${block.hash}`, value: index });
-      }
-      
-      if (block.transactions) {
-        for (let i = 0; i < block.transactions.length; i++) {
-          const tx = block.transactions[i];
-          const txId = tx.id || (tx.toJSON ? tx.toJSON().id : tx);
-          if (txId) {
-            ops.push({
-              type: 'put',
-              key: `tx:${txId}`,
-              value: { blockIndex: index, txIndex: i }
-            });
-            
-            const involvedAddresses = new Set();
-            if (tx.data) {
-              if (tx.data.from) involvedAddresses.add(tx.data.from.toLowerCase());
-              if (tx.data.to) involvedAddresses.add(tx.data.to.toLowerCase());
-              if (tx.data.validator) involvedAddresses.add(tx.data.validator.toLowerCase());
-              if (tx.data.contractAddress) involvedAddresses.add(tx.data.contractAddress.toLowerCase());
-            }
-            for (const addr of involvedAddresses) {
+    push: (...blocks) => {
+      for (const block of blocks) {
+        const index = block.index;
+        cache.set(index, block);
+        if (index >= chainLength) {
+          chainLength = index + 1;
+        }
+
+        const ops = [
+          { type: 'put', key: `block:${index}`, value: block.toJSON ? block.toJSON() : block },
+          { type: 'put', key: 'latest_height', value: index }
+        ];
+        
+        if (block.hash) {
+          ops.push({ type: 'put', key: `hash:${block.hash}`, value: index });
+        }
+        
+        if (block.transactions) {
+          for (let i = 0; i < block.transactions.length; i++) {
+            const tx = block.transactions[i];
+            const txId = tx.id || (tx.toJSON ? tx.toJSON().id : tx);
+            if (txId) {
               ops.push({
                 type: 'put',
-                key: `addr:${addr}:${index}:${i}`,
-                value: txId
+                key: `tx:${txId}`,
+                value: { blockIndex: index, txIndex: i }
               });
+
+              const involvedAddresses = new Set();
+              if (tx.data) {
+                if (tx.data.from) involvedAddresses.add(tx.data.from.toLowerCase());
+                if (tx.data.to) involvedAddresses.add(tx.data.to.toLowerCase());
+                if (tx.data.validator) involvedAddresses.add(tx.data.validator.toLowerCase());
+                if (tx.data.contractAddress) involvedAddresses.add(tx.data.contractAddress.toLowerCase());
+              }
+              for (const addr of involvedAddresses) {
+                ops.push({
+                  type: 'put',
+                  key: `addr:${addr}:${index}:${i}`,
+                  value: txId
+                });
+              }
             }
           }
         }
-      }
-      
-      await blockchain.db.batch(ops).catch(err => console.error('Error batch writing block/txs:', err));
-      
-      cache.set(index, block);
-      if (index >= chainLength) {
-        chainLength = index + 1;
-      }
-      // Keep only last 100 blocks in memory cache
-      if (cache.size > 100) {
+
+        blockchain.db.batch(ops).catch(err => console.error('Error batch writing block/txs:', err));
+
         for (const [key] of cache) {
           if (key < chainLength - 100) {
             cache.delete(key);
@@ -186,12 +184,18 @@ class Blockchain {
     this.totalParallelBuckets = 0;
     this.totalParallelTransactions = 0;
 
+    this.peakTPS = 0;
+    this.recentBlockMeta = [];
+
     // Optional callback — server.js sets this to trigger instant block production
     // when a transaction enters the mempool (avoids full block-time delay).
     this.onTransactionAdded = null;
 
     // Initialize archive if enabled
     if (this.config.archive && this.config.archive.enabled) {
+      if (!this.config.archive.githubToken && process.env.GITHUB_TOKEN) {
+        this.config.archive.githubToken = process.env.GITHUB_TOKEN;
+      }
       this.githubClient = new GithubClient(this.config.archive);
       this.repoManager = new RepoManager(this.githubClient, this.config.archive);
       this.archiveWriter = new ArchiveWriter(this.githubClient, this.repoManager, this);
@@ -224,6 +228,25 @@ class Blockchain {
     } catch (e) {
       console.error('Error in getBlock:', e);
       return null;
+    }
+  }
+
+  async getBlockRange(start, end) {
+    try {
+      const from = Math.max(0, parseInt(start, 10) || 0);
+      const to = Math.min(this.chain.length - 1, parseInt(end, 10) || (from + 99));
+      if (from > to) return [];
+      const blocks = [];
+      for (let i = from; i <= to; i++) {
+        const block = await this.getBlock(i);
+        if (block) {
+          blocks.push(block.toJSON ? block.toJSON() : block);
+        }
+      }
+      return blocks;
+    } catch (e) {
+      console.error('Error in getBlockRange:', e);
+      return [];
     }
   }
 
@@ -696,6 +719,17 @@ class Blockchain {
 
     if (block.validator) {
       this.state.increaseReputation(block.validator, 10);
+    }
+
+    if (this.recentBlockMeta) {
+      this.recentBlockMeta.push({
+        index: block.index,
+        timestamp: block.timestamp || Date.now(),
+        txCount: block.transactions?.length || 0
+      });
+      if (this.recentBlockMeta.length > 200) {
+        this.recentBlockMeta.shift();
+      }
     }
 
     // Evict transactions from mempool that were included in this block
@@ -1202,7 +1236,8 @@ class Blockchain {
       stateRoot:       this.state.computeStateRoot(),
       gasLimits:       this.gas.limits,
       gasCosts:        this.gas.costs,
-      tps:             this._estimateTPS(),
+      tps:             this._estimateTPS().live,
+      tpsMetrics:      this._estimateTPS(),
       parallelEfficiency: this.totalParallelBuckets > 0
         ? +(this.totalParallelTransactions / this.totalParallelBuckets).toFixed(2)
         : 1.0,
@@ -1212,18 +1247,69 @@ class Blockchain {
   // ─── TPS estimate ────────────────────────────────────────────────────────────
   // Returns ONLY measured TPS from actual recent block data.
   // IMPORTANT: Never fabricates fake TPS numbers.
-  // Returns 0 if chain is too new to measure, or actual tx/s from last 10 blocks.
+  // Returns 0 if chain is too new to measure, or actual tx/s from rolling window.
   _estimateTPS() {
     const height = this.chain.length;
-    if (height < 2) return 0; // Cannot measure from genesis only
+    if (height < 2) {
+      return { live: '0.00', instantTPS: 0, tps5s: 0, tps30s: 0, tps60s: 0, peakTPS: this.peakTPS || 0 };
+    }
 
+    const now = Date.now();
+    const meta = this.recentBlockMeta || [];
+
+    if (meta.length >= 2) {
+      const lastMeta = meta[meta.length - 1];
+      const prevMeta = meta[meta.length - 2];
+      const instantDiff = Math.max(0.5, (lastMeta.timestamp - prevMeta.timestamp) / 1000);
+      const instantTPS = +(lastMeta.txCount / instantDiff).toFixed(2);
+
+      const calcWindowTPS = (seconds) => {
+        const cutoff = now - (seconds * 1000);
+        const windowBlocks = meta.filter(m => m.timestamp >= cutoff);
+        if (windowBlocks.length < 2) return 0;
+        const totalTx = windowBlocks.reduce((s, b) => s + b.txCount, 0);
+        const timeSpan = Math.max(1, (windowBlocks[windowBlocks.length - 1].timestamp - windowBlocks[0].timestamp) / 1000);
+        return +(totalTx / timeSpan).toFixed(2);
+      };
+
+      const tps5s = calcWindowTPS(5);
+      const tps30s = calcWindowTPS(30);
+      const tps60s = calcWindowTPS(60);
+
+      const currentInstant = instantTPS > 0 ? instantTPS : (tps5s > 0 ? tps5s : (tps30s > 0 ? tps30s : 0));
+      if (currentInstant > (this.peakTPS || 0)) {
+        this.peakTPS = currentInstant;
+      }
+
+      return {
+        live: currentInstant.toFixed(2),
+        instantTPS,
+        tps5s,
+        tps30s,
+        tps60s,
+        peakTPS: +(this.peakTPS || 0).toFixed(2)
+      };
+    }
+
+    // Fallback if recentBlockMeta is being initialized
     const recent = this.chain.slice(-Math.min(10, this.chain.length));
-    if (recent.length < 2) return 0;
+    if (recent.length < 2) {
+      return { live: '0.00', instantTPS: 0, tps5s: 0, tps30s: 0, tps60s: 0, peakTPS: this.peakTPS || 0 };
+    }
 
     const txCount  = recent.reduce((s, b) => s + (b.transactions?.length || 0), 0);
     const timeDiff = (recent[recent.length - 1].timestamp - recent[0].timestamp) || 1;
-    if (timeDiff <= 0) return 0;
-    return +(txCount / (timeDiff / 1000)).toFixed(2);
+    const measured = timeDiff > 0 ? +(txCount / (timeDiff / 1000)).toFixed(2) : 0;
+    if (measured > (this.peakTPS || 0)) this.peakTPS = measured;
+
+    return {
+      live: measured.toFixed(2),
+      instantTPS: measured,
+      tps5s: measured,
+      tps30s: measured,
+      tps60s: measured,
+      peakTPS: +(this.peakTPS || 0).toFixed(2)
+    };
   }
 
   _fmt(baseUnits) {

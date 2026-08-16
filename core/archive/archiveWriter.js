@@ -4,175 +4,174 @@ import path from 'path';
 export class ArchiveWriter {
   constructor(githubClient, repoManager, blockchain) {
     this.githubClient = githubClient;
-    this.repoManager = repoManager;
-    this.blockchain = blockchain;
-    this.config = blockchain.config;
+    this.repoManager  = repoManager;
+    this.blockchain   = blockchain;
+    this.config       = blockchain.config;
 
-    this.batchSize = this.config.archive.batchSize || 1000;
-    this.checkpointPath = path.resolve(this.config.archive.migrationCheckpoint || './data/migration-checkpoint.json');
+    this.batchSize    = this.config.archive.batchSize    || 100;
+    this.minBatch     = this.config.archive.archiveMinBatch || 10;
+    this.checkpointPath = path.resolve(
+      this.config.archive.migrationCheckpoint || './data/migration-checkpoint.json'
+    );
     this.lastArchivedBlock = -1;
-    this.isRunning = false;
+    this.isRunning         = false;
 
-    // Concurrency lock, timers, and exponential backoff variables to prevent OOM / loops
-    this.isProcessing = false;
+    // Concurrency / backoff
+    this.isProcessing  = false;
     this.scheduleTimeout = null;
-    this.retryDelay = 5000; // start with 5s delay
-    this.maxRetryDelay = 5 * 60 * 1000; // max 5 minutes
+    this.retryDelay    = 5000;
+    this.maxRetryDelay = 5 * 60 * 1000;
   }
 
   async start() {
     this.loadCheckpoint();
     this.isRunning = true;
-    console.log(`[ArchiveWriter] Started continuous archiver. Last archived block: ${this.lastArchivedBlock}`);
-    
-    // Check if we can archive any existing blocks immediately after boot
-    this.schedulePendingChunk(1000);
+    console.log(`[ArchiveWriter] Started. Last archived block: ${this.lastArchivedBlock}`);
+    this.schedulePendingChunk(3000);
   }
 
   loadCheckpoint() {
     if (fs.existsSync(this.checkpointPath)) {
       try {
-        const checkpoint = JSON.parse(fs.readFileSync(this.checkpointPath, 'utf8'));
-        this.lastArchivedBlock = checkpoint.lastArchivedBlock ?? -1;
-      } catch (err) {
-        console.error('[ArchiveWriter] Failed to read checkpoint for continuous writer:', err.message);
-      }
+        const cp = JSON.parse(fs.readFileSync(this.checkpointPath, 'utf8'));
+        this.lastArchivedBlock = cp.lastArchivedBlock ?? -1;
+      } catch {}
     }
   }
 
   saveCheckpoint() {
     try {
-      let checkpoint = {};
+      let cp = {};
       if (fs.existsSync(this.checkpointPath)) {
-        checkpoint = JSON.parse(fs.readFileSync(this.checkpointPath, 'utf8'));
+        cp = JSON.parse(fs.readFileSync(this.checkpointPath, 'utf8'));
       }
-      checkpoint.lastArchivedBlock = this.lastArchivedBlock;
-      fs.writeFileSync(this.checkpointPath, JSON.stringify(checkpoint, null, 2));
+      cp.lastArchivedBlock = this.lastArchivedBlock;
+      fs.writeFileSync(this.checkpointPath, JSON.stringify(cp, null, 2));
     } catch (err) {
-      console.error('[ArchiveWriter] Failed to write checkpoint:', err.message);
+      console.error('[ArchiveWriter] Checkpoint write failed:', err.message);
     }
   }
 
   queueBlock(block) {
     if (!this.isRunning) return;
-    if (this.blockchain.isSyncing) return; // skip continuous write during active sync
-    this.schedulePendingChunk(100);
+    if (this.blockchain.isSyncing) return;
+    // Schedule a flush check when a new block arrives
+    this.schedulePendingChunk(200);
   }
 
   schedulePendingChunk(delay = 0) {
-    if (!this.isRunning) return;
-    if (this.isProcessing) return;
-    if (this.blockchain.isSyncing) return; // skip scheduling during active sync
-
-    if (this.scheduleTimeout) {
-      clearTimeout(this.scheduleTimeout);
-    }
-
+    if (!this.isRunning || this.isProcessing || this.blockchain.isSyncing) return;
+    if (this.scheduleTimeout) clearTimeout(this.scheduleTimeout);
     this.scheduleTimeout = setTimeout(() => {
       this.scheduleTimeout = null;
       this.writePendingChunk().catch(err => {
-        console.error('[ArchiveWriter] Continuous archiving error:', err.message);
+        console.error('[ArchiveWriter] Error:', err.message);
       });
     }, delay);
   }
 
   async writePendingChunk() {
-    if (this.isProcessing || !this.isRunning) return;
-    if (this.blockchain.isSyncing) return; // skip writing during active sync
+    if (this.isProcessing || !this.isRunning || this.blockchain.isSyncing) return;
+
+    const start    = this.lastArchivedBlock + 1;
+    const chainLen = this.blockchain.chain.length;
+    const available = chainLen - start;        // how many new blocks exist
+
+    // Need at least minBatch blocks to push (unless we have a full batch ready)
+    if (available < this.minBatch) {
+      // Schedule a check later
+      this.schedulePendingChunk(30_000);
+      return;
+    }
 
     this.isProcessing = true;
 
-    const start = this.lastArchivedBlock + 1;
-    const end = start + this.batchSize - 1;
+    // Pick chunk boundaries: use full batchSize if possible, else take all available
+    const end = start + Math.min(this.batchSize, available) - 1;
 
-    // We only create a chunk if we have at least batchSize blocks available
     const blocks = [];
     for (let i = start; i <= end; i++) {
       try {
         const rawBlock = await this.blockchain.db.get(`block:${i}`);
-        if (!rawBlock) {
-          this.isProcessing = false;
-          return; // incomplete batch
-        }
+        if (!rawBlock) break;
         blocks.push(typeof rawBlock === 'string' ? JSON.parse(rawBlock) : rawBlock);
-      } catch (err) {
-        // block not found or db error - means the batch is not ready
-        this.isProcessing = false;
-        return;
+      } catch {
+        break; // block not in DB yet
       }
     }
 
-    console.log(`[ArchiveWriter] Creating and writing chunk for blocks ${start}-${end}...`);
+    if (blocks.length < this.minBatch) {
+      this.isProcessing = false;
+      this.schedulePendingChunk(30_000);
+      return;
+    }
+
+    const actualEnd = start + blocks.length - 1;
+    console.log(`[ArchiveWriter] Archiving blocks ${start}–${actualEnd} (${blocks.length} blocks)…`);
+
     try {
-      // Check repository size and rotate if needed
       await this.repoManager.checkAndRotate(start);
 
-      // Verify the chunk cryptographically
       const { buildChunkMerkleTree, verifyChunk } = await import('./merkleVerify.js');
-      const tree = buildChunkMerkleTree(blocks);
+      const tree      = buildChunkMerkleTree(blocks);
       const merkleRoot = tree.getRoot();
 
-      const chunk = {
-        startHeight: start,
-        endHeight: end,
-        merkleRoot,
-        blocks
-      };
+      const chunk = { startHeight: start, endHeight: actualEnd, merkleRoot, blocks };
 
       const isValid = await verifyChunk(chunk);
       if (!isValid) {
-        console.error(`[ArchiveWriter] Chunk ${start}-${end} failed verification. Writing aborted.`);
+        console.error(`[ArchiveWriter] Chunk ${start}–${actualEnd} failed Merkle verification. Aborting.`);
         this.isProcessing = false;
-        
-        // Apply backoff
-        this.retryDelay = Math.min(this.retryDelay * 2, this.maxRetryDelay);
-        console.log(`[ArchiveWriter] Backing off verification retry for ${this.retryDelay / 1000}s`);
+        this.retryDelay   = Math.min(this.retryDelay * 2, this.maxRetryDelay);
         this.schedulePendingChunk(this.retryDelay);
         return;
       }
 
-      // Write chunk to GitHub
-      const currentRepo = this.repoManager.currentRepo;
-      await this.githubClient.queueWrite(`chunks/chunk_${start}_${end}.json`, chunk, currentRepo);
+      const repo = this.repoManager.currentRepo;
 
-      // Write a state snapshot at this chunk boundary for history tracking
-      const stateSnapshot = this.blockchain.state.exportState();
-      await this.githubClient.queueWrite(`snapshots/state_${end}.json`, stateSnapshot, currentRepo);
-
-      // Update latest snapshot info
+      // Write chunk
       await this.githubClient.queueWrite(
-        'snapshots/latest.json',
-        { height: end, repo: currentRepo },
-        currentRepo
+        `chunks/chunk_${start}_${actualEnd}.json`,
+        chunk,
+        repo
       );
 
-      // Update checkpoint
-      this.lastArchivedBlock = end;
+      // Write state snapshot at chunk boundary
+      const stateSnap = this.blockchain.state.exportState();
+      await this.githubClient.queueWrite(
+        `snapshots/state_${actualEnd}.json`,
+        stateSnap,
+        repo
+      );
+
+      // Update latest pointer
+      await this.githubClient.queueWrite(
+        'snapshots/latest.json',
+        { height: actualEnd, repo },
+        repo
+      );
+
+      // Flush immediately so the commit goes out
+      await this.githubClient.flush();
+
+      this.lastArchivedBlock = actualEnd;
       this.saveCheckpoint();
-      console.log(`[ArchiveWriter] Successfully archived chunk ${start}-${end}`);
+      this.retryDelay = 5000; // reset backoff
+      console.log(`[ArchiveWriter] ✅ Archived blocks ${start}–${actualEnd} → github:sayman-archive`);
 
-      // Reset backoff on success
-      this.retryDelay = 5000;
       this.isProcessing = false;
-
-      // Check if another chunk is already ready to be processed immediately
+      // Check if another chunk is ready right away
       this.schedulePendingChunk(0);
-    } catch (err) {
-      console.error(`[ArchiveWriter] Error writing chunk ${start}-${end}:`, err.message);
-      this.isProcessing = false;
 
-      // Apply backoff
-      this.retryDelay = Math.min(this.retryDelay * 2, this.maxRetryDelay);
-      console.log(`[ArchiveWriter] Backing off write retry for ${this.retryDelay / 1000}s`);
+    } catch (err) {
+      console.error(`[ArchiveWriter] Write failed for ${start}–${actualEnd}: ${err.message}`);
+      this.isProcessing = false;
+      this.retryDelay   = Math.min(this.retryDelay * 2, this.maxRetryDelay);
       this.schedulePendingChunk(this.retryDelay);
     }
   }
 
   async flushQueue() {
-    try {
-      await this.githubClient.flush();
-    } catch (err) {
-      console.error('[ArchiveWriter] Error flushing queue:', err.message);
-    }
+    try { await this.githubClient.flush(); } catch {}
   }
 }
