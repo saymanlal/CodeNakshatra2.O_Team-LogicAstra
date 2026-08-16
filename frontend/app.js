@@ -139,16 +139,22 @@ class Web4PeerMeshEngine {
     try {
       const stored = JSON.parse(localStorage.getItem('sayman_mesh_peers_cache') || '{}');
       const now = Date.now();
+      const updated = {};
+      updated[this.myNodeId] = payload;
       for (const [id, peer] of Object.entries(stored)) {
-        if (now - peer.lastSeen < 60000) {
+        if (id !== this.myNodeId && (now - peer.lastSeen < 15000)) {
           this.peers.set(id, peer);
+          updated[id] = peer;
+        } else if (id !== this.myNodeId) {
+          this.peers.delete(id);
         }
       }
+      localStorage.setItem('sayman_mesh_peers_cache', JSON.stringify(updated));
     } catch(e) {}
   }
 
   handlePeerHeartbeat(peer) {
-    if (!peer || !peer.nodeId) return;
+    if (!peer || !peer.nodeId || peer.nodeId === this.myNodeId) return;
     peer.lastSeen = Date.now();
     this.peers.set(peer.nodeId, peer);
     updateNodeDiscoveryUI();
@@ -157,10 +163,11 @@ class Web4PeerMeshEngine {
   cleanStalePeers() {
     const now = Date.now();
     for (const [id, p] of this.peers.entries()) {
-      if (id !== this.myNodeId && now - p.lastSeen > 45000) {
+      if (id !== this.myNodeId && now - p.lastSeen > 15000) {
         this.peers.delete(id);
       }
     }
+    updateNodeDiscoveryUI();
   }
 
   getActiveNodesList() {
@@ -1244,14 +1251,14 @@ function renderValidatorList(validators) {
   tbody.innerHTML = validators.map(v => `
     <tr onclick="showValidatorDetail('${v.address || ''}')">
       <td class="mono">${(v.address || '').slice(0, 20)}… <button class="copy-data-btn" onclick="event.stopPropagation();copyToClipboard(this, '${v.address || ''}')"><i class="fas fa-copy"></i></button></td>
-      <td>${sayn(v.stake ?? 0)} <span style="font-size:10px;color:var(--mono-500)">(${(v.stake ?? 0).toLocaleString()} bu)</span></td>
-      <td style="font-size:11px;color:var(--mono-500)">${(v.stake ?? 0).toLocaleString()}</td>
+      <td><strong>${v.storagePledgedMB ? (v.storagePledgedMB + ' MB') : sayn(v.stake ?? 0)}</strong></td>
+      <td style="font-size:11px;color:var(--mono-500)">${(v.stake ?? 0).toLocaleString()} bu</td>
       <td>${v.percentage ?? 0}%</td>
-      <td>${v.reputation ?? 0}</td>
+      <td>${v.reputation ?? 100}</td>
       <td>${v.missedBlocks ?? 0}</td>
       <td>
-        <span style="font-size:11px;padding:2px 8px;border:1px solid ${v.isActive ? '#2a7a2a' : 'var(--mono-800)'};color:${v.isActive ? '#2a7a2a' : 'var(--mono-400)'}">
-          ${v.isActive ? 'Active' : 'Inactive'}
+        <span style="font-size:11px;padding:2px 8px;border:1px solid ${v.isActive ? '#10b981' : 'var(--mono-800)'};color:${v.isActive ? '#10b981' : 'var(--mono-400)'};background:rgba(16,185,129,0.08);border-radius:4px;">
+          ${v.isActive ? 'Active (PoSA)' : 'Inactive'}
         </span>
       </td>
     </tr>
@@ -2137,13 +2144,16 @@ function handleEmptyData(path) {
       address: n.nodeId,
       name: `${n.device || 'Mesh Node'} #${i + 1} (${n.tier || 'Tier 1'})`,
       stake: (n.storageMB || 250) * 10000000,
+      storagePledgedMB: n.storageMB || 250,
       uptime: 99.98,
-      status: 'Active · Storage Mesh',
-      commission: '1.5%'
+      percentage: Math.round(100 / activeCount),
+      reputation: 100,
+      missedBlocks: 0,
+      isActive: true,
+      status: 'Active · Storage Mesh Provider (PoSA)',
+      commission: '1.5%',
+      estimatedAPR: 12.8
     }));
-    if (vals.length < 2) {
-      vals.push({ address: 'sayn1valgenesis9876543210abcdef0000', name: 'SAYMAN Genesis Seed Validator', stake: 50000000000, uptime: 100.0, status: 'Active · Core Validator', commission: '2.0%' });
-    }
     return { validators: vals, totalStake: vals.reduce((s, v) => s + (v.stake || 0), 0), estimatedAPR: 12.8 };
   }
 
