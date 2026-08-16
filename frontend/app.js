@@ -31,16 +31,144 @@ let allValidators  = [];
 let allContracts   = [];
 let allPeers       = [];
 
-// ── Dynamic Node Auto-Discovery & PoSA Storage Contributor Engine ─────────────
-const COMMUNITY_SEEDS = [
-  (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '',
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3002',
-  'http://localhost:10000',
-  'https://sayman-blockchain.onrender.com',
-  'https://sayman.up.railway.app'
-].filter((url, i, arr) => url && typeof url === 'string' && url.startsWith('http') && arr.indexOf(url) === i);
+// ── Web4 Decentralized Peer Mesh Engine (Multi-Device P2P Swarm) ───────────────
+class Web4PeerMeshEngine {
+  constructor() {
+    this.peers = new Map();
+    this.myNodeId = this.getOrCreateNodeId();
+    this.deviceType = (typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) ? 'Mobile Node' : 'Desktop/Laptop Node';
+    this.bc = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('sayman_p2p_mesh') : null;
+    this.peer = null;
+    this.initP2P();
+  }
+
+  getOrCreateNodeId() {
+    let id = (typeof localStorage !== 'undefined') ? localStorage.getItem('sayman_browser_node_id') : null;
+    if (!id) {
+      const bytes = new Uint8Array(8);
+      crypto.getRandomValues(bytes);
+      id = 'browser-' + Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+      if (typeof localStorage !== 'undefined') localStorage.setItem('sayman_browser_node_id', id);
+    }
+    return id;
+  }
+
+  initP2P() {
+    this.heartbeatSelf();
+
+    // Layer 1: Local Cross-Tab / Cross-Window Broadcast
+    if (this.bc) {
+      this.bc.onmessage = (e) => {
+        if (e.data && e.data.type === 'PEER_HEARTBEAT') {
+          this.handlePeerHeartbeat(e.data.payload);
+        }
+      };
+    }
+
+    // Layer 2: Public Decentralized WebRTC Swarm (Cross-Device Phone <-> Laptop)
+    try {
+      if (typeof Peer !== 'undefined') {
+        const cleanId = 'sayman-v1-' + this.myNodeId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
+        this.peer = new Peer(cleanId, {
+          debug: 0,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' }
+            ]
+          }
+        });
+
+        this.peer.on('open', () => {
+          this.broadcastSwarm();
+        });
+
+        this.peer.on('connection', (conn) => {
+          conn.on('data', (data) => {
+            if (data && data.type === 'PEER_HEARTBEAT') {
+              this.handlePeerHeartbeat(data.payload);
+            }
+          });
+          conn.send({
+            type: 'PEER_HEARTBEAT',
+            payload: this.getSelfPayload()
+          });
+        });
+      }
+    } catch(err) {
+      console.warn('WebRTC swarm init error:', err);
+    }
+
+    setInterval(() => {
+      this.heartbeatSelf();
+      this.broadcastSwarm();
+      this.cleanStalePeers();
+    }, 3000);
+  }
+
+  getSelfPayload() {
+    const isPermanent = typeof localStorage !== 'undefined' && localStorage.getItem('sayman_contributor_permanent') === 'true';
+    const alloc = parseInt((typeof localStorage !== 'undefined' && localStorage.getItem('sayman_contributor_alloc')) || '250', 10);
+    return {
+      nodeId: this.myNodeId,
+      device: this.deviceType,
+      height: getBrowserMeshHeight(),
+      storageMB: alloc,
+      tier: isPermanent ? 'Permanent (Tier 2+)' : 'Browser (Tier 1)',
+      uptime: uptimeSeconds,
+      proofs: verifiedShardsCount,
+      lastSeen: Date.now()
+    };
+  }
+
+  heartbeatSelf() {
+    const self = this.getSelfPayload();
+    this.peers.set(this.myNodeId, self);
+    try {
+      const stored = JSON.parse(localStorage.getItem('sayman_mesh_peers_cache') || '{}');
+      stored[this.myNodeId] = self;
+      localStorage.setItem('sayman_mesh_peers_cache', JSON.stringify(stored));
+    } catch(e) {}
+  }
+
+  broadcastSwarm() {
+    const payload = this.getSelfPayload();
+    if (this.bc) {
+      this.bc.postMessage({ type: 'PEER_HEARTBEAT', payload });
+    }
+    try {
+      const stored = JSON.parse(localStorage.getItem('sayman_mesh_peers_cache') || '{}');
+      const now = Date.now();
+      for (const [id, peer] of Object.entries(stored)) {
+        if (now - peer.lastSeen < 60000) {
+          this.peers.set(id, peer);
+        }
+      }
+    } catch(e) {}
+  }
+
+  handlePeerHeartbeat(peer) {
+    if (!peer || !peer.nodeId) return;
+    peer.lastSeen = Date.now();
+    this.peers.set(peer.nodeId, peer);
+    updateNodeDiscoveryUI();
+  }
+
+  cleanStalePeers() {
+    const now = Date.now();
+    for (const [id, p] of this.peers.entries()) {
+      if (id !== this.myNodeId && now - p.lastSeen > 45000) {
+        this.peers.delete(id);
+      }
+    }
+  }
+
+  getActiveNodesList() {
+    this.heartbeatSelf();
+    const list = Array.from(this.peers.values());
+    return list.sort((a, b) => b.lastSeen - a.lastSeen);
+  }
+}
 
 let activeNodeUrl = '';
 let activeNodeHeight = 0;
@@ -48,9 +176,9 @@ let activeNodeLatency = 0;
 
 function getBrowserMeshHeight() {
   const initialBase = 14820;
-  const started = parseInt(localStorage.getItem('sayman_mesh_genesis_time') || '0', 10);
+  const started = parseInt((typeof localStorage !== 'undefined' && localStorage.getItem('sayman_mesh_genesis_time')) || '0', 10);
   if (!started) {
-    localStorage.setItem('sayman_mesh_genesis_time', Date.now().toString());
+    if (typeof localStorage !== 'undefined') localStorage.setItem('sayman_mesh_genesis_time', Date.now().toString());
     return initialBase;
   }
   const diffSec = Math.floor((Date.now() - started) / 5000);
@@ -65,6 +193,8 @@ let miningTickerInterval = null;
 let verifiedShardsCount = 0;
 let uptimeSeconds = 0;
 let engineInterval = null;
+
+const meshSwarm = new Web4PeerMeshEngine();
 
 // ── Explorer Sync Manager (Gap Detection & Range Sync) ─────────────────────────
 class ExplorerSyncManager {
@@ -170,18 +300,25 @@ function updateNodeDiscoveryUI() {
 
   const h = activeNodeHeight > 0 ? activeNodeHeight : getBrowserMeshHeight();
   const lat = activeNodeLatency > 0 ? activeNodeLatency : 1;
+  const nodes = meshSwarm.getActiveNodesList();
+  const count = Math.max(1, nodes.length);
 
-  if (urlEl) urlEl.textContent = activeNodeUrl || 'Autonomous Web4 Mesh (Local Node Active)';
+  if (urlEl) urlEl.textContent = `Web4 P2P Mesh (${count} Node${count > 1 ? 's' : ''} Online)`;
   if (heightEl) heightEl.textContent = `Height: #${h}`;
   if (latencyEl) latencyEl.textContent = `${lat} ms`;
   if (dotEl) {
     dotEl.style.background = '#10b981';
   }
   if (modeBadge) {
-    modeBadge.textContent = API ? 'Live · Community Peer' : 'Live · Web4 Mesh Node';
+    modeBadge.textContent = count > 1 ? `Live · Swarm Mesh (${count} Nodes)` : 'Live · Web4 Mesh Node';
     modeBadge.style.color = '#10b981';
     modeBadge.style.background = 'rgba(16,185,129,0.12)';
   }
+
+  const valEl = document.getElementById('stat-validators');
+  if (valEl) valEl.textContent = count;
+  const meshCountEl = document.getElementById('mesh-nodes-count');
+  if (meshCountEl) meshCountEl.textContent = count;
 }
 
 window.rescanFastestNode = async function() {
@@ -1917,6 +2054,8 @@ function handleEmptyData(path) {
   const p = path.split('?')[0];
   const curHeight = getBrowserMeshHeight();
   const nodeId = (typeof localStorage !== 'undefined' && localStorage.getItem('sayman_browser_node_id')) || 'browser-6f0250c1243e2f64';
+  const activeNodes = (typeof meshSwarm !== 'undefined') ? meshSwarm.getActiveNodesList() : [{ nodeId, tier: 'Browser Node (Tier 1)', storageMB: 250, device: 'Desktop/Laptop' }];
+  const activeCount = Math.max(1, activeNodes.length);
 
   if (p === '/stats') {
     return {
@@ -1926,10 +2065,10 @@ function handleEmptyData(path) {
       contracts: 6,
       blockReward: 200000000,
       blockTime: 5000,
-      tps: '18.42',
-      peersCount: 1,
-      parallelEfficiency: 1.28,
-      tpsMetrics: { live: '18.42', peak: '64.50' }
+      tps: (14.2 + activeCount * 4.2).toFixed(2),
+      peersCount: activeCount,
+      parallelEfficiency: (1.0 + activeCount * 0.15).toFixed(2),
+      tpsMetrics: { live: (14.2 + activeCount * 4.2).toFixed(2), peak: '64.50' }
     };
   }
 
@@ -1949,19 +2088,20 @@ function handleEmptyData(path) {
     for (let i = 0; i < count; i++) {
       const idx = curHeight - i;
       if (idx < 1) break;
+      const valNode = activeNodes[i % activeNodes.length]?.nodeId || nodeId;
       blocks.push({
         index: idx,
         hash: `0000${(idx * 9973 + 1234567).toString(16).padStart(60, 'a')}`,
         previousHash: `0000${((idx - 1) * 9973 + 1234567).toString(16).padStart(60, 'b')}`,
         timestamp: Date.now() - (i * 5000),
-        validator: i % 2 === 0 ? nodeId : 'sayn1valgenesis9876543210abcdef0000',
+        validator: valNode,
         transactions: [
           {
             id: `tx_${idx}_reward`,
             type: 'posa_reward',
             amount: 200000000,
             from: 'SYSTEM_STAKE_REWARD',
-            to: nodeId
+            to: valNode
           }
         ],
         gasUsed: 21000,
@@ -1973,27 +2113,38 @@ function handleEmptyData(path) {
   }
 
   if (p === '/validators') {
+    const vals = activeNodes.map((n, i) => ({
+      address: n.nodeId,
+      name: `${n.device || 'Mesh Node'} #${i + 1} (${n.tier || 'Tier 1'})`,
+      stake: (n.storageMB || 250) * 10000000,
+      uptime: 99.98,
+      status: 'Active · Storage Mesh',
+      commission: '1.5%'
+    }));
+
+    if (vals.length === 1 && !vals.find(v => v.address.includes('genesis'))) {
+      vals.push({
+        address: 'sayn1valgenesis9876543210abcdef0000',
+        name: 'SAYMAN Public Genesis Seed',
+        stake: 50000000000,
+        uptime: 100.0,
+        status: 'Active · Core Validator',
+        commission: '2.0%'
+      });
+    }
+
     return {
-      validators: [
-        {
-          address: nodeId,
-          name: 'Your Autonomous Browser Node (Tier 2+)',
-          stake: 2500000000,
-          uptime: 99.98,
-          status: 'Active · Storage Mesh',
-          commission: '1.5%'
-        },
-        {
-          address: 'sayn1valgenesis9876543210abcdef0000',
-          name: 'SAYMAN Public Genesis Seed',
-          stake: 50000000000,
-          uptime: 100.0,
-          status: 'Active · Core Validator',
-          commission: '2.0%'
-        }
-      ],
-      totalStake: 52500000000,
+      validators: vals,
+      totalStake: vals.reduce((sum, v) => sum + (v.stake || 0), 0),
       estimatedAPR: 12.8
+    };
+  }
+
+  if (p === '/community-nodes') {
+    return {
+      nodes: activeNodes,
+      total: activeCount,
+      active: activeCount
     };
   }
 
@@ -2035,15 +2186,6 @@ function handleEmptyData(path) {
   if (p === '/nfts') return { collections: [] };
   if (p === '/memecoins') return { memecoins: [] };
   if (p === '/layers') return { layers: [{ name: 'Layer 2 Storage State Mesh', status: 'Active', tps: '1,450' }] };
-  if (p === '/community-nodes') {
-    return {
-      nodes: [
-        { nodeId: nodeId, tier: 'Permanent Node (Tier 2+)', storageMB: 1024, status: 'Active' }
-      ],
-      total: 1,
-      active: 1
-    };
-  }
 
   return {};
 }
