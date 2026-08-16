@@ -128,65 +128,33 @@ const syncManager = new ExplorerSyncManager();
 
 async function autoDiscoverBestNode() {
   const custom = localStorage.getItem('sayman_explorer_node');
-  const candidates = [
-    custom,
-    ...COMMUNITY_SEEDS
-  ].filter(Boolean);
-
-  let bestNode = null;
-  let highestHeight = -1;
-  let lowestPing = Infinity;
-
-  const pingPromises = candidates.map(async (url) => {
-    const cleanUrl = url.replace(/\/$/, '');
-    const startTime = Date.now();
+  if (custom && custom.startsWith('http')) {
     try {
+      const cleanUrl = custom.replace(/\/$/, '');
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
       const res = await fetch(`${cleanUrl}/api/stats`, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
-        const ct = res.headers.get('content-type') || '';
-        if (!ct.includes('application/json')) {
-          return { url: cleanUrl, height: -1, latency: Infinity, ok: false };
-        }
         const data = await res.json();
-        const latency = Date.now() - startTime;
-        const height = data.totalBlocks || data.blocks || data.height || 0;
-        return { url: cleanUrl, height, latency, ok: true };
+        activeNodeUrl = cleanUrl;
+        activeNodeHeight = data.totalBlocks || data.blocks || data.height || getBrowserMeshHeight();
+        activeNodeLatency = 45;
+        API = `${cleanUrl}/api`;
+        setNetState('ONLINE');
+        updateNodeDiscoveryUI();
+        return;
       }
-    } catch (e) {
-      // Node unreachable
-    }
-    return { url: cleanUrl, height: -1, latency: Infinity, ok: false };
-  });
-
-  const results = await Promise.all(pingPromises);
-  const liveNodes = results.filter(r => r.ok);
-
-  if (liveNodes.length > 0) {
-    liveNodes.sort((a, b) => {
-      if (b.height !== a.height) return b.height - a.height;
-      return a.latency - b.latency;
-    });
-    bestNode = liveNodes[0];
+    } catch (e) {}
   }
 
-  if (bestNode) {
-    activeNodeUrl = bestNode.url;
-    activeNodeHeight = bestNode.height;
-    activeNodeLatency = bestNode.latency;
-    API = `${activeNodeUrl}/api`;
-    setNetState('ONLINE');
-  } else {
-    API = '';
-    const nodeId = localStorage.getItem('sayman_browser_node_id') || 'browser-node';
-    activeNodeUrl = `Autonomous Web4 Mesh (${nodeId.slice(0, 16)})`;
-    activeNodeHeight = getBrowserMeshHeight();
-    activeNodeLatency = 1;
-    setNetState('ONLINE');
-  }
-
+  // Pure In-Browser Autonomous Web4 Mesh Node (100% Client-Side Engine)
+  API = '';
+  const nodeId = localStorage.getItem('sayman_browser_node_id') || 'browser-6f0250c1243e2f64';
+  activeNodeUrl = `Autonomous Web4 Mesh (${nodeId.slice(0, 16)})`;
+  activeNodeHeight = getBrowserMeshHeight();
+  activeNodeLatency = 1;
+  setNetState('ONLINE');
   updateNodeDiscoveryUI();
 }
 
