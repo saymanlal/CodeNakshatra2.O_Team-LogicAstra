@@ -471,31 +471,31 @@
     </div>
   </div>
 
-  <!-- ═══ VALIDATORS ═══ -->
+  <!-- ═══ VALIDATORS / STORAGE PROVIDERS ═══ -->
   <div id="validators" class="page">
     <div class="section">
-      <div class="section-header"><h2>Active Validators</h2></div>
+      <div class="section-header"><h2><i class="fas fa-server"></i> Storage Nodes &amp; Validators (Proof of Storage &amp; Availability)</h2></div>
 
       <div class="search-bar">
         <div class="search-wrapper">
           <i class="fas fa-search search-icon"></i>
-          <input type="text" id="validator-search" placeholder="Search validator by wallet address…" oninput="filterValidators()">
+          <input type="text" id="validator-search" placeholder="Search storage provider by wallet / node ID…" oninput="filterValidators()">
         </div>
       </div>
 
       <div class="val-summary">
-        <div class="val-summary-item"><span class="val-summary-label">Count</span><span class="val-summary-val" id="val-count">—</span></div>
-        <div class="val-summary-item"><span class="val-summary-label">Total Stake</span><span class="val-summary-val" id="val-total-stake">—</span></div>
-        <div class="val-summary-item"><span class="val-summary-label">Est. APR</span><span class="val-summary-val" id="val-apr">—</span></div>
+        <div class="val-summary-item"><span class="val-summary-label">Storage Providers</span><span class="val-summary-val" id="val-count">—</span></div>
+        <div class="val-summary-item"><span class="val-summary-label">Pledged Capacity</span><span class="val-summary-val" id="val-total-stake">—</span></div>
+        <div class="val-summary-item"><span class="val-summary-label">Storage APR</span><span class="val-summary-val" id="val-apr">—</span></div>
       </div>
 
       <table>
         <thead>
-          <tr><th>Address</th><th>Stake (SAYN)</th><th>Base Units</th><th>Share</th><th>Reputation</th><th>Missed Blocks</th><th>Status</th></tr>
+          <tr><th>Node / Provider ID</th><th>Pledged Allocation</th><th>Base Units</th><th>Network Share</th><th>Reputation</th><th>Missed Proofs</th><th>Consensus Status</th></tr>
         </thead>
-        <tbody id="validator-list"><tr><td colspan="7" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading validators…</td></tr></tbody>
+        <tbody id="validator-list"><tr><td colspan="7" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading storage providers…</td></tr></tbody>
       </table>
-      <p style="font-size:11px;color:var(--mono-400);margin-top:calc(var(--grid)*1)">Click any row to see blocks validated by that address.</p>
+      <p style="font-size:11px;color:var(--mono-400);margin-top:calc(var(--grid)*1)">Click any row to inspect blocks and storage availability verified by that provider.</p>
     </div>
   </div>
 
