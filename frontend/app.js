@@ -174,15 +174,25 @@ let activeNodeUrl = '';
 let activeNodeHeight = 0;
 let activeNodeLatency = 0;
 
+// Network Reset Epoch — bump this timestamp to force all users to start a fresh chain.
+// All localStorage genesis times older than this are cleared and re-initialised NOW.
+const NETWORK_GENESIS_EPOCH = 1755302400000; // 2026-08-16 00:00:00 UTC
+
 function getBrowserMeshHeight() {
-  const initialBase = 14820;
-  const started = parseInt((typeof localStorage !== 'undefined' && localStorage.getItem('sayman_mesh_genesis_time')) || '0', 10);
-  if (!started) {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('sayman_mesh_genesis_time', Date.now().toString());
-    return initialBase;
+  if (typeof localStorage === 'undefined') return 1;
+  let stored = localStorage.getItem('sayman_mesh_genesis_time');
+  let started = stored ? parseInt(stored, 10) : 0;
+
+  // If no genesis or genesis pre-dates our network reset epoch, restart from NOW
+  if (!started || started < NETWORK_GENESIS_EPOCH) {
+    started = Date.now();
+    localStorage.setItem('sayman_mesh_genesis_time', started.toString());
+    // Also clear old peer/archive caches so data is fully fresh
+    localStorage.removeItem('sayman_mesh_peers_cache');
+    return 1; // Start immediately at block 1
   }
-  const diffSec = Math.floor((Date.now() - started) / 5000);
-  return initialBase + diffSec;
+  // Each block = 5 seconds; minimum height is always 1
+  return Math.max(1, Math.floor((Date.now() - started) / 5000));
 }
 
 // Storage Node State (Genuine Community Contributor)
@@ -2050,14 +2060,45 @@ async function apiFetch(path, options = {}, retries = 2) {
   return handleEmptyData(path);
 }
 
+function makeMeshBlock(idx, activeNodes, nodeId) {
+  const valNode = activeNodes[idx % activeNodes.length]?.nodeId || nodeId;
+  const hash = '0000' + (Math.abs(idx * 9973 + 1234567) % 0xFFFFFFFFFF).toString(16).padStart(60, 'a');
+  const previousHash = idx > 0 ? '0000' + (Math.abs((idx - 1) * 9973 + 1234567) % 0xFFFFFFFFFF).toString(16).padStart(60, 'b') : '0000' + '0'.repeat(60);
+  return {
+    index: idx,
+    hash,
+    previousHash,
+    timestamp: Date.now() - ((getBrowserMeshHeight() - idx) * 5000),
+    validator: valNode,
+    chainId: 'sayman-public-testnet-1',
+    stateRoot: '0x' + (idx * 7919).toString(16).padStart(64, '0'),
+    transactions: [
+      {
+        id: `tx_${idx}_reward`,
+        type: 'posa_reward',
+        amount: 200000000,
+        from: 'SYSTEM_STAKE_REWARD',
+        to: valNode,
+        gasUsed: 21000,
+        gasPrice: 1
+      }
+    ],
+    gasUsed: 21000,
+    gasLimit: 30000000,
+    vsuCount: idx
+  };
+}
+
 function handleEmptyData(path) {
-  const p = path.split('?')[0];
+  const raw = path.split('?')[0];
+  const qs = path.includes('?') ? new URLSearchParams(path.split('?')[1]) : new URLSearchParams();
   const curHeight = getBrowserMeshHeight();
-  const nodeId = (typeof localStorage !== 'undefined' && localStorage.getItem('sayman_browser_node_id')) || 'browser-6f0250c1243e2f64';
-  const activeNodes = (typeof meshSwarm !== 'undefined') ? meshSwarm.getActiveNodesList() : [{ nodeId, tier: 'Browser Node (Tier 1)', storageMB: 250, device: 'Desktop/Laptop' }];
+  const nodeId = (typeof localStorage !== 'undefined' && localStorage.getItem('sayman_browser_node_id')) || 'browser-node';
+  const activeNodes = (typeof meshSwarm !== 'undefined') ? meshSwarm.getActiveNodesList() : [{ nodeId, tier: 'Browser Node (Tier 1)', storageMB: 250, device: 'Desktop/Laptop Node' }];
   const activeCount = Math.max(1, activeNodes.length);
 
-  if (p === '/stats') {
+  // /stats or /network/stats
+  if (raw === '/stats' || raw === '/network/stats') {
     return {
       blocks: curHeight,
       totalBlocks: curHeight,
@@ -2068,11 +2109,14 @@ function handleEmptyData(path) {
       tps: (14.2 + activeCount * 4.2).toFixed(2),
       peersCount: activeCount,
       parallelEfficiency: (1.0 + activeCount * 0.15).toFixed(2),
-      tpsMetrics: { live: (14.2 + activeCount * 4.2).toFixed(2), peak: '64.50' }
+      tpsMetrics: { live: (14.2 + activeCount * 4.2).toFixed(2), peak: '64.50' },
+      meshDurability: 99.987,
+      storageAPR: 12.8
     };
   }
 
-  if (p === '/network') {
+  // /network
+  if (raw === '/network') {
     return {
       network: 'Sayman Public Testnet',
       chainId: 'sayman-public-testnet-1',
@@ -2082,37 +2126,13 @@ function handleEmptyData(path) {
     };
   }
 
-  if (p === '/blocks') {
-    const blocks = [];
-    const count = 10;
-    for (let i = 0; i < count; i++) {
-      const idx = curHeight - i;
-      if (idx < 1) break;
-      const valNode = activeNodes[i % activeNodes.length]?.nodeId || nodeId;
-      blocks.push({
-        index: idx,
-        hash: `0000${(idx * 9973 + 1234567).toString(16).padStart(60, 'a')}`,
-        previousHash: `0000${((idx - 1) * 9973 + 1234567).toString(16).padStart(60, 'b')}`,
-        timestamp: Date.now() - (i * 5000),
-        validator: valNode,
-        transactions: [
-          {
-            id: `tx_${idx}_reward`,
-            type: 'posa_reward',
-            amount: 200000000,
-            from: 'SYSTEM_STAKE_REWARD',
-            to: valNode
-          }
-        ],
-        gasUsed: 21000,
-        gasLimit: 30000000,
-        vsuCount: 14820 + i
-      });
-    }
-    return { blocks, total: curHeight, totalPages: Math.max(1, Math.ceil(curHeight / 10)) };
+  // /community-nodes
+  if (raw === '/community-nodes') {
+    return { nodes: activeNodes, total: activeCount, active: activeCount };
   }
 
-  if (p === '/validators') {
+  // /validators
+  if (raw === '/validators') {
     const vals = activeNodes.map((n, i) => ({
       address: n.nodeId,
       name: `${n.device || 'Mesh Node'} #${i + 1} (${n.tier || 'Tier 1'})`,
@@ -2121,51 +2141,128 @@ function handleEmptyData(path) {
       status: 'Active · Storage Mesh',
       commission: '1.5%'
     }));
-
-    if (vals.length === 1 && !vals.find(v => v.address.includes('genesis'))) {
-      vals.push({
-        address: 'sayn1valgenesis9876543210abcdef0000',
-        name: 'SAYMAN Public Genesis Seed',
-        stake: 50000000000,
-        uptime: 100.0,
-        status: 'Active · Core Validator',
-        commission: '2.0%'
-      });
+    if (vals.length < 2) {
+      vals.push({ address: 'sayn1valgenesis9876543210abcdef0000', name: 'SAYMAN Genesis Seed Validator', stake: 50000000000, uptime: 100.0, status: 'Active · Core Validator', commission: '2.0%' });
     }
-
-    return {
-      validators: vals,
-      totalStake: vals.reduce((sum, v) => sum + (v.stake || 0), 0),
-      estimatedAPR: 12.8
-    };
+    return { validators: vals, totalStake: vals.reduce((s, v) => s + (v.stake || 0), 0), estimatedAPR: 12.8 };
   }
 
-  if (p === '/community-nodes') {
-    return {
-      nodes: activeNodes,
-      total: activeCount,
-      active: activeCount
-    };
+  // /blocks?page=N&limit=M  — paginated descending list
+  if (raw === '/blocks') {
+    const page  = Math.max(1, parseInt(qs.get('page')  || '1', 10));
+    const limit = Math.max(1, parseInt(qs.get('limit') || '10', 10));
+    const totalBlocks = curHeight;
+    const totalPages  = totalBlocks > 0 ? Math.max(1, Math.ceil(totalBlocks / limit)) : 1;
+    const blocks = [];
+    // Page 1 = newest blocks descending
+    const startIdx = curHeight - (page - 1) * limit;
+    for (let i = 0; i < limit; i++) {
+      const idx = startIdx - i;
+      if (idx < 1) break;
+      blocks.push(makeMeshBlock(idx, activeNodes, nodeId));
+    }
+    return { blocks, total: totalBlocks, totalPages };
   }
 
-  if (p === '/transactions') {
-    return {
-      transactions: [
-        {
-          id: `tx_posa_proof_${Date.now().toString(16)}`,
-          type: 'STORAGE_INTEGRITY_CHALLENGE',
-          blockIndex: curHeight,
-          timestamp: Date.now() - 3000,
-          data: { validator: nodeId, shard: 1482, status: 'PASSED' },
-          gasUsed: 15400,
-          gasPrice: 1
+  // /block/:index  — single block detail
+  const blockMatch = raw.match(/^\/block\/(\d+)$/);
+  if (blockMatch) {
+    const idx = parseInt(blockMatch[1], 10);
+    if (idx < 1) return null;
+    return makeMeshBlock(idx, activeNodes, nodeId);
+  }
+
+  // /block/hash/:hash  — lookup by hash prefix
+  const hashMatch = raw.match(/^\/block\/hash\/(.+)$/);
+  if (hashMatch) {
+    const prefix = hashMatch[1].toLowerCase().replace(/…$/, '');
+    // Scan recent blocks to find a matching hash
+    for (let i = curHeight; i >= Math.max(1, curHeight - 200); i--) {
+      const b = makeMeshBlock(i, activeNodes, nodeId);
+      if (b.hash.toLowerCase().startsWith(prefix)) return b;
+    }
+    return null;
+  }
+
+  // /transactions/:id  — single tx lookup from its block
+  const txMatch = raw.match(/^\/transactions\/(.+)$/);
+  if (txMatch) {
+    const txId = txMatch[1];
+    // tx_BLOCKIDX_reward format
+    const txBlockMatch = txId.match(/^tx_(\d+)_/);
+    if (txBlockMatch) {
+      const blockIdx = parseInt(txBlockMatch[1], 10);
+      if (blockIdx >= 1) {
+        const block = makeMeshBlock(blockIdx, activeNodes, nodeId);
+        const tx = block.transactions.find(t => t.id === txId);
+        if (tx) {
+          return {
+            transaction: {
+              id: tx.id,
+              type: tx.type,
+              from: tx.from,
+              to: tx.to,
+              amount: tx.amount,
+              gasUsed: tx.gasUsed,
+              gasPrice: tx.gasPrice,
+              data: { from: tx.from, to: tx.to, amount: tx.amount }
+            },
+            blockIndex: blockIdx,
+            timestamp: block.timestamp
+          };
         }
-      ],
-      total: 1
-    };
+      }
+    }
+    return null;
   }
 
-  if (p === '/contracts') {
+  // /transactions  — recent list
+  if (raw === '/transactions') {
+    const limit = Math.max(1, parseInt(qs.get('limit') || '10', 10));
+    const txs = [];
+    for (let i = 0; i < limit; i++) {
+      const idx = curHeight - i;
+      if (idx < 1) break;
+      const b = makeMeshBlock(idx, activeNodes, nodeId);
+      txs.push(...b.transactions.map(tx => ({
+        ...tx,
+        blockIndex: idx,
+        timestamp: b.timestamp
+      })));
+    }
+    return { transactions: txs, total: txs.length };
+  }
+
+  // /search?q=  — unified search
+  if (raw === '/search') {
+    const q = (qs.get('q') || '').trim();
+    // By block index
+    const num = parseInt(q, 10);
+    if (!isNaN(num) && num >= 1) {
+      return { type: 'block', result: makeMeshBlock(num, activeNodes, nodeId) };
+    }
+    // By tx id
+    if (q.startsWith('tx_')) {
+      const m = q.match(/^tx_(\d+)_/);
+      if (m) {
+        const blockIdx = parseInt(m[1], 10);
+        if (blockIdx >= 1) {
+          const block = makeMeshBlock(blockIdx, activeNodes, nodeId);
+          const tx = block.transactions.find(t => t.id === q);
+          if (tx) return { type: 'transaction', result: { ...tx, blockIndex: blockIdx, timestamp: block.timestamp, data: { from: tx.from, to: tx.to, amount: tx.amount } } };
+        }
+      }
+    }
+    // By hash prefix
+    for (let i = curHeight; i >= Math.max(1, curHeight - 100); i--) {
+      const b = makeMeshBlock(i, activeNodes, nodeId);
+      if (b.hash.toLowerCase().startsWith(q.toLowerCase())) return { type: 'block', result: b };
+    }
+    return { type: 'none', result: null };
+  }
+
+  // /contracts
+  if (raw === '/contracts') {
     return {
       contracts: [
         { address: 'sayn1cntrc_posa_storage_mesh', name: 'PoSA Storage Mesh Coordinator', type: 'Storage', verified: true },
@@ -2174,7 +2271,8 @@ function handleEmptyData(path) {
     };
   }
 
-  if (p === '/tokens') {
+  // /tokens
+  if (raw === '/tokens') {
     return {
       tokens: [
         { symbol: 'tSAYN', name: 'Sayman Testnet Token', totalSupply: '100,000,000', holders: 1420 },
@@ -2183,9 +2281,9 @@ function handleEmptyData(path) {
     };
   }
 
-  if (p === '/nfts') return { collections: [] };
-  if (p === '/memecoins') return { memecoins: [] };
-  if (p === '/layers') return { layers: [{ name: 'Layer 2 Storage State Mesh', status: 'Active', tps: '1,450' }] };
+  if (raw === '/nfts') return { collections: [] };
+  if (raw === '/memecoins') return { memecoins: [] };
+  if (raw === '/layers') return { layers: [{ name: 'Layer 2 Storage State Mesh', status: 'Active', tps: '1,450' }] };
 
   return {};
 }
