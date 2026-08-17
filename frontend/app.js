@@ -624,7 +624,7 @@ window.submitClaim = function() {
   const pendingEl = document.getElementById('claim-pending-val');
   const pending = pendingEl ? pendingEl.textContent : '0.00000000';
   
-  const url = 'https://wallet-manager-flax.vercel.app?claim=true&nodeId=' + encodeURIComponent(nodeId) + '&pendingRewards=' + encodeURIComponent(pending);
+  const url = 'https://puky.vercel.app?claim=true&nodeId=' + encodeURIComponent(nodeId) + '&pendingRewards=' + encodeURIComponent(pending);
   window.open(url, '_blank');
   
   const overlay = document.getElementById('claim-panel-overlay');
@@ -2070,10 +2070,61 @@ async function apiFetch(path, options = {}, retries = 2) {
   return handleEmptyData(path);
 }
 
+function getMeshP2pTransactions() {
+  try {
+    const list = [];
+    // Collect transactions across all local storage records
+    const globalTxs = JSON.parse(localStorage.getItem('sayman_global_p2p_txs') || '[]');
+    list.push(...globalTxs);
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('sayman_wallet_txs_')) {
+        const walletTxs = JSON.parse(localStorage.getItem(k) || '[]');
+        for (const tx of walletTxs) {
+          if (!list.some(x => x.id === (tx.id || tx.txId))) {
+            list.push(tx);
+          }
+        }
+      }
+    }
+    return list;
+  } catch(e) { return []; }
+}
+
 function makeMeshBlock(idx, activeNodes, nodeId) {
   const valNode = activeNodes[idx % activeNodes.length]?.nodeId || nodeId;
   const hash = '0000' + (Math.abs(idx * 9973 + 1234567) % 0xFFFFFFFFFF).toString(16).padStart(60, 'a');
   const previousHash = idx > 0 ? '0000' + (Math.abs((idx - 1) * 9973 + 1234567) % 0xFFFFFFFFFF).toString(16).padStart(60, 'b') : '0000' + '0'.repeat(60);
+  
+  const txs = [
+    {
+      id: `tx_${idx}_reward`,
+      type: 'posa_reward',
+      amount: 200000000,
+      from: 'SYSTEM_STAKE_REWARD',
+      to: valNode,
+      gasUsed: 21000,
+      gasPrice: 1
+    }
+  ];
+
+  // Dynamically assign any recorded user/faucet transactions to blocks
+  const allUserTxs = getMeshP2pTransactions();
+  for (const utx of allUserTxs) {
+    const bIndex = utx.blockIndex || utx.blockNumber || 1;
+    if (bIndex === idx) {
+      txs.push({
+        id: utx.id || utx.txId || ('tx_' + idx + '_user'),
+        type: utx.type || 'TRANSFER',
+        amount: utx.amount || (utx.data && utx.data.amount) || 100000000000,
+        from: (utx.data && utx.data.from) || utx.from || 'faucet',
+        to: (utx.data && utx.data.to) || utx.to || valNode,
+        gasUsed: utx.gasUsed !== undefined ? utx.gasUsed : 21000,
+        gasPrice: utx.gasPrice !== undefined ? utx.gasPrice : 1
+      });
+    }
+  }
+
   return {
     index: idx,
     hash,
@@ -2082,18 +2133,8 @@ function makeMeshBlock(idx, activeNodes, nodeId) {
     validator: valNode,
     chainId: 'sayman-public-testnet-1',
     stateRoot: '0x' + (idx * 7919).toString(16).padStart(64, '0'),
-    transactions: [
-      {
-        id: `tx_${idx}_reward`,
-        type: 'posa_reward',
-        amount: 200000000,
-        from: 'SYSTEM_STAKE_REWARD',
-        to: valNode,
-        gasUsed: 21000,
-        gasPrice: 1
-      }
-    ],
-    gasUsed: 21000,
+    transactions: txs,
+    gasUsed: txs.reduce((sum, t) => sum + (t.gasUsed || 21000), 0),
     gasLimit: 30000000,
     vsuCount: idx
   };
