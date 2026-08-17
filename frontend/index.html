@@ -171,7 +171,7 @@
         <div>
           <h2 style="margin-bottom:8px;"><i class="fas fa-server" style="color:var(--success); margin-right:8px;"></i> Contributor Status <span id="permanent-badge-el"></span></h2>
           <div style="font-size:13px; color:var(--mono-400); margin-bottom:4px;">Node ID: <span class="mono" id="mining-node-id">—</span> <button class="copy-data-btn" onclick="copyToClipboard(this, document.getElementById('mining-node-id').textContent)"><i class="fas fa-copy"></i></button></div>
-          <div style="font-size:13px; color:var(--mono-400); margin-bottom:4px;">Node URL: <span class="mono" id="mining-node-url" style="color:var(--success);font-weight:600;">https://sayman-blockchain.onrender.com</span> <button class="copy-data-btn" onclick="copyToClipboard(this, document.getElementById('mining-node-url').textContent)" title="Copy node URL to paste in Wallet / Faucet"><i class="fas fa-copy"></i> Copy URL</button></div>
+          <div style="font-size:13px; color:var(--mono-400); margin-bottom:4px;">Node URL: <span class="mono" id="mining-node-url" style="color:var(--success);font-weight:600;">https://sayman-testnet.vercel.app</span> <button class="copy-data-btn" onclick="copyToClipboard(this, document.getElementById('mining-node-url').textContent)" title="Copy node URL to paste in Wallet / Faucet"><i class="fas fa-copy"></i> Copy URL</button></div>
           <div style="font-size:13px; color:var(--mono-400); margin-bottom:4px;">Tier: <span id="mining-tier-label">—</span></div>
           <div style="font-size:13px; color:var(--mono-400);">Uptime: <span id="mining-uptime">0</span>s · Proofs Passed: <span id="mining-proofs">0</span></div>
         </div>
@@ -636,51 +636,44 @@ await client.callContract({
     <!-- ── Community Node URLs for Contributors ── -->
     <div class="section">
       <div class="section-header">
-        <h2><i class="fas fa-plug" style="margin-right:6px;"></i>Community Node URLs <span style="font-size:11px;font-weight:400;color:var(--mono-400);margin-left:8px;">— paste in Wallet or Faucet to connect</span></h2>
+        <h2><i class="fas fa-plug" style="margin-right:6px;"></i>Web4 Decentralized Mesh Nodes <span style="font-size:11px;font-weight:400;color:var(--mono-400);margin-left:8px;">— auto-connected in-browser</span></h2>
       </div>
       <p style="font-size:12px;color:var(--mono-400);margin-bottom:calc(var(--grid)*2);line-height:1.6;">
-        SAYMAN has no central server — it runs on decentralized community nodes. Copy any URL below and paste it into <strong>Wallet → Settings → Network Node</strong> or into the <strong>Faucet</strong> node field to connect.
+        SAYMAN is 100% serverless — powered natively by your browser's WebCrypto and Web4 P2P mesh storage. Every visitor automatically joins as an active contributor node.
       </p>
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead>
           <tr>
-            <th style="text-align:left;padding:8px 12px;border-bottom:var(--border);color:var(--mono-400);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Node</th>
-            <th style="text-align:left;padding:8px 12px;border-bottom:var(--border);color:var(--mono-400);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">URL</th>
-            <th style="text-align:left;padding:8px 12px;border-bottom:var(--border);color:var(--mono-400);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Use in</th>
+            <th style="text-align:left;padding:8px 12px;border-bottom:var(--border);color:var(--mono-400);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Node / Platform</th>
+            <th style="text-align:left;padding:8px 12px;border-bottom:var(--border);color:var(--mono-400);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Endpoint URL</th>
+            <th style="text-align:left;padding:8px 12px;border-bottom:var(--border);color:var(--mono-400);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Role</th>
             <th style="padding:8px 12px;border-bottom:var(--border);"></th>
           </tr>
         </thead>
         <tbody>
           <tr style="border-bottom:var(--border);">
-            <td style="padding:10px 12px;font-weight:600;">Community Node #1 (Render)</td>
-            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--success);">https://sayman-blockchain.onrender.com</td>
-            <td style="padding:10px 12px;color:var(--mono-400);">Wallet · Faucet</td>
-            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman-blockchain.onrender.com')"><i class="fas fa-copy"></i> Copy</button></td>
+            <td style="padding:10px 12px;font-weight:600;">SAYMAN Public Testnet</td>
+            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--success);">https://sayman-testnet.vercel.app</td>
+            <td style="padding:10px 12px;color:var(--mono-400);">Explorer · RPC</td>
+            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman-testnet.vercel.app')"><i class="fas fa-copy"></i> Copy</button></td>
           </tr>
           <tr style="border-bottom:var(--border);">
-            <td style="padding:10px 12px;font-weight:600;">Community Node #2 (Railway)</td>
-            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--success);">https://sayman.up.railway.app</td>
-            <td style="padding:10px 12px;color:var(--mono-400);">Wallet · Faucet</td>
-            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman.up.railway.app')"><i class="fas fa-copy"></i> Copy</button></td>
-          </tr>
-          <tr style="border-bottom:var(--border);">
-            <td style="padding:10px 12px;font-weight:600;">Community Node #3 (Render Backup)</td>
-            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--success);">https://sayman.onrender.com</td>
-            <td style="padding:10px 12px;color:var(--mono-400);">Wallet · Faucet</td>
-            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman.onrender.com')"><i class="fas fa-copy"></i> Copy</button></td>
+            <td style="padding:10px 12px;font-weight:600;">PUKY Web4 Wallet</td>
+            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--success);">https://sayman-wallet.vercel.app</td>
+            <td style="padding:10px 12px;color:var(--mono-400);">Wallet Hub</td>
+            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman-wallet.vercel.app')"><i class="fas fa-copy"></i> Copy</button></td>
           </tr>
           <tr style="border-bottom:var(--border);background:rgba(16,185,129,0.04);">
-            <td style="padding:10px 12px;font-weight:600;color:var(--success);">Faucet API</td>
-            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;">https://sayman-faucet.onrender.com</td>
-            <td style="padding:10px 12px;color:var(--mono-400);">Faucet URL field</td>
-            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman-faucet.onrender.com')"><i class="fas fa-copy"></i> Copy</button></td>
+            <td style="padding:10px 12px;font-weight:600;color:var(--success);">Web4 Mesh Faucet</td>
+            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--success);">https://sayman-faucet-site.vercel.app</td>
+            <td style="padding:10px 12px;color:var(--mono-400);">Token Faucet</td>
+            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman-faucet-site.vercel.app')"><i class="fas fa-copy"></i> Copy</button></td>
           </tr>
         </tbody>
       </table>
       <div style="margin-top:calc(var(--grid)*2);padding:calc(var(--grid)*2);background:var(--mono-950);border:var(--border);font-size:11px;color:var(--mono-400);line-height:1.7;">
-        <i class="fas fa-server" style="margin-right:4px;color:var(--mono-500);"></i>
-        <strong>Run your own node:</strong> Deploy SAYMAN to <a href="https://render.com" target="_blank" style="color:var(--mono-300);">Render</a> or <a href="https://railway.app" target="_blank" style="color:var(--mono-300);">Railway</a> using this <a href="https://github.com/saymanlal/SAYMAN" target="_blank" style="color:var(--mono-300);">GitHub repo</a>.
-        Once live, paste your node URL in <strong>Wallet → Settings → Network Node</strong>.
+        <i class="fas fa-network-wired" style="margin-right:4px;color:var(--mono-500);"></i>
+        <strong>Zero Setup Web4 Blockchain:</strong> No servers or command-line nodes are required. Simply opening the explorer or wallet turns your device into an active peer in the SAYMAN Web4 storage mesh.
       </div>
     </div>
   </div>
