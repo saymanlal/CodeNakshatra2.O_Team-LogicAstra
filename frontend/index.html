@@ -771,7 +771,7 @@ await client.callContract({
             <tr><td style="color:var(--mono-400);padding:4px 0;">Chain ID</td><td class="mono" id="wallet-chain-id" style="padding:4px 0;">82922 <button class="copy-data-btn" onclick="copyToClipboard(this,'82922')"><i class="fas fa-copy"></i></button></td></tr>
             <tr><td style="color:var(--mono-400);padding:4px 0;">Currency Symbol</td><td class="mono" id="wallet-symbol" style="padding:4px 0;">tSAYN <button class="copy-data-btn" onclick="copyToClipboard(this,'tSAYN')"><i class="fas fa-copy"></i></button></td></tr>
             <tr><td style="color:var(--mono-400);padding:4px 0;">RPC URL</td><td class="mono" id="wallet-rpc-url" style="padding:4px 0;font-size:10px;word-break:break-all;">—</td></tr>
-            <tr><td style="color:var(--mono-400);padding:4px 0;">Block Explorer</td><td class="mono" id="wallet-explorer-url" style="padding:4px 0;font-size:10px;word-break:break-all;">https://frontend-zeta-lac-36.vercel.app</td></tr>
+            <tr><td style="color:var(--mono-400);padding:4px 0;">Block Explorer</td><td class="mono" id="wallet-explorer-url" style="padding:4px 0;font-size:10px;word-break:break-all;">https://sayman-explorer.vercel.app</td></tr>
             <tr><td style="color:var(--mono-400);padding:4px 0;">Decimals (internal)</td><td class="mono" id="wallet-decimals" style="padding:4px 0;">8</td></tr>
           </table>
         </div>
@@ -803,6 +803,70 @@ await client.callContract({
         </div>
       </div>
     </div>
+
+    <!-- ── Community Node URLs for Contributors ── -->
+    <div class="section">
+      <div class="section-header">
+        <h2><i class="fas fa-plug" style="margin-right:6px;"></i>Community Node URLs <span style="font-size:11px;font-weight:400;color:var(--mono-400);margin-left:8px;">— paste in Wallet or Faucet to connect</span></h2>
+      </div>
+      <p style="font-size:12px;color:var(--mono-400);margin-bottom:calc(var(--grid)*2);line-height:1.6;">
+        SAYMAN has no central server — it runs on community nodes. Copy any URL below and paste it into <strong>Wallet → Settings → Network Node</strong> or into the <strong>Faucet</strong> node field to connect.
+      </p>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:8px 12px;border-bottom:var(--border);color:var(--mono-400);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Node</th>
+            <th style="text-align:left;padding:8px 12px;border-bottom:var(--border);color:var(--mono-400);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">URL</th>
+            <th style="text-align:left;padding:8px 12px;border-bottom:var(--border);color:var(--mono-400);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">Use in</th>
+            <th style="padding:8px 12px;border-bottom:var(--border);"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:var(--border);">
+            <td style="padding:10px 12px;font-weight:600;">Community Node #1</td>
+            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;">https://sayman-blockchain.onrender.com</td>
+            <td style="padding:10px 12px;color:var(--mono-400);">Wallet · Faucet</td>
+            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman-blockchain.onrender.com')"><i class="fas fa-copy"></i> Copy</button></td>
+          </tr>
+          <tr style="border-bottom:var(--border);">
+            <td style="padding:10px 12px;font-weight:600;">Community Node #2</td>
+            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;">https://sayman.up.railway.app</td>
+            <td style="padding:10px 12px;color:var(--mono-400);">Wallet · Faucet</td>
+            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman.up.railway.app')"><i class="fas fa-copy"></i> Copy</button></td>
+          </tr>
+          <tr style="border-bottom:var(--border);">
+            <td style="padding:10px 12px;font-weight:600;">Community Node #3</td>
+            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;">https://sayman.onrender.com</td>
+            <td style="padding:10px 12px;color:var(--mono-400);">Wallet · Faucet</td>
+            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman.onrender.com')"><i class="fas fa-copy"></i> Copy</button></td>
+          </tr>
+          <tr style="border-bottom:var(--border);background:rgba(16,185,129,0.04);">
+            <td style="padding:10px 12px;font-weight:600;color:var(--success);">Faucet API</td>
+            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;">https://sayman-faucet.onrender.com</td>
+            <td style="padding:10px 12px;color:var(--mono-400);">Faucet URL field</td>
+            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman-faucet.onrender.com')"><i class="fas fa-copy"></i> Copy</button></td>
+          </tr>
+          <tr style="border-bottom:var(--border);background:rgba(16,185,129,0.04);">
+            <td style="padding:10px 12px;font-weight:600;">Explorer</td>
+            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;">https://sayman-explorer.vercel.app</td>
+            <td style="padding:10px 12px;color:var(--mono-400);">Browser</td>
+            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman-explorer.vercel.app')"><i class="fas fa-copy"></i> Copy</button></td>
+          </tr>
+          <tr style="background:rgba(16,185,129,0.04);">
+            <td style="padding:10px 12px;font-weight:600;">Wallet (PUKY)</td>
+            <td style="padding:10px 12px;font-family:monospace;font-size:11px;word-break:break-all;">https://sayman-wallet.vercel.app</td>
+            <td style="padding:10px 12px;color:var(--mono-400);">Browser · Mobile</td>
+            <td style="padding:10px 12px;"><button class="copy-data-btn" onclick="copyToClipboard(this,'https://sayman-wallet.vercel.app')"><i class="fas fa-copy"></i> Copy</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top:calc(var(--grid)*2);padding:calc(var(--grid)*2);background:var(--mono-950);border:var(--border);font-size:11px;color:var(--mono-400);line-height:1.7;">
+        <i class="fas fa-server" style="margin-right:4px;color:var(--mono-500);"></i>
+        <strong>Run your own node:</strong> Deploy SAYMAN to <a href="https://render.com" target="_blank" style="color:var(--mono-300);">Render</a> or <a href="https://railway.app" target="_blank" style="color:var(--mono-300);">Railway</a> using this <a href="https://github.com/saymanlal/SAYMAN" target="_blank" style="color:var(--mono-300);">GitHub repo</a>.
+        Once live, paste your node URL in <strong>Wallet → Settings → Network Node</strong>. 
+        Your node will auto-join the P2P mesh and other users will discover it automatically.
+      </div>
+    </div>
   </div>
 
   <!-- ── Footer ── -->
@@ -815,13 +879,13 @@ await client.callContract({
     </span>
     <span class="footer-links">
       <a href="https://github.com/saymanlal/SAYMAN" target="_blank" rel="noopener"><i class="fab fa-github"></i> GitHub</a>
-      <a href="https://wallet-manager-flax.vercel.app/" target="_blank" rel="noopener"><i class="fas fa-wallet"></i> Wallet</a>
+      <a href="https://sayman-wallet.vercel.app/" target="_blank" rel="noopener"><i class="fas fa-wallet"></i> Wallet</a>
       <a href="https://sayman-faucet-site.vercel.app/" target="_blank" rel="noopener"><i class="fas fa-tint"></i> Faucet</a>
     </span>
   </footer>
 
 </div>
-<script src="crypto-client.js?v=24.0"></script>
-<script src="app.js?v=24.0"></script>
+<script src="crypto-client.js?v=25.0"></script>
+<script src="app.js?v=25.0"></script>
 </body>
 </html>
