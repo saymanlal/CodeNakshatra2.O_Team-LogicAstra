@@ -70,15 +70,11 @@
       <li class="nav-item"><button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')"><i class="fas fa-th-large"></i> Dashboard</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="explorer" onclick="showPage('explorer')"><i class="fas fa-search"></i> Explorer</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="storage-mining" onclick="showPage('storage-mining')"><i class="fas fa-database"></i> Storage & Mining (PoSA)</button></li>
-      <li class="nav-item"><button class="nav-btn" data-page="validators" onclick="showPage('validators')"><i class="fas fa-user-check"></i> Storage Nodes & Validators</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="validators" onclick="showPage('validators')"><i class="fas fa-user-check"></i> Storage Nodes &amp; Validators</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="transactions" onclick="showPage('transactions')"><i class="fas fa-exchange-alt"></i> Transactions</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="contracts" onclick="showPage('contracts')"><i class="fas fa-file-contract"></i> Contracts</button></li>
-      <li class="nav-item"><button class="nav-btn" data-page="tokens" onclick="showPage('tokens')"><i class="fas fa-coins"></i> Tokens</button></li>
-      <li class="nav-item"><button class="nav-btn" data-page="nfts" onclick="showPage('nfts')"><i class="fas fa-images"></i> NFTs</button></li>
-      <li class="nav-item"><button class="nav-btn" data-page="memecoins" onclick="showPage('memecoins')"><i class="fas fa-rocket"></i> Memecoins</button></li>
-      <li class="nav-item"><button class="nav-btn" data-page="layers" onclick="showPage('layers')"><i class="fas fa-layer-group"></i> Layers</button></li>
       <li class="nav-item"><button class="nav-btn" data-page="network" onclick="showPage('network')"><i class="fas fa-network-wired"></i> Network</button></li>
-       <li class="nav-item"><button class="nav-btn" data-page="docs" onclick="window.open('https://sayman-docs.vercel.app', '_blank')"><i class="fas fa-book"></i> Docs</button></li>
+      <li class="nav-item"><button class="nav-btn" data-page="docs" onclick="window.open('https://sayman-docs.vercel.app', '_blank')"><i class="fas fa-book"></i> Docs</button></li>
       <li class="nav-item" style="margin-left: auto; border-left: var(--border); border-right: none;">
         <button class="nav-btn" id="themeToggleBtn" onclick="toggleExplorerTheme()" title="Toggle Theme">
           <i class="fas fa-moon"></i> Theme
@@ -405,155 +401,7 @@
     </div>
   </div>
 
-  <!-- ═══ LAYERS ═══ -->
-  <div id="layers" class="page">
-    <div class="section">
-      <div class="section-header"><h2>📦 Multi-Layer Chains</h2></div>
-      <p style="color:var(--mono-400);font-size:13px;margin-bottom:calc(var(--grid)*3)">
-        SAYMAN supports Layer 1, Layer 2, and custom multi-layer chains. Anyone can create their own chain
-        (EVM-compatible style) anchored to the SAYMAN L1 via the Layer2Bridge contract.
-      </p>
-      <div class="stats-grid" style="margin-bottom:calc(var(--grid)*3)">
-        <div class="stat-card">
-          <div class="stat-label">This Chain Layer</div>
-          <div class="stat-value" id="layer-level">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Chain ID</div>
-          <div class="stat-value mono" id="layer-chain-id" style="font-size:14px">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Block Time</div>
-          <div class="stat-value"><span id="layer-blocktime">—</span><span class="stat-unit">ms</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Decimals</div>
-          <div class="stat-value" id="layer-decimals">—</div>
-        </div>
-      </div>
 
-      <div class="section" style="margin-bottom:calc(var(--grid)*4)">
-        <div class="section-header"><h3 style="font-size:14px">How to Create Your Own Chain</h3></div>
-        <div style="font-size:12px;color:var(--mono-300);line-height:1.8;">
-          <p><strong>1. Layer 2 Rollup (anchored to SAYMAN L1)</strong></p>
-          <pre style="background:var(--mono-950);padding:12px;overflow-x:auto;border:var(--border);font-size:11px;">import { ChainFactory } from './core/chain-factory.js';
-import Blockchain from './core/blockchain.js';
-
-const config = ChainFactory.createL2Config({
-  name: 'MyL2Chain',
-  chainId: 'my-l2-1',
-  apiPort: 11000,
-  l1RpcUrl: 'https://sayman.onrender.com',
-  l1Bridge: '&lt;BRIDGE_CONTRACT_ADDRESS&gt;',
-  genesis: { '&lt;YOUR_ADDRESS&gt;': 1_000_000_000 }
-});
-
-const chain = new Blockchain(config, './data/my-l2');
-await chain.initialize();</pre>
-
-          <p style="margin-top:12px"><strong>2. Independent Sidechain</strong></p>
-          <pre style="background:var(--mono-950);padding:12px;overflow-x:auto;border:var(--border);font-size:11px;">const config = ChainFactory.createSidechainConfig({
-  name: 'GameChain',
-  chainId: 'gamechain-1',
-  blockReward: 10_000_000,
-  minStake: 10_000_000,
-  genesis: { '&lt;DEV_WALLET&gt;': 100_000_000_000 }
-});</pre>
-
-          <p style="margin-top:12px"><strong>3. Custom Token (deploy on any chain)</strong></p>
-          <pre style="background:var(--mono-950);padding:12px;overflow-x:auto;border:var(--border);font-size:11px;">import { SaymanClient } from './sdk/client.js';
-const client = new SaymanClient({ rpcUrl: 'http://localhost:10000' });
-
-// Deploy token factory contract once, then:
-await client.callContract({
-  contractAddress: TOKEN_FACTORY_ADDR,
-  method: 'createToken',
-  args: { name: 'My Token', symbol: 'MTK', totalSupply: 1000000 },
-  wallet: myWallet,
-});</pre>
-
-          <p style="margin-top:12px"><strong>4. NFT Collection</strong></p>
-          <pre style="background:var(--mono-950);padding:12px;overflow-x:auto;border:var(--border);font-size:11px;">await client.callContract({
-  contractAddress: NFT_FACTORY_ADDR,
-  method: 'createCollection',
-  args: { name: 'CoolNFTs', symbol: 'COOL', maxSupply: 10000 },
-  wallet: myWallet,
-});</pre>
-        </div>
-      </div>
-
-      <div class="section" style="margin-top:calc(var(--grid)*4); margin-bottom:calc(var(--grid)*3)">
-        <div class="section-header"><h2>Active L2 / Sidechains</h2></div>
-        <table>
-          <thead>
-            <tr><th>Chain Name</th><th>Chain ID</th><th>Type</th><th>Sequencer Address</th><th>Block Height</th><th>Last Commitment</th><th>Status</th></tr>
-          </thead>
-          <tbody id="active-layers-list">
-            <tr><td colspan="7" style="padding:calc(var(--grid)*2);color:var(--mono-400);font-size:12px;text-align:center;">Loading active chains…</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ═══ TOKENS ═══ -->
-  <div id="tokens" class="page">
-    <div class="section">
-      <div class="section-header"><h2>Fungible Tokens</h2></div>
-      <div class="search-bar">
-        <div class="search-wrapper">
-          <i class="fas fa-search search-icon"></i>
-          <input type="text" id="token-search" placeholder="Search tokens by name or symbol…" oninput="filterTokens()">
-        </div>
-      </div>
-      <table>
-        <thead>
-          <tr><th>Token Name</th><th>Symbol</th><th>Contract Address</th><th>Total Supply</th><th>Holders</th><th>Type</th></tr>
-        </thead>
-        <tbody id="token-list">
-          <tr><td colspan="6" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading tokens…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- ═══ NFTS ═══ -->
-  <div id="nfts" class="page">
-    <div class="section">
-      <div class="section-header"><h2>NFT Collections</h2></div>
-      <div class="search-bar">
-        <div class="search-wrapper">
-          <i class="fas fa-search search-icon"></i>
-          <input type="text" id="nft-search" placeholder="Search NFT collections by name or symbol…" oninput="filterNFTs()">
-        </div>
-      </div>
-      <div id="nft-collection-grid" class="nft-grid-container">
-        <p style="color:var(--mono-400);font-size:12px;padding:calc(var(--grid)*2);">Loading collections…</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ MEMECOINS ═══ -->
-  <div id="memecoins" class="page">
-    <div class="section">
-      <div class="section-header"><h2>Memecoin Launchpad</h2></div>
-      <div class="search-bar">
-        <div class="search-wrapper">
-          <i class="fas fa-search search-icon"></i>
-          <input type="text" id="memecoin-search" placeholder="Search memecoins by name or symbol…" oninput="filterMemecoins()">
-        </div>
-      </div>
-      <table>
-        <thead>
-          <tr><th>Icon</th><th>Name</th><th>Symbol</th><th>Total Supply</th><th>Holders</th><th>Burn %</th><th>Tax %</th><th>Anti-Whale</th><th>Type</th></tr>
-        </thead>
-        <tbody id="memecoin-list">
-          <tr><td colspan="9" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;">Loading memecoins…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
 
   <!-- ═══ NETWORK ═══ -->
   <div id="network" class="page">
@@ -694,7 +542,7 @@ await client.callContract({
   </footer>
 
 </div>
-<script src="crypto-client.js?v=28.0"></script>
-<script src="app.js?v=28.0"></script>
+<script src="crypto-client.js?v=29.0"></script>
+<script src="app.js?v=29.0"></script>
 </body>
 </html>
