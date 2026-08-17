@@ -2152,7 +2152,7 @@ function handleEmptyData(path) {
       blocks: curHeight,
       totalBlocks: curHeight,
       mempool: 0,
-      contracts: 6,
+      contracts: 0,
       blockReward: 200000000,
       blockTime: 5000,
       tps: (14.2 + activeCount * 4.2).toFixed(2),
@@ -2313,26 +2313,20 @@ function handleEmptyData(path) {
   // /contracts
   if (raw === '/contracts') {
     return {
-      contracts: [
-        { address: 'sayn1cntrc_posa_storage_mesh', name: 'PoSA Storage Mesh Coordinator', type: 'Storage', verified: true },
-        { address: 'sayn1cntrc_erc20_tsayn_faucet', name: 'tSAYN Community Faucet', type: 'Token/Faucet', verified: true }
-      ]
+      contracts: []
     };
   }
 
   // /tokens
   if (raw === '/tokens') {
     return {
-      tokens: [
-        { symbol: 'tSAYN', name: 'Sayman Testnet Token', totalSupply: '100,000,000', holders: 1420 },
-        { symbol: 'VSU', name: 'Verified Storage Units', totalSupply: '500,000,000', holders: 890 }
-      ]
+      tokens: []
     };
   }
 
   if (raw === '/nfts') return { collections: [] };
   if (raw === '/memecoins') return { memecoins: [] };
-  if (raw === '/layers') return { layers: [{ name: 'Layer 2 Storage State Mesh', status: 'Active', tps: '1,450' }] };
+  if (raw === '/layers') return { layers: [] };
 
   return {};
 }
