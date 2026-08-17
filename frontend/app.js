@@ -1914,22 +1914,25 @@ async function showContractDetail(address) {
 async function loadNetwork() {
   try {
     const d = await apiFetch('/network/stats');
+    const height = d.blocks || d.blockHeight || d.totalBlocks || getBrowserMeshHeight();
+    const myId = localStorage.getItem('sayman_browser_node_id') || 'browser-mesh-node';
+    const activeNodes = (typeof meshSwarm !== 'undefined') ? meshSwarm.getActiveNodesList() : [{ nodeId: myId, tier: 'Browser Node (Tier 1)', storageMB: 250, device: 'Desktop/Laptop Node' }];
 
-    setEl('net-peers',     d.peers       ?? 0);
-    setEl('net-height',    d.blockHeight ?? 0);
-    setEl('net-blocktime', Math.round(d.averageBlockTime || 5000));
-    setEl('net-mempool',   d.mempool     ?? 0);
+    setEl('net-peers',     activeNodes.length);
+    setEl('net-height',    height);
+    setEl('net-blocktime', Math.round(d.blockTime || 5000));
+    setEl('net-mempool',   d.mempool ?? 0);
     const netNodeEl = document.getElementById('net-node-id');
-    if (netNodeEl) netNodeEl.innerHTML = (d.nodeId || '').slice(0, 32) + '… <button class="copy-data-btn" onclick="copyToClipboard(this, \'' + (d.nodeId || '') + '\')"><i class="fas fa-copy"></i></button>';
-    setEl('net-mode',      (d.mode    || '—').toUpperCase());
-    setEl('net-network',   d.network  || '—');
-    setEl('net-chain',     d.chainId  || '—');
-    setEl('net-uptime',    fmtUptime(d.uptime || 0));
+    if (netNodeEl) netNodeEl.innerHTML = myId + ' <button class="copy-data-btn" onclick="copyToClipboard(this, \'' + myId + '\')"><i class="fas fa-copy"></i></button>';
+    setEl('net-mode',      'AUTONOMOUS WEB4 MESH');
+    setEl('net-network',   d.network || 'Sayman Public Testnet');
+    setEl('net-chain',     d.chainId || 'sayman-public-testnet-1');
+    setEl('net-uptime',    fmtUptime(uptimeSeconds || 3600));
 
     const peerDiv = document.getElementById('peer-list');
     if (!peerDiv) return;
 
-    allPeers = d.peerList || [];
+    allPeers = activeNodes;
     renderPeers(allPeers);
 
   } catch (e) { console.error('Network:', e); }
