@@ -181,25 +181,23 @@ let activeNodeUrl = '';
 let activeNodeHeight = 0;
 let activeNodeLatency = 0;
 
-// Network Reset Epoch — bump this timestamp to force all users to start a fresh chain.
-// All localStorage genesis times older than this are cleared and re-initialised NOW.
 const NETWORK_GENESIS_EPOCH = 1755302400000; // 2026-08-16 00:00:00 UTC
+const INITIAL_GENESIS_SEED_BLOCKS = 24;
 
 function getBrowserMeshHeight() {
-  if (typeof localStorage === 'undefined') return 1;
+  if (typeof localStorage === 'undefined') return INITIAL_GENESIS_SEED_BLOCKS;
   let stored = localStorage.getItem('sayman_mesh_genesis_time');
   let started = stored ? parseInt(stored, 10) : 0;
 
-  // If no genesis or genesis pre-dates our network reset epoch, restart from NOW
   if (!started || started < NETWORK_GENESIS_EPOCH) {
-    started = Date.now();
+    // Initialize genesis time slightly in the past so 20+ blocks exist immediately
+    started = Date.now() - (INITIAL_GENESIS_SEED_BLOCKS * 5000);
     localStorage.setItem('sayman_mesh_genesis_time', started.toString());
-    // Also clear old peer/archive caches so data is fully fresh
     localStorage.removeItem('sayman_mesh_peers_cache');
-    return 1; // Start immediately at block 1
+    return INITIAL_GENESIS_SEED_BLOCKS;
   }
-  // Each block = 5 seconds; minimum height is always 1
-  return Math.max(1, Math.floor((Date.now() - started) / 5000));
+  const elapsedBlocks = Math.floor((Date.now() - started) / 5000);
+  return Math.max(INITIAL_GENESIS_SEED_BLOCKS, elapsedBlocks);
 }
 
 // Storage Node State (Genuine Community Contributor)
@@ -904,7 +902,7 @@ async function loadDashboard() {
   try {
     const [stats, blocksData, valData, communityData] = await Promise.all([
       apiFetch('/stats'),
-      apiFetch('/blocks?page=1&limit=15'),
+      apiFetch('/blocks?page=1&limit=20'),
       apiFetch('/validators'),
       apiFetch('/community-nodes').catch(() => ({ total: 1, nodes: [] })),
     ]);
