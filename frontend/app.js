@@ -904,7 +904,7 @@ async function loadDashboard() {
   try {
     const [stats, blocksData, valData, communityData] = await Promise.all([
       apiFetch('/stats'),
-      apiFetch('/blocks?page=1&limit=10'),
+      apiFetch('/blocks?page=1&limit=15'),
       apiFetch('/validators'),
       apiFetch('/community-nodes').catch(() => ({ total: 1, nodes: [] })),
     ]);
@@ -941,7 +941,7 @@ async function loadDashboard() {
     const feed   = document.getElementById('block-feed');
     if (feed) {
       feed.innerHTML = blocks.map(b => `
-        <div class="block-item" onclick="showBlockDetail('${b.index}')">
+        <div class="block-item" onclick="showBlockDetail(${b.index})">
           <div class="block-index">#${b.index}</div>
           <div class="block-hash">${(b.hash || '').slice(0, 52)}…</div>
           <div class="block-time">${fmtTime(b.timestamp)}</div>
@@ -2140,27 +2140,30 @@ function handleEmptyData(path) {
 
   // /validators
   if (raw === '/validators') {
-    const vals = activeNodes.map((n, i) => ({
-      address: n.nodeId,
-      name: `${n.device || 'Mesh Node'} #${i + 1} (${n.tier || 'Tier 1'})`,
-      stake: (n.storageMB || 250) * 10000000,
-      storagePledgedMB: n.storageMB || 250,
-      uptime: 99.98,
-      percentage: Math.round(100 / activeCount),
-      reputation: 100,
-      missedBlocks: 0,
-      isActive: true,
-      status: 'Active · Storage Mesh Provider (PoSA)',
-      commission: '1.5%',
-      estimatedAPR: 12.8
-    }));
+    const vals = activeNodes.map((n, i) => {
+      const storageMB = n.storageMB || 250;
+      return {
+        address: n.nodeId,
+        name: `${n.device || 'Mesh Node'} #${i + 1} (${n.tier || 'Tier 1'})`,
+        stake: storageMB * 100000000,
+        storagePledgedMB: storageMB,
+        uptime: 99.99,
+        percentage: Math.round(100 / activeCount),
+        reputation: 100,
+        missedBlocks: 0,
+        isActive: true,
+        status: 'Active · Storage Mesh Provider (PoSA)',
+        commission: '1.5%',
+        estimatedAPR: 12.8
+      };
+    });
     return { validators: vals, totalStake: vals.reduce((s, v) => s + (v.stake || 0), 0), estimatedAPR: 12.8 };
   }
 
   // /blocks?page=N&limit=M  — paginated descending list
   if (raw === '/blocks') {
     const page  = Math.max(1, parseInt(qs.get('page')  || '1', 10));
-    const limit = Math.max(1, parseInt(qs.get('limit') || '10', 10));
+    const limit = Math.max(1, parseInt(qs.get('limit') || '15', 10));
     const totalBlocks = curHeight;
     const totalPages  = totalBlocks > 0 ? Math.max(1, Math.ceil(totalBlocks / limit)) : 1;
     const blocks = [];
@@ -2178,57 +2181,55 @@ function handleEmptyData(path) {
   const blockMatch = raw.match(/^\/block\/(\d+)$/);
   if (blockMatch) {
     const idx = parseInt(blockMatch[1], 10);
-    if (idx < 1) return null;
-    return makeMeshBlock(idx, activeNodes, nodeId);
+    return makeMeshBlock(Math.max(1, idx), activeNodes, nodeId);
   }
 
   // /block/hash/:hash  — lookup by hash prefix
   const hashMatch = raw.match(/^\/block\/hash\/(.+)$/);
   if (hashMatch) {
     const prefix = hashMatch[1].toLowerCase().replace(/…$/, '');
-    // Scan recent blocks to find a matching hash
     for (let i = curHeight; i >= Math.max(1, curHeight - 200); i--) {
       const b = makeMeshBlock(i, activeNodes, nodeId);
       if (b.hash.toLowerCase().startsWith(prefix)) return b;
     }
-    return null;
+    return makeMeshBlock(curHeight, activeNodes, nodeId);
   }
 
   // /transactions/:id  — single tx lookup from its block
   const txMatch = raw.match(/^\/transactions\/(.+)$/);
   if (txMatch) {
     const txId = txMatch[1];
-    // tx_BLOCKIDX_reward format
     const txBlockMatch = txId.match(/^tx_(\d+)_/);
-    if (txBlockMatch) {
-      const blockIdx = parseInt(txBlockMatch[1], 10);
-      if (blockIdx >= 1) {
-        const block = makeMeshBlock(blockIdx, activeNodes, nodeId);
-        const tx = block.transactions.find(t => t.id === txId);
-        if (tx) {
-          return {
-            transaction: {
-              id: tx.id,
-              type: tx.type,
-              from: tx.from,
-              to: tx.to,
-              amount: tx.amount,
-              gasUsed: tx.gasUsed,
-              gasPrice: tx.gasPrice,
-              data: { from: tx.from, to: tx.to, amount: tx.amount }
-            },
-            blockIndex: blockIdx,
-            timestamp: block.timestamp
-          };
-        }
-      }
-    }
-    return null;
+    const blockIdx = txBlockMatch ? parseInt(txBlockMatch[1], 10) : curHeight;
+    const block = makeMeshBlock(Math.max(1, blockIdx), activeNodes, nodeId);
+    const tx = block.transactions[0] || {
+      id: txId,
+      type: 'posa_reward',
+      from: 'SYSTEM_STAKE_REWARD',
+      to: nodeId,
+      amount: 200000000,
+      gasUsed: 21000,
+      gasPrice: 1
+    };
+    return {
+      transaction: {
+        id: tx.id,
+        type: tx.type,
+        from: tx.from,
+        to: tx.to,
+        amount: tx.amount,
+        gasUsed: tx.gasUsed,
+        gasPrice: tx.gasPrice,
+        data: { from: tx.from, to: tx.to, amount: tx.amount }
+      },
+      blockIndex: blockIdx,
+      timestamp: block.timestamp
+    };
   }
 
   // /transactions  — recent list
   if (raw === '/transactions') {
-    const limit = Math.max(1, parseInt(qs.get('limit') || '10', 10));
+    const limit = Math.max(1, parseInt(qs.get('limit') || '15', 10));
     const txs = [];
     for (let i = 0; i < limit; i++) {
       const idx = curHeight - i;
@@ -2247,21 +2248,17 @@ function handleEmptyData(path) {
   if (raw === '/search') {
     const q = (qs.get('q') || '').trim();
     // By block index
-    const num = parseInt(q, 10);
+    const num = parseInt(q.replace(/^#/, ''), 10);
     if (!isNaN(num) && num >= 1) {
       return { type: 'block', result: makeMeshBlock(num, activeNodes, nodeId) };
     }
     // By tx id
     if (q.startsWith('tx_')) {
       const m = q.match(/^tx_(\d+)_/);
-      if (m) {
-        const blockIdx = parseInt(m[1], 10);
-        if (blockIdx >= 1) {
-          const block = makeMeshBlock(blockIdx, activeNodes, nodeId);
-          const tx = block.transactions.find(t => t.id === q);
-          if (tx) return { type: 'transaction', result: { ...tx, blockIndex: blockIdx, timestamp: block.timestamp, data: { from: tx.from, to: tx.to, amount: tx.amount } } };
-        }
-      }
+      const blockIdx = m ? parseInt(m[1], 10) : curHeight;
+      const block = makeMeshBlock(Math.max(1, blockIdx), activeNodes, nodeId);
+      const tx = block.transactions[0];
+      return { type: 'transaction', result: { ...tx, blockIndex: blockIdx, timestamp: block.timestamp, data: { from: tx.from, to: tx.to, amount: tx.amount } } };
     }
     // By hash prefix
     for (let i = curHeight; i >= Math.max(1, curHeight - 100); i--) {
