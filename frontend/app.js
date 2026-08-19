@@ -611,22 +611,60 @@ window.openClaimPanel = function() {
 
 window.submitClaim = function() {
   const input = document.getElementById('claim-wallet-input');
-  const wallet = input ? input.value.trim() : '';
-  if (!wallet) {
+  const walletAddr = input ? input.value.trim() : '';
+  if (!walletAddr) {
     showNotification('Please enter a wallet address.');
     return;
   }
-  localStorage.setItem('sayman_claim_wallet', wallet);
+  localStorage.setItem('sayman_claim_wallet', walletAddr);
   
-  const nodeId = localStorage.getItem('sayman_browser_node_id');
+  const nodeId = localStorage.getItem('sayman_browser_node_id') || 'storage-node';
   const pendingEl = document.getElementById('claim-pending-val');
-  const pending = pendingEl ? pendingEl.textContent : '0.00000000';
-  
-  const url = 'https://puky.vercel.app?claim=true&nodeId=' + encodeURIComponent(nodeId) + '&pendingRewards=' + encodeURIComponent(pending);
+  const pendingStr = pendingEl ? pendingEl.textContent.trim() : '0';
+  const pendingAmount = parseFloat(pendingStr) || 0;
+  const curHeight = getBrowserMeshHeight();
+
+  // Record the reward tx immediately into shared ledger so explorer can see it
+  if (pendingAmount > 0) {
+    const txId = 'tx_reward_' + Date.now().toString(16);
+    const rewardTx = {
+      id: txId,
+      type: 'REWARD',
+      timestamp: Date.now(),
+      time: Date.now(),
+      amount: pendingAmount,
+      blockIndex: curHeight,
+      blockNumber: curHeight,
+      data: { from: nodeId, to: walletAddr, amount: pendingAmount },
+      gasUsed: 0, gasPrice: 0
+    };
+    try {
+      const gl = JSON.parse(localStorage.getItem('sayman_global_p2p_txs') || '[]');
+      gl.unshift(rewardTx);
+      localStorage.setItem('sayman_global_p2p_txs', JSON.stringify(gl.slice(0, 200)));
+    } catch(e) {}
+
+    // Also credit to wallet balances key directly
+    try {
+      const addr = walletAddr.startsWith('0x') ? walletAddr : '0x' + walletAddr;
+      const balances = JSON.parse(localStorage.getItem('sayman_wallet_balances') || '{}');
+      balances[addr] = (balances[addr] || 0) + pendingAmount;
+      balances[walletAddr] = balances[addr];
+      localStorage.setItem('sayman_wallet_balances', JSON.stringify(balances));
+    } catch(e) {}
+
+    // Reset pending rewards counter
+    if (pendingEl) pendingEl.textContent = '0.00000000';
+    localStorage.setItem('sayman_claimed_rewards_total', '0');
+    localStorage.setItem('sayman_storage_pending_rewards', '0');
+  }
+
+  const url = 'https://puky.vercel.app?claim=true&nodeId=' + encodeURIComponent(nodeId) + '&pendingRewards=' + encodeURIComponent(pendingAmount);
   window.open(url, '_blank');
   
   const overlay = document.getElementById('claim-panel-overlay');
   if (overlay) overlay.style.display = 'none';
+  showNotification('Reward claim sent! Opening wallet to confirm.');
 };
 
 window.updateCalculator = function(val) {
@@ -1453,30 +1491,57 @@ async function loadTransactions() {
   if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="padding:calc(var(--grid)*3);color:var(--mono-400);font-size:12px;text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading transactions…</td></tr>`;
 
   try {
-    // Fetch all blocks (up to 500) and extract every transaction
-    const data = await apiFetch('/blocks?page=1&limit=500');
+    // Fetch blocks for block-anchored txs
+    const data = await apiFetch('/blocks?page=1&limit=200');
     const blocks = data.blocks || [];
 
     allTransactions = [];
+    const seenIds = new Set();
+
     for (const block of blocks) {
       for (const tx of (block.transactions || [])) {
+        const uid = tx.id || tx.txId || (tx.type + '_' + block.index);
+        if (seenIds.has(uid)) continue;
+        seenIds.add(uid);
         allTransactions.push({
-          id:           tx.id || '—',
-          type:         tx.type || 'UNKNOWN',
-          blockIndex:   block.index,
-          timestamp:    block.timestamp,
-          from:         tx.data?.from     || tx.data?.validator || null,
-          to:           tx.data?.to       || tx.data?.validator || null,
-          amount:       tx.data?.amount   ?? null,
-          gasUsed:      tx.gasUsed        ?? 0,
-          gasPrice:     tx.gasPrice       ?? 0,
-          data:         tx.data           || {},
+          id:         uid,
+          type:       tx.type || 'UNKNOWN',
+          blockIndex: block.index,
+          timestamp:  block.timestamp,
+          from:       tx.data?.from     || tx.from || null,
+          to:         tx.data?.to       || tx.to   || null,
+          amount:     tx.data?.amount   ?? tx.amount ?? null,
+          gasUsed:    tx.gasUsed        ?? 0,
+          gasPrice:   tx.gasPrice       ?? 0,
+          data:       tx.data           || {},
         });
       }
     }
 
+    // ── Always pull user p2p txs directly (faucet, transfer, reward, claim) ──
+    const userTxs = getMeshP2pTransactions();
+    const curHeight = getBrowserMeshHeight();
+    for (const utx of userTxs) {
+      const uid = utx.id || utx.txId || ('utx_' + (utx.timestamp || utx.time));
+      if (seenIds.has(uid)) continue;
+      seenIds.add(uid);
+      const blockIdx = utx.blockIndex || utx.blockNumber || curHeight;
+      allTransactions.push({
+        id:         uid,
+        type:       (utx.type || 'TRANSFER').toUpperCase(),
+        blockIndex: blockIdx,
+        timestamp:  utx.timestamp || utx.time || Date.now(),
+        from:       utx.data?.from || utx.from || null,
+        to:         utx.data?.to   || utx.to   || null,
+        amount:     utx.data?.amount ?? utx.amount ?? null,
+        gasUsed:    utx.gasUsed  ?? 0,
+        gasPrice:   utx.gasPrice ?? 0,
+        data:       utx.data || {},
+      });
+    }
+
     // Sort newest first
-    allTransactions.sort((a, b) => b.blockIndex - a.blockIndex || 0);
+    allTransactions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     txPage = 1;
     applyTxFilters();
@@ -1489,7 +1554,8 @@ async function loadTransactions() {
 
 function applyTxFilters() {
   const q = (document.getElementById('tx-search')?.value || '').trim().toLowerCase();
-  const rewardTypes = new Set(['REWARD', 'REWARD_FEE']);
+  // Only hide system-level PoSA block rewards, not user FAUCET / contributor REWARD claims
+  const rewardTypes = new Set(['posa_reward', 'POSA_REWARD', 'REWARD_FEE']);
 
   filteredTransactions = allTransactions.filter(tx => {
     // Reward filter
@@ -2106,17 +2172,24 @@ function makeMeshBlock(idx, activeNodes, nodeId) {
     }
   ];
 
-  // Dynamically assign any recorded user/faucet transactions to blocks
+  // Dynamically assign any recorded user/faucet/reward transactions to blocks
+  // Use time-window: tx belongs to block closest to its timestamp
   const allUserTxs = getMeshP2pTransactions();
+  const blockTimestamp = Date.now() - ((getBrowserMeshHeight() - idx) * 5000);
+  const BLOCK_WINDOW_MS = 5000; // 5 second window per block
   for (const utx of allUserTxs) {
-    const bIndex = utx.blockIndex || utx.blockNumber || 1;
-    if (bIndex === idx) {
+    const txTime = utx.timestamp || utx.time || 0;
+    const txBlockIdx = utx.blockIndex || utx.blockNumber || 0;
+    // Match by exact blockIndex OR by timestamp proximity (within this block's 5s window)
+    const timeMatch = txTime > 0 && Math.abs(txTime - blockTimestamp) < BLOCK_WINDOW_MS;
+    const indexMatch = txBlockIdx === idx;
+    if (indexMatch || timeMatch) {
       txs.push({
-        id: utx.id || utx.txId || ('tx_' + idx + '_user'),
-        type: utx.type || 'TRANSFER',
-        amount: utx.amount || (utx.data && utx.data.amount) || 100000000000,
-        from: (utx.data && utx.data.from) || utx.from || 'faucet',
-        to: (utx.data && utx.data.to) || utx.to || valNode,
+        id: utx.id || utx.txId || ('tx_' + idx + '_' + (utx.type || 'user')),
+        type: (utx.type || 'TRANSFER').toUpperCase(),
+        amount: utx.data?.amount ?? utx.amount ?? 0,
+        from: utx.data?.from || utx.from || 'faucet',
+        to: utx.data?.to || utx.to || valNode,
         gasUsed: utx.gasUsed !== undefined ? utx.gasUsed : 21000,
         gasPrice: utx.gasPrice !== undefined ? utx.gasPrice : 1
       });
